@@ -73,7 +73,10 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - **Cross-engine check:** Trino reads the partitioned table DuckDB wrote, including DuckDB's partition field name, and prunes partitions on `_batch_id`.
 - **Same I/O path for every engine.** Lakekeeper's S3 warehouses default to remote signing. Spark and PyIceberg would have silently signed every request through the catalog, while Trino, DuckDB and StarRocks use static keys. That is two different I/O paths behind one catalog, and the read numbers would not be comparable. Remote signing is now off, and every engine uses the same keys.
 - **Small hardening from the official examples:** a TCP Postgres healthcheck (the socket answers while the init server is still running), explicit catalog connection pools, `RUST_LOG=info`, and a hard delete profile.
-- _(next: ingestion of the first GHCN year, dbt bronze → gold on Trino, Cube on Trino)_
+- **First year ingested (GHCN 2025).** 1.31 GB of CSV (168 MB gzipped), 36.3 M source rows, cut into 12 monthly batches with overlap and revisions: 69.4 M bronze rows. DuckDB inserted each batch in 0.6–0.8 s (median ~9.2 M rows/s, ~330 MB/s of CSV) on the M profile (4 CPU / 8 GB), with each batch committed to Iceberg in one go.
+- **Gotcha:** a whole-table `GROUP BY` on the natural key exceeds Trino's default per-query memory on the M profile (~1.8 GB). Deduplication has to work per batch window, or Trino needs spill-to-disk.
+- **Gotcha:** sorting rows before writing halved the Parquet size (7.9 vs 16.5 MB per batch). Bronze keeps the source order to stay a faithful copy; sort order becomes a layout variable for B6.
+- _(next: dbt bronze → gold on Trino, Cube on Trino)_
 
 ### Phase 2 — benchmark
 

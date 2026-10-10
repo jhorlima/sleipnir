@@ -108,7 +108,7 @@ Versões pinadas em `.env`; nenhuma tag `latest`.
 - Downloads são idempotentes: arquivo já presente em `landing/` com o mesmo tamanho/ETag não é baixado de novo.
 
 ### Simulação de duplicados
-Ingestão em **lotes incrementais com janela sobreposta**: cada lote `n` inclui os últimos 30 dias do lote `n-1`, mais ~1% de linhas reemitidas com `value` alterado (simula revisão da fonte). Chave natural: `(station_id, date, element)`; vence o maior `_ingested_at`. Como `date` faz parte da chave, um duplicado sempre cai no mesmo batch temporal — isso viabiliza microbatch/insert_overwrite sem perder o dedup.
+Ingestão em **lotes incrementais com janela sobreposta**: cada lote `n` inclui os últimos 30 dias do lote `n-1`, mais ~1% de linhas reemitidas com `value` alterado (simula revisão da fonte). A revisão **substitui** a cópia sobreposta dentro do lote (uma linha por chave por lote), para que "vence o maior `_ingested_at`" nunca empate. Chave natural: `(station_id, date, element)`; vence o maior `_ingested_at`. Como `date` faz parte da chave, um duplicado sempre cai no mesmo batch temporal — isso viabiliza microbatch/insert_overwrite sem perder o dedup.
 
 ## 6. Orçamento de storage (≤ 10 GB)
 

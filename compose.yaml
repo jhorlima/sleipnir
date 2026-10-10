@@ -8,3 +8,5 @@ include:
     project_directory: .
   - path: compose/engines.yaml
     project_directory: .
+  - path: compose/ingest.yaml
+    project_directory: .
