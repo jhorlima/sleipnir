@@ -1,0 +1,8 @@
+name: sleipnir
+
+# project_directory keeps relative paths and the root .env shared by every included file.
+include:
+  - path: compose/storage.yaml
+    project_directory: .
+  - path: compose/proxy.yaml
+    project_directory: .

@@ -65,7 +65,9 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 
 - **Spike V4 — does dbt-trino support microbatch?** Yes, since dbt-trino 1.9.0. On Trino it is a `DELETE` + `INSERT` per batch filtered on `event_time` (it ignores `unique_key`), so each batch creates two Iceberg snapshots and position-delete files. Prediction: microbatch will need compaction more than any other strategy.
 - **Gotcha:** Trino renamed the native S3 switch from `fs.native-s3.enabled` to `fs.s3.enabled`.
-- _(next: storage + catalog up, spike V1 — can DuckDB write Iceberg through the REST catalog?)_
+- **Storage and catalog up** (RustFS 1.0.1, Postgres 18.6, Lakekeeper 0.14.0, Traefik 3.7). `make init` creates the bucket and the Iceberg warehouse and is safe to run twice.
+- **Gotchas:** RustFS answers its bare root with an S3-style 403 (the console lives under `/rustfs/console/`, so the proxy redirects). RustFS has no STS, so the Lakekeeper warehouse uses the `s3-compat` flavor with `sts-enabled: false` — engines either use remote signing or their own keys.
+- _(next: Trino on the REST catalog, spike V1 — can DuckDB write Iceberg through the REST catalog?)_
 
 ### Phase 2 — benchmark
 
