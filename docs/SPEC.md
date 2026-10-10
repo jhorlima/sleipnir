@@ -71,7 +71,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 | Catálogo | **Lakekeeper** (Iceberg REST) | Polaris, R2 Data Catalog | Backend Postgres. |
 | Formato | **Parquet + Iceberg v2** | Iceberg v3 (V6) | Codec e tamanho de arquivo definidos pelo B6. |
 | Ingestão | **DuckDB** | Airbyte (se precisar de conectores) | ⚠️ V1: escrita Iceberg via REST. |
-| Transformação | **dbt Core 1.x** (última estável) | dbt Core v2 quando houver adapter Trino/Postgres | `dbt-trino`, `dbt-spark`, `dbt-postgres`. |
+| Transformação | **dbt Core 1.12** + dbt-trino 1.10 (Trino 483) | dbt Core v2 quando houver adapter Trino/Postgres | `dbt-trino`, `dbt-spark`, `dbt-postgres`. |
 | Engines de transformação | **Trino**, **Spark 4.1.x** | — | Postgres como baseline. |
 | Engines de leitura | **StarRocks**, Trino, DuckDB, Postgres | — | StarRocks via external catalog. |
 | Aceleração | **StarRocks async MV**, Trino MV, **Cube Store** | — | §10.3. |
@@ -148,8 +148,9 @@ Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada �
 | `merge` (chave natural) | ✅ | ✅ | ✅ | Referência. No Spark, testar `write.merge.mode` copy-on-write × merge-on-read. |
 | `delete+insert` | ✅ | — | ✅ | Apaga a janela afetada e reinsere. |
 | `insert_overwrite` (partição) | — | ✅ | — | Reescreve só as partições tocadas pelo lote. |
-| `microbatch` (`event_time = date`, `batch_size = month`) | ⚠️ V4 | ✅ | ✅ | `concurrent_batches` com o mesmo valor em todos os engines. Tempo medido **por batch**. |
+| `microbatch` (`event_time = date`, `batch_size = month`) | ✅ | ✅ | ✅ | `concurrent_batches` com o mesmo valor em todos os engines. Tempo medido **por batch**. |
 
+- No Trino, o microbatch é `DELETE` + `INSERT` por batch filtrado por `event_time` (ignora `unique_key`; usa tabela temporária). Cada batch gera dois snapshots e position deletes, então a manutenção (§10.4) pesa mais nessa estratégia.
 - Janela incremental: datas presentes no último `_batch_id` + `lookback` igual à sobreposição dos lotes (30 dias).
 - Cada execução de B2 é de um engine × uma estratégia, a partir do mesmo estado inicial do bronze (`duckdb_bronze` é só lido).
 - **Correção do incremental:** ao fim de cada execução, o resultado incremental é comparado com um `--full-refresh` em `bench_*` (`audit_helper.compare_relations`). Divergência invalida a medição daquela estratégia.
@@ -419,7 +420,7 @@ docs/SPEC.en.md           # ao estabilizar
 | V1 | DuckDB escreve Iceberg via REST (Lakekeeper) | Fase 1, início | Parquet no S3 + CTAS via Trino |
 | V2 | Trino MV no conector Iceberg com catálogo REST | Fase 2 | Tabela equivalente via dbt |
 | V3 | StarRocks reescreve automaticamente para MV de join sobre Iceberg | Fase 2 | Documentar limitação; Cube aponta para a MV |
-| V4 | dbt-trino suporta `microbatch` | Fase 1 | Trino fica com `merge` e `delete+insert` |
+| V4 | ✅ Resolvido: dbt-trino suporta `microbatch` desde 1.9.0; `concurrent_batches` desde 1.10.2 (detalhes em `spikes/V4/README.md`). A validar na prática: `event_time` DATE comparado com literais TIMESTAMP e conflitos de commit com `concurrent_batches` | Fase 1 | — |
 | V5 | Limites atuais do free tier do R2 (storage, ops Class A/B) | Antes da fase 4 | Reduzir repetições/volume |
 | V6 | Iceberg v3: escrita no Trino, deletion vectors no StarRocks, suporte no Lakekeeper | Revisão periódica | Manter v2 |
 | V7 | Endpoints de métricas e integração OpenLineage de cada engine na versão pinada | Fase 4 | Manter só cAdvisor + `dbt-ol` |
