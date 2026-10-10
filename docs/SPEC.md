@@ -27,6 +27,7 @@
 - **Docker Compose** (sem Swarm): `deploy.resources.limits` (cpus/memory) por serviço, `profiles` para subir só o necessário e `include` para separar os arquivos por domínio.
 - **Um engine sob teste por vez:** nunca duas transformações ao mesmo tempo (ex.: Trino e Spark em paralelo). Dentro de uma execução, o dbt pode rodar models em paralelo com `threads = DBT_THREADS` (**mesmo valor para todos os engines**, padrão 4); o resto do paralelismo fica a cargo de cada engine.
 - Números absolutos vêm de uma VM em macOS; o valor está na **comparação relativa**.
+- **Disco:** os CSVs são baixados **antes** da ingestão para `LANDING_DIR` (padrão `./landing`; pode apontar para um SSD externo) e o DuckDB lê de lá — download nunca entra na medição. Para mais espaço no lake, mover a **imagem de disco do Docker Desktop** para o SSD (Settings → Resources → Disk image location) e manter os volumes nomeados: bind mount de disco externo passa pelo compartilhamento de arquivos da VM e adicionaria overhead de I/O ao RustFS.
 - **Rede:** nenhuma porta publicada por padrão. UIs HTTP via Traefik (`trino.localhost`, `starrocks.localhost`, `spark.localhost`, `cube.localhost`, `lakekeeper.localhost`, `rustfs.localhost`). O harness de benchmark roda num container na mesma rede e fala direto com os serviços, sem passar pelo proxy. Portas de banco (MySQL do StarRocks, Postgres, SQL API do Cube) são publicadas só em `127.0.0.1` e só quando for preciso usar um cliente local (ex.: DBeaver).
 
 ## 3. Arquitetura
