@@ -224,7 +224,7 @@ Uma única instância do Cube com **multi data source**:
 |---|---|---|
 | `trino` | `trino` | catálogo `lakehouse`, tabelas `lakehouse.trino_gold.*` |
 | `starrocks` | `mysql` (porta 9030 do FE) | nomes em três partes: `lakehouse.<gold_namespace>.<tabela>` |
-| `duckdb` | `duckdb` | init SQL carrega `iceberg`/`httpfs` e faz `ATTACH` no Lakekeeper |
+| `duckdb` | `duckdb` | DuckDB 1.5.5 **embutido no processo do Cube** (a ingestão usa 1.5.6). Extensões via `CUBEJS_DS_DUCKDB_DB_DUCKDB_EXTENSIONS`; `CREATE SECRET` + `ATTACH` no Lakekeeper exigem um `driverFactory` no `cube.js` (V13). Usa os limites de CPU/memória do container do Cube, não um perfil S/M/L |
 | `postgres` | `postgres` | schema `postgres_gold` |
 
 - O `data_source` é fixo em cada cube. Os membros são escritos uma vez em `cube/model/cubes/base/` (cubes `base_*`, data source placeholder, não públicos) e cada engine tem arquivos curtos em `cube/model/cubes/<engine>/` com `extends`, `data_source`, `sql_table` e só o que difere (percentis, joins e referências a outros cubes, que o `extends` não renomeia). Nomes com prefixo: `trino_weather_daily`, `starrocks_weather_daily`, etc. Sem Jinja.
@@ -293,7 +293,7 @@ Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+w
 | Cenário | Mecanismo | Como o Cube usa |
 |---|---|---|
 | **B5a** | **StarRocks async MV** `mv_weather_wide`: o SQL "cru" que o Cube gera — o tabelão `fct_weather_daily` × `dim_station` × `dim_date` com todas as colunas usadas pelos cubes. Propriedade `force_external_table_query_rewrite = true`; sessão com `enable_materialized_view_rewrite = true`. | O Cube continua lendo os marts; o otimizador do StarRocks reescreve a query para a MV. |
-| **B5b** | **Trino materialized view** equivalente no conector Iceberg (⚠️ V2). | Trino não reescreve automaticamente: o Cube aponta para a MV (via `sql_table` por variável). |
+| **B5b** | **Tabela equivalente à MV** no Trino: model dbt `table` `trino_gold.mv_weather_wide` com o mesmo SQL do B5a. O Trino 483 não cria MV no catálogo REST (V2). O "refresh" medido é `dbt run --select mv_weather_wide` | O Cube aponta para a tabela via `sql_table`, sem reescrita. |
 | **B5c** | **Cube Store** pre-aggregations (país × mês, estação × ano) sobre Trino e sobre StarRocks. | O Cube roteia para o Cube Store. |
 
 - DDL do B5a: `PARTITION BY date_trunc('month', date)`, `DISTRIBUTED BY HASH(station_id)` com buckets pelo volume (< 5M linhas → 4; 5–50M → 8; 50–200M → 16; > 200M → 32), `ORDER BY` pelas dimensões filtradas, `REFRESH MANUAL`. Não existe `CREATE OR REPLACE` para MV: recriar é `DROP` + `CREATE`.
@@ -445,18 +445,18 @@ docs/SPEC.en.md           # ao estabilizar
 | # | Validação | Quando | Fallback |
 |---|---|---|---|
 | V1 | ✅ Resolvido: DuckDB 1.5.6 escreve Iceberg v2 (CREATE, INSERT, particionado) via Lakekeeper com `ACCESS_DELEGATION_MODE 'none'` + secret S3 estático (detalhes em `spikes/V1/README.md`). Trino 483 lê as tabelas do DuckDB com poda de partição; Spark e StarRocks validados na fase 2 | Fase 1 | — |
-| V2 | Trino MV no conector Iceberg com catálogo REST | Fase 2 | Tabela equivalente via dbt |
+| V2 | ✅ Resolvido: **não suportado**. O Trino 483 responde `createMaterializedView is not supported for Iceberg REST catalog` (o `CREATE VIEW` lógico funciona); o código no master é igual. Fallback adotado no B5b (detalhes em `spikes/V2/README.md`). Revalidar a cada upgrade do Trino | Fase 2 | — |
 | V3 | StarRocks reescreve automaticamente para MV de join sobre Iceberg | Fase 2 | Documentar limitação; Cube aponta para a MV |
 | V4 | ✅ Resolvido: dbt-trino suporta `microbatch` desde 1.9.0; `concurrent_batches` desde 1.10.2 (detalhes em `spikes/V4/README.md`). A validar na prática: `event_time` DATE comparado com literais TIMESTAMP e conflitos de commit com `concurrent_batches` | Fase 1 | — |
 | V5 | Limites atuais do free tier do R2 (storage, ops Class A/B) | Antes da fase 6 | Reduzir repetições/volume |
 | V6 | Iceberg v3: escrita no Trino, deletion vectors no StarRocks, suporte no Lakekeeper | Revisão periódica | Manter v2 |
 | V7 | Endpoints de métricas e integração OpenLineage de cada engine na versão pinada | Fase 4 | Manter só cAdvisor + `dbt-ol` |
 | V8 | Cosmos `ExecutionMode.WATCHER` com Airflow 3 + CeleryExecutor + dbt-trino/dbt-spark | Fase 3 | `ExecutionMode.LOCAL` com `DbtTaskGroup` |
-| V9 | Medidas multi-stage e não aditivas do Cube com pre-aggregations no Cube Store | Fase 2 | Q7–Q10 ficam fora do B5c e o motivo é documentado |
+| V9 | Parcial (pesquisa, `spikes/V9/README.md`): Q9 (share, só somas) e Q10 (`time_shift` na granularidade exata país × mês) devem casar com rollups; Q7 (percentis) só num rollup na granularidade exata e com `granularity` na query; Q8 (`sub_query`) sem evidência. A confirmar na prova: se `dateRange` sem `granularity` casa com rollup | Fase 2 | Q7/Q8 ficam fora do B5c e o motivo é documentado |
 | V10 | STS do RustFS (AssumeRole) com a session policy do Lakekeeper → vended credentials para todos os engines | Fase 4 | Manter chaves estáticas |
 | V11 | Cosmos: `ExecutionMode.WATCHER` (dbt instalado na imagem do Airflow/worker) × `ExecutionMode.DOCKER` (dbt numa imagem própria, uma task por model) — overhead e isolamento | Fase 3 | `DockerOperator` chamando `dbt build` |
 | V12 | "Modo seguro": IdP OIDC leve (Dex ou Zitadel) + Lakekeeper com autenticação OIDC (sem OpenFGA) + vended credentials via STS do RustFS (depende do V10); engines com OAuth2 client credentials (DuckDB `CLIENT_ID`/`CLIENT_SECRET`/`OAUTH2_SERVER_URI`). Medido como cenário à parte; o cenário sem auth e com chaves estáticas segue como linha de base | Fase 4 | Manter chaves estáticas sem auth |
-| V13 | Driver `duckdb` do Cube com init SQL (`iceberg`/`httpfs` + `ATTACH` no Lakekeeper) e versão do DuckDB embutida na imagem do Cube | Fase 2 | Ler os marts via Postgres ou Trino e documentar |
+| V13 | Parcial (`spikes/V13/README.md`): o Cube v1.7.50 embute DuckDB 1.5.5; extensões por env, `CREATE SECRET` + `ATTACH` só via `driverFactory` no `cube.js`; o `ATTACH` com `ACCESS_DELEGATION_MODE 'none'` executa no 1.5.5. Pegadinhas: erro no init SQL é engolido e fica em cache até reiniciar o Cube (subir o Lakekeeper antes); `INSTALL` baixa extensões a cada start. A confirmar na prova: leitura real dos marts | Fase 2 | Ler os marts via Postgres ou Trino e documentar |
 
 ## 16. Publicação
 

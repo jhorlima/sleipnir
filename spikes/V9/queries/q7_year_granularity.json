@@ -1,0 +1,7 @@
+{
+  "measures": ["trino_weather.median_tmax", "trino_weather.p95_tmax"],
+  "dimensions": ["trino_weather.country"],
+  "timeDimensions": [{"dimension": "trino_weather.date", "granularity": "year", "dateRange": ["2025-01-01", "2025-12-31"]}],
+  "order": {"trino_weather.country": "asc"},
+  "limit": 50000
+}
