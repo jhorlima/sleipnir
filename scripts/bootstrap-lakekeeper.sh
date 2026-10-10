@@ -22,7 +22,8 @@ if echo "$warehouses" | grep -q "\"name\":\"$WAREHOUSE_NAME\""; then
   exit 0
 fi
 
-# RustFS has no STS, so credential vending stays off; engines use remote signing or their own keys.
+# STS and remote signing are off: every engine reads and writes with the same static S3 keys,
+# so no engine gets a different I/O path. Defaults are pinned so runs are reproducible.
 warehouse_request=$(cat <<JSON
 {
   "warehouse-name": "$WAREHOUSE_NAME",
@@ -34,8 +35,11 @@ warehouse_request=$(cat <<JSON
     "region": "$S3_REGION",
     "endpoint": "$S3_ENDPOINT",
     "path-style-access": true,
-    "sts-enabled": false
+    "sts-enabled": false,
+    "remote-signing-enabled": false,
+    "key-prefix": "$WAREHOUSE_NAME"
   },
+  "delete-profile": {"type": "hard"},
   "storage-credential": {
     "type": "s3",
     "credential-type": "access-key",

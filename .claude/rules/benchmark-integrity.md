@@ -10,3 +10,4 @@ Non-negotiable. These protect the published numbers. If a request conflicts with
 6. **Storage budget.** One execution (bronze + one writer's silver/gold + TPC-H) stays ≤ 10 GB; check with `make storage-report ENGINE=<engine>` before declaring a phase done.
 7. **TPC-H naming.** Results derived from TPC-H are labelled "derived from TPC-H, not comparable to published TPC-H results" (TPC fair-use policy).
 8. **No hidden work inside measured steps.** Measured dbt runs pass `--vars '{maintenance: false}'`; maintenance runs only as its own measured step (`dbt run-operation maintain_table`).
+9. **Resets are complete before the next run.** `DROP TABLE ... PURGE` deletes files asynchronously in Lakekeeper; a reset waits until the table prefix is empty (or wipes it) before the next measured step.

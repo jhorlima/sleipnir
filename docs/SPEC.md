@@ -62,7 +62,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 | `bench_*` | harness | tabelas temporárias de experimentos de layout (apagadas com `PURGE`) |
 | `postgres_bronze/silver/gold` | DuckDB + dbt-postgres | baseline, em schemas do Postgres (fora do lake) |
 
-- **Acesso ao S3:** o warehouse não tem STS, então não há vended credentials. O Trino 483 não oferece remote signing para o catálogo REST e usa chaves estáticas (`s3.aws-access-key`); Spark/StarRocks seguem o mesmo caminho salvo se a fase 2 mostrar outro; o DuckDB não suporta remote signing e usa `ACCESS_DELEGATION_MODE 'none'` + secret S3 estático (path-style, sem SSL).
+- **Acesso ao S3 — o mesmo caminho para todos os engines:** o warehouse tem `sts-enabled: false` e `remote-signing-enabled: false`, então todos leem e escrevem com as mesmas chaves S3 estáticas. Sem isso, Spark/PyIceberg cairiam em silêncio no remote signing pelo Lakekeeper, enquanto Trino (sem remote signing para REST), DuckDB e StarRocks (que não suportam) usariam chaves — caminhos de I/O diferentes contaminariam a comparação. Spark envia também `X-Iceberg-Access-Delegation: client-managed`; DuckDB usa `ACCESS_DELEGATION_MODE 'none'` + secret S3. Warehouse com `key-prefix: lakehouse` e `delete-profile: hard`.
 - Os readers leem `trino_gold` por padrão (`GOLD_NAMESPACE`). Cenário extra: ler `spark_gold` para medir o efeito do layout gerado por cada writer.
 
 ## 4. Componentes
@@ -388,7 +388,7 @@ docs/SPEC.en.md           # ao estabilizar
 | **0 — Specs** | Este documento | Aprovado; pendências viram spikes (§15) |
 | **1 — MVP lakehouse** | Spikes V1/V4; storage + Lakekeeper + Trino + Traefik; ingestão D1 (1 ano → dimensionar); dbt-trino bronze→gold com testes; Cube sobre Trino | `make up ingest dbt` do zero sem erro; testes dbt passam; Cube responde às 6 perguntas; `storage-report` dentro do teto |
 | **2 — Benchmark** | Harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
-| **3 — Orquestração** | Airflow 3 + Cosmos (`ExecutionMode.WATCHER`, CeleryExecutor) executando o fluxo do §9 | DAG ponta a ponta; tempos por model ≈ fase 2; overhead do orquestrador registrado |
+| **3 — Orquestração** | Airflow 3 + Cosmos (`ExecutionMode.WATCHER`, CeleryExecutor) executando o fluxo do §9; tarefas que não são dbt (ingestão DuckDB, manutenção, refresh de MV, harness) rodam como **containers** via `DockerOperator` com imagens do projeto, para a imagem do Airflow ter só Cosmos, o provider Docker e as connections dos engines | DAG ponta a ponta; tempos por model ≈ fase 2; overhead do orquestrador registrado |
 | **4 — Extras** | R2 (+ R2 Data Catalog); Superset via Cube; observabilidade e linhagem (§10.8); Polaris; Airbyte se necessário; `SPEC.en.md` | Resultado documentado por item |
 | **5 — Comparação de orquestração** | Dagster + dbt (`dagster-dbt`) executando o mesmo fluxo | Overhead Dagster × Airflow/Cosmos documentado |
 | **6 — Publicação** | README em inglês, resultados, gráficos, artigo (§16); CI no GitHub Actions (`docker compose config`, SQLFluff, `dbt parse`) | Repo público; CI verde; qualquer pessoa reproduz com `make` |
@@ -432,6 +432,8 @@ docs/SPEC.en.md           # ao estabilizar
 | V7 | Endpoints de métricas e integração OpenLineage de cada engine na versão pinada | Fase 4 | Manter só cAdvisor + `dbt-ol` |
 | V8 | Cosmos `ExecutionMode.WATCHER` com Airflow 3 + CeleryExecutor + dbt-trino/dbt-spark | Fase 3 | `ExecutionMode.LOCAL` com `DbtTaskGroup` |
 | V9 | Medidas multi-stage e não aditivas do Cube com pre-aggregations no Cube Store | Fase 2 | Q7–Q10 ficam fora do B5c e o motivo é documentado |
+| V10 | STS do RustFS (AssumeRole) com a session policy do Lakekeeper → vended credentials para todos os engines | Fase 4 | Manter chaves estáticas |
+| V11 | Cosmos: `ExecutionMode.WATCHER` (dbt instalado na imagem do Airflow/worker) × `ExecutionMode.DOCKER` (dbt numa imagem própria, uma task por model) — overhead e isolamento | Fase 3 | `DockerOperator` chamando `dbt build` |
 
 ## 16. Publicação
 

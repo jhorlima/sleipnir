@@ -71,6 +71,8 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - **Trino 483 on the REST catalog.** Single node, heap at 75% of the container limit, query memory left at Trino's defaults so it scales with each profile (M: 8 GB container → 6 GB heap → ~4.2 GB query pool). Iceberg v2 + Parquet + ZSTD by default.
 - **Gotchas:** behind Traefik the Trino UI answered `406` until `http-server.process-forwarded=true` (Trino rejects `X-Forwarded-*` headers by default). Trino has no remote signing for Iceberg REST, so it uses static S3 keys like DuckDB. Mounting a catalog folder hides the image's built-in `tpch`/`tpcds` catalogs.
 - **Cross-engine check:** Trino reads the partitioned table DuckDB wrote, including DuckDB's partition field name, and prunes partitions on `_batch_id`.
+- **Same I/O path for every engine.** Lakekeeper's S3 warehouses default to remote signing. Spark and PyIceberg would have silently signed every request through the catalog, while Trino, DuckDB and StarRocks use static keys. That is two different I/O paths behind one catalog, and the read numbers would not be comparable. Remote signing is now off, and every engine uses the same keys.
+- **Small hardening from the official examples:** a TCP Postgres healthcheck (the socket answers while the init server is still running), explicit catalog connection pools, `RUST_LOG=info`, and a hard delete profile.
 - _(next: ingestion of the first GHCN year, dbt bronze → gold on Trino, Cube on Trino)_
 
 ### Phase 2 — benchmark
