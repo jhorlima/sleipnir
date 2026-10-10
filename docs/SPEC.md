@@ -1,4 +1,4 @@
-# SPEC — ELT Lakehouse + Benchmark de Query Engines
+# SPEC — Sleipnir: ELT Lakehouse + Benchmark de Query Engines
 
 > Status: **v0.3** (2026-10-09) · Itens marcados com ⚠️ precisam ser validados antes/durante a implementação (§15).
 > Versão em inglês (`SPEC.en.md`) será gerada quando esta versão estabilizar.

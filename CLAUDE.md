@@ -1,4 +1,4 @@
-# ELT Lakehouse + Query Engine Benchmark
+# Sleipnir — ELT Lakehouse + Query Engine Benchmark
 
 Local lakehouse (DuckDB → Iceberg on RustFS/Lakekeeper → dbt on Trino/Spark/Postgres → StarRocks/Trino/DuckDB readers → Cube) built to benchmark ingestion, transformation and read latency. The end goal is a **public repo + article** (blog/LinkedIn) with reproducible numbers.
 
