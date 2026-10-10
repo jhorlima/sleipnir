@@ -1,0 +1,129 @@
+services:
+  rustfs:
+    image: rustfs/rustfs:${RUSTFS_VERSION:?set in .env}
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    deploy:
+      resources:
+        limits:
+          cpus: "${RUSTFS_CPUS:-1}"
+          memory: ${RUSTFS_MEMORY:-1g}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.rustfs.rule: Host(`rustfs.localhost`)
+      traefik.http.routers.rustfs.entrypoints: web
+      traefik.http.services.rustfs.loadbalancer.server.port: "9001"
+      # The console lives under /rustfs/console/; the bare root answers S3-style 403.
+      traefik.http.routers.rustfs.middlewares: rustfs-console-root
+      traefik.http.middlewares.rustfs-console-root.redirectregex.regex: ^https?://[^/]+/$$
+      traefik.http.middlewares.rustfs-console-root.redirectregex.replacement: /rustfs/console/
+
+  rustfs-create-bucket:
+    image: amazon/aws-cli:${AWS_CLI_VERSION:?set in .env}
+    profiles: [init]
+    entrypoint: ["bash", "/scripts/create-bucket.sh"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      AWS_REGION: ${S3_REGION:?set in .env}
+      AWS_ENDPOINT_URL: http://rustfs:9000
+      S3_BUCKET: ${S3_BUCKET:?set in .env}
+    volumes:
+      - ./scripts/create-bucket.sh:/scripts/create-bucket.sh:ro
+    depends_on:
+      rustfs:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:${POSTGRES_VERSION:?set in .env}
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      LAKEKEEPER_DB_PASSWORD: ${LAKEKEEPER_DB_PASSWORD:?set in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./config/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      # TCP, not the socket: the socket answers while the init-time server is still running.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    deploy:
+      resources:
+        limits:
+          cpus: "${POSTGRES_CPUS:-1}"
+          memory: ${POSTGRES_MEMORY:-512m}
+
+  lakekeeper-migrate:
+    image: quay.io/lakekeeper/catalog:${LAKEKEEPER_VERSION:?set in .env}
+    command: ["migrate"]
+    environment: &lakekeeper-environment
+      LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://lakekeeper:${LAKEKEEPER_DB_PASSWORD}@postgres:5432/lakekeeper
+      # Explicit pools so catalog commits never queue behind dbt threads and engines.
+      LAKEKEEPER__PG_WRITE_POOL_CONNECTIONS: ${LAKEKEEPER_PG_WRITE_POOL:-20}
+      LAKEKEEPER__PG_READ_POOL_CONNECTIONS: ${LAKEKEEPER_PG_READ_POOL:-20}
+      RUST_LOG: info
+      LAKEKEEPER__PG_ENCRYPTION_KEY: ${LAKEKEEPER_ENCRYPTION_KEY:?set in .env}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  lakekeeper:
+    image: quay.io/lakekeeper/catalog:${LAKEKEEPER_VERSION}
+    command: ["serve"]
+    environment: *lakekeeper-environment
+    healthcheck:
+      test: ["CMD", "/home/nonroot/lakekeeper", "healthcheck"]
+      start_period: 3s
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    deploy:
+      resources:
+        limits:
+          cpus: "${LAKEKEEPER_CPUS:-1}"
+          memory: ${LAKEKEEPER_MEMORY:-512m}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.lakekeeper.rule: Host(`lakekeeper.localhost`)
+      traefik.http.routers.lakekeeper.entrypoints: web
+      traefik.http.services.lakekeeper.loadbalancer.server.port: "8181"
+    depends_on:
+      lakekeeper-migrate:
+        condition: service_completed_successfully
+
+  lakekeeper-bootstrap:
+    image: amazon/aws-cli:${AWS_CLI_VERSION}
+    profiles: [init]
+    entrypoint: ["bash", "/scripts/bootstrap-lakekeeper.sh"]
+    environment:
+      LAKEKEEPER_URL: http://lakekeeper:8181
+      WAREHOUSE_NAME: ${LAKEKEEPER_WAREHOUSE:?set in .env}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION}
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    volumes:
+      - ./scripts/bootstrap-lakekeeper.sh:/scripts/bootstrap-lakekeeper.sh:ro
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      rustfs-create-bucket:
+        condition: service_completed_successfully
+
+volumes:
+  rustfs-data:
+  postgres-data:

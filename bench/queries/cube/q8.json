@@ -1,0 +1,5 @@
+{
+  "measures": ["trino_weather.median_station_annual_prcp"],
+  "dimensions": ["trino_weather.station_year"],
+  "order": {"trino_weather.station_year": "asc"}
+}

@@ -1,0 +1,48 @@
+services:
+  ingest:
+    image: sleipnir-ingest:${INGEST_VERSION:-0.1.0}
+    build: ./ingest
+    profiles: [ingest]
+    environment:
+      GHCN_YEARS: ${GHCN_YEARS:-2025}
+      BATCH: ${BATCH:-}
+      LANDING_DIR: /landing
+      S3_REGION: ${S3_REGION:?set in .env}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+      S3_ENDPOINT: rustfs:9000
+      LAKEKEEPER_CATALOG_URL: http://lakekeeper:8181/catalog
+      LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE:?set in .env}
+    volumes:
+      - ${LANDING_DIR:-./landing}:/landing
+    deploy:
+      resources:
+        limits:
+          cpus: "${ENGINE_CPUS:-4}"
+          memory: ${ENGINE_MEMORY:-8g}
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+
+  storage-report:
+    image: amazon/aws-cli:${AWS_CLI_VERSION:?set in .env}
+    profiles: [ingest]
+    entrypoint: ["bash", "/scripts/storage-report.sh"]
+    environment:
+      ENGINE: ${ENGINE:-trino}
+      STORAGE_BUDGET_GB: ${STORAGE_BUDGET_GB:-10}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      AWS_REGION: ${S3_REGION}
+      AWS_ENDPOINT_URL: http://rustfs:9000
+      LAKEKEEPER_URL: http://lakekeeper:8181
+      LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE}
+    volumes:
+      - ./scripts/storage-report.sh:/scripts/storage-report.sh:ro
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy

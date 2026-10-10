@@ -1,0 +1,124 @@
+# fct_weather_daily (one row per station and day) (SPEC §8.2, §8.3).
+# Engine cubes (cubes/<engine>/weather_daily.yml) extend base_weather_daily and set data_source and sql_table.
+# base_* cubes are never queried: placeholder data source, not public.
+# What an engine supplies because Cube cannot inherit it:
+#   - the percentile measures (median_tmax, p95_tmax, p95_prcp): the engine's own function;
+#   - the joins and total_prcp_country: they reference cubes by name (<engine>_stations, <engine>_dates);
+#   - the DOUBLE casts below, if the engine spells its double type differently.
+cubes:
+  - name: base_weather_daily
+    data_source: default
+    sql_table: placeholder.fct_weather_daily
+    public: false
+
+    joins:
+      - name: base_stations
+        relationship: many_to_one
+        sql: "{CUBE}.station_id = {base_stations}.station_id"
+      - name: base_dates
+        relationship: many_to_one
+        sql: "{CUBE}.date = {base_dates}.date"
+
+    dimensions:
+      - name: id
+        sql: "CONCAT({CUBE}.station_id, '|', CAST({CUBE}.date AS VARCHAR))"
+        type: string
+        primary_key: true
+        public: false
+      - name: station_id
+        sql: "{CUBE}.station_id"
+        type: string
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+
+    measures:
+      - name: observation_count
+        type: count
+      - name: station_count
+        sql: "{CUBE}.station_id"
+        type: count_distinct
+      - name: days_with_rain
+        type: count
+        filters:
+          - sql: "{CUBE}.prcp > 0"
+      - name: avg_tmax
+        sql: "CAST({CUBE}.tmax AS DOUBLE)"
+        type: avg
+      - name: avg_tmin
+        sql: "CAST({CUBE}.tmin AS DOUBLE)"
+        type: avg
+      - name: total_prcp
+        sql: "CAST({CUBE}.prcp AS DOUBLE)"
+        type: sum
+
+      # Derived ratios: never rolled up, so no cast on the result.
+      - name: temp_range
+        sql: "{avg_tmax} - {avg_tmin}"
+        type: number
+      - name: rain_day_ratio
+        sql: "CAST({days_with_rain} AS DOUBLE) / NULLIF({observation_count}, 0)"
+        type: number
+        format: percent
+
+      # Q5: 7-day moving average (the window ends on the row's day).
+      - name: avg_tmax_7d
+        sql: "CAST({CUBE}.tmax AS DOUBLE)"
+        type: avg
+        rolling_window:
+          trailing: 7 day
+
+      # Share of total (multi-stage). The *_total helpers are hidden from the view.
+      - name: total_prcp_all
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: sum
+        grain:
+          keep_only: []
+      - name: prcp_share_of_total
+        multi_stage: true
+        sql: "{total_prcp} / NULLIF({total_prcp_all}, 0)"
+        type: number
+        format: percent
+      - name: total_prcp_country
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: sum
+        grain:
+          keep_only: [base_stations.country]
+      - name: prcp_share_of_country
+        multi_stage: true
+        sql: "{total_prcp} / NULLIF({total_prcp_country}, 0)"
+        type: number
+        format: percent
+
+      # Period over period (multi-stage time_shift). The *_prior_* helpers are hidden from the view
+      # except avg_tmax_prior_year, which SPEC §8.3 exposes.
+      - name: avg_tmax_prior_year
+        multi_stage: true
+        sql: "{avg_tmax}"
+        type: number
+        time_shift:
+          - time_dimension: date
+            interval: 1 year
+            type: prior
+      - name: tmax_yoy_delta
+        multi_stage: true
+        sql: "{avg_tmax} - {avg_tmax_prior_year}"
+        type: number
+      - name: total_prcp_prior_month
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: number
+        time_shift:
+          - time_dimension: date
+            interval: 1 month
+            type: prior
+      - name: prcp_mom_ratio
+        multi_stage: true
+        sql: "{total_prcp} / NULLIF({total_prcp_prior_month}, 0)"
+        type: number
+
+    # Cube Store rollups (monthly_country, yearly_station) are added here in B5c (SPEC §8.4).
+    pre_aggregations: []
+

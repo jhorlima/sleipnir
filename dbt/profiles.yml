@@ -1,0 +1,14 @@
+# One output per engine; DBT_TARGET picks it. Schemas come from generate_schema_name.
+sleipnir:
+  target: "{{ env_var('DBT_TARGET', 'trino') }}"
+  outputs:
+    trino:
+      type: trino
+      method: none
+      user: dbt
+      host: trino
+      port: 8080
+      http_scheme: http
+      database: lakehouse
+      schema: trino
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"

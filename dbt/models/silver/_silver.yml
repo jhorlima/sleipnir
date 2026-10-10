@@ -1,0 +1,96 @@
+version: 2
+
+models:
+  - name: ghcn_daily
+    description: Typed, QC-filtered and deduplicated GHCN-Daily observations (one row per station, date and element).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [station_id, date, element]
+    columns:
+      - name: station_id
+        data_tests: [not_null]
+      - name: date
+        data_tests: [not_null]
+      - name: element
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [TMAX, TMIN, PRCP, SNOW, SNWD]
+      - name: value
+        description: TMAX/TMIN in °C, PRCP/SNOW/SNWD in mm.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -90
+                max_value: 60
+              config:
+                where: "element in ('TMAX', 'TMIN')"
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+              config:
+                where: "element = 'PRCP'"
+
+  - name: stations
+    description: GHCN stations with the country name from ghcnd-countries.
+    columns:
+      - name: station_id
+        data_tests: [unique, not_null]
+      - name: country_code
+        data_tests: [not_null]
+      - name: latitude
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -90
+                max_value: 90
+      - name: longitude
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -180
+                max_value: 180
+
+unit_tests:
+  - name: ghcn_daily_keeps_latest_revision
+    description: Among revisions of the same key, the largest _ingested_at wins; QC-flagged rows are dropped.
+    model: ghcn_daily
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: source('duckdb_bronze', 'ghcn_daily_raw')
+        rows:
+          - {id: ST1, date: "20250105", element: PRCP, value: 10, q_flag: null, _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+          - {id: ST1, date: "20250105", element: PRCP, value: 30, q_flag: null, _batch_id: 202502, _ingested_at: "2026-02-01 00:00:00 UTC"}
+          - {id: ST2, date: "20250105", element: PRCP, value: 50, q_flag: null, _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+          - {id: ST2, date: "20250105", element: PRCP, value: 70, q_flag: "I", _batch_id: 202502, _ingested_at: "2026-02-01 00:00:00 UTC"}
+          - {id: ST3, date: "20250105", element: PRCP, value: 90, q_flag: "D", _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+    expect:
+      rows:
+        - {station_id: ST1, date: "2025-01-05", element: PRCP, value: 3.0, _batch_id: 202502}
+
+  - name: ghcn_daily_converts_units
+    description: TMAX/TMIN/PRCP go from tenths to units; SNOW/SNWD stay in mm; other elements are dropped.
+    model: ghcn_daily
+    overrides:
+      macros:
+        is_incremental: false
+    given:
+      - input: source('duckdb_bronze', 'ghcn_daily_raw')
+        rows:
+          - {id: ST1, date: "20250105", element: TMAX, value: 253, q_flag: null, _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+          - {id: ST1, date: "20250105", element: TMIN, value: -41, q_flag: null, _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+          - {id: ST1, date: "20250105", element: PRCP, value: 125, q_flag: null, _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+          - {id: ST1, date: "20250105", element: SNOW, value: 40, q_flag: null, _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+          - {id: ST1, date: "20250105", element: SNWD, value: 120, q_flag: null, _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+          - {id: ST1, date: "20250105", element: TAVG, value: 100, q_flag: null, _batch_id: 202501, _ingested_at: "2026-01-01 00:00:00 UTC"}
+    expect:
+      rows:
+        - {station_id: ST1, date: "2025-01-05", element: TMAX, value: 25.3}
+        - {station_id: ST1, date: "2025-01-05", element: TMIN, value: -4.1}
+        - {station_id: ST1, date: "2025-01-05", element: PRCP, value: 12.5}
+        - {station_id: ST1, date: "2025-01-05", element: SNOW, value: 40.0}
+        - {station_id: ST1, date: "2025-01-05", element: SNWD, value: 120.0}

@@ -1,0 +1,127 @@
+# Semantic layer (SPEC §8): Cube API + refresh worker on top of the engines, Cube Store for pre-aggregations.
+# No depends_on on the engines: each engine is started on its own, with its profile, like dbt.
+x-cube-env-common: &cube-env-common
+  CUBEJS_DEV_MODE: "false"
+  CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:?set in .env}
+  CUBEJS_TESSERACT_SQL_PLANNER: "true"
+  CUBEJS_SCHEDULED_REFRESH_TIMEZONES: UTC
+  CUBEJS_CUBESTORE_HOST: cubestore-router
+  CUBEJS_LOG_LEVEL: warn
+
+  # Cube refuses CUBEJS_DATASOURCES without `default`, which reads the un-prefixed CUBEJS_DB_* vars.
+  # No cube uses it: it is an in-memory DuckDB, so it needs no running engine and never fails /readyz.
+  CUBEJS_DATASOURCES: default,trino
+  CUBEJS_DB_TYPE: duckdb
+
+  CUBEJS_DS_TRINO_DB_TYPE: trino
+  CUBEJS_DS_TRINO_DB_HOST: trino
+  CUBEJS_DS_TRINO_DB_PORT: "8080"
+  CUBEJS_DS_TRINO_DB_USER: cube
+  CUBEJS_DS_TRINO_DB_PRESTO_CATALOG: lakehouse
+  CUBEJS_DS_TRINO_DB_SCHEMA: trino_gold
+
+x-cube-healthcheck: &cube-healthcheck
+  test: ["CMD", "node", "-e", "fetch('http://localhost:4000/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+  start_period: 60s
+  start_interval: 3s
+  interval: 30s
+  timeout: 10s
+  retries: 3
+
+# Cube Store images have no curl: probe the status port (/readyz) with bash's /dev/tcp.
+x-cubestore-healthcheck: &cubestore-healthcheck
+  test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/3031 && printf 'GET /readyz HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q 200"]
+  start_period: 60s
+  start_interval: 3s
+  interval: 30s
+  timeout: 10s
+  retries: 3
+
+services:
+  cube-api:
+    image: cubejs/cube:${CUBE_VERSION:?set in .env}
+    profiles: [cube]
+    environment:
+      <<: *cube-env-common
+      CUBEJS_REFRESH_WORKER: "false"
+      CUBEJS_SQL_USER: cube
+      CUBEJS_SQL_PASSWORD: ${CUBE_SQL_PASSWORD:?set in .env}
+      CUBEJS_PG_SQL_PORT: "15432"
+    volumes:
+      - ./cube/model:/cube/conf/model:ro
+    healthcheck: *cube-healthcheck
+    deploy:
+      resources:
+        limits:
+          cpus: "${CUBE_API_CPUS:-1}"
+          memory: ${CUBE_API_MEMORY:-1g}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.cube.rule: Host(`cube.localhost`)
+      traefik.http.routers.cube.entrypoints: web
+      traefik.http.services.cube.loadbalancer.server.port: "4000"
+    depends_on:
+      cubestore-router:
+        condition: service_healthy
+
+  cube-refresh-worker:
+    image: cubejs/cube:${CUBE_VERSION}
+    profiles: [cube]
+    environment:
+      <<: *cube-env-common
+      CUBEJS_REFRESH_WORKER: "true"
+    volumes:
+      - ./cube/model:/cube/conf/model:ro
+    healthcheck: *cube-healthcheck
+    deploy:
+      resources:
+        limits:
+          cpus: "${CUBE_REFRESH_WORKER_CPUS:-0.5}"
+          memory: ${CUBE_REFRESH_WORKER_MEMORY:-512m}
+    depends_on:
+      cubestore-router:
+        condition: service_healthy
+
+  cubestore-router:
+    image: cubejs/cubestore:${CUBE_VERSION}${CUBESTORE_ARCH_SUFFIX:-}
+    profiles: [cube]
+    environment:
+      CUBESTORE_SERVER_NAME: cubestore-router:9999
+      CUBESTORE_META_PORT: "9999"
+      CUBESTORE_WORKERS: cubestore-worker:10001
+      CUBESTORE_REMOTE_DIR: /cube/data
+      CUBESTORE_LOG_LEVEL: warn
+    volumes:
+      - cubestore-data:/cube/data
+    healthcheck: *cubestore-healthcheck
+    deploy:
+      resources:
+        limits:
+          cpus: "${CUBESTORE_ROUTER_CPUS:-0.5}"
+          memory: ${CUBESTORE_ROUTER_MEMORY:-512m}
+    depends_on:
+      cubestore-worker:
+        condition: service_started
+
+  cubestore-worker:
+    image: cubejs/cubestore:${CUBE_VERSION}${CUBESTORE_ARCH_SUFFIX:-}
+    profiles: [cube]
+    environment:
+      CUBESTORE_SERVER_NAME: cubestore-worker:10001
+      CUBESTORE_WORKER_PORT: "10001"
+      CUBESTORE_META_ADDR: cubestore-router:9999
+      CUBESTORE_WORKERS: cubestore-worker:10001
+      CUBESTORE_REMOTE_DIR: /cube/data
+      CUBESTORE_LOG_LEVEL: warn
+    volumes:
+      - cubestore-data:/cube/data
+    # No healthcheck: a worker is only ready once the router is up, and the router waits for the
+    # worker to start; the router's /readyz covers the pair.
+    deploy:
+      resources:
+        limits:
+          cpus: "${CUBESTORE_WORKER_CPUS:-1}"
+          memory: ${CUBESTORE_WORKER_MEMORY:-1g}
+
+volumes:
+  cubestore-data:

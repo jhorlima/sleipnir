@@ -1,0 +1,83 @@
+version: 2
+
+models:
+  - name: dim_station
+    columns:
+      - name: station_id
+        data_tests: [unique, not_null]
+      - name: latitude
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -90
+                max_value: 90
+      - name: longitude
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -180
+                max_value: 180
+
+  - name: dim_date
+    columns:
+      - name: date
+        data_tests: [unique, not_null]
+
+  - name: fct_weather_daily
+    description: One row per station and day; TMAX/TMIN in °C, PRCP/SNOW in mm.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [station_id, date]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "tmax >= tmin"
+          # The simulated source revisions (SPEC §5) alter one value of a key, so a day with
+          # tmax = tmin can end with tmin a tenth above; a handful of rows warns, more fails.
+          config:
+            where: "tmax is not null and tmin is not null"
+            warn_if: ">0"
+            error_if: ">100"
+    columns:
+      - name: station_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_station')
+                field: station_id
+      - name: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: tmax
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -90
+                max_value: 60
+      - name: tmin
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -90
+                max_value: 60
+      - name: prcp
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+  - name: agg_weather_monthly_country
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [country_code, month]
+    columns:
+      - name: country_code
+        data_tests: [not_null]
+      - name: month
+        data_tests: [not_null]

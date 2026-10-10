@@ -1,0 +1,29 @@
+# One row per station and year: the outer cube of the nested aggregate (SPEC §8.3).
+# Engine cubes (cubes/<engine>/station_years.yml) extend base_station_years and set data_source and the
+# engine's table paths in sql. They also restate what references cubes by name (the join to their
+# weather_daily and annual_prcp) and add median_station_annual_prcp with the engine's percentile function.
+# annual_prcp is the inner measure (weather_daily.total_prcp) as a sub_query dimension; stations without
+# precipitation data in the year have a NULL annual_prcp and are skipped by the median.
+# base_* cubes are never queried: placeholder data source, not public.
+cubes:
+  - name: base_station_years
+    data_source: default
+    sql: SELECT 1 AS station_id, 1 AS year
+    public: false
+    joins:
+      - name: base_weather_daily
+        relationship: one_to_many
+        sql: "{CUBE}.station_id = {base_weather_daily}.station_id AND {CUBE}.year = EXTRACT(YEAR FROM {base_weather_daily}.date)"
+    dimensions:
+      - name: id
+        sql: "CONCAT({CUBE}.station_id, '|', CAST({CUBE}.year AS VARCHAR))"
+        type: string
+        primary_key: true
+        public: false
+      - name: year
+        sql: "{CUBE}.year"
+        type: number
+      - name: annual_prcp
+        sql: "{base_weather_daily.total_prcp}"
+        type: number
+        sub_query: true

@@ -1,0 +1,22 @@
+# The public surface: one view per engine (<engine>_weather), written out for Trino.
+views:
+  - name: trino_weather
+    public: true
+    cubes:
+      - join_path: trino_weather_daily
+        includes: "*"
+        excludes:
+          - id
+          - total_prcp_all
+          - total_prcp_country
+          - total_prcp_prior_month
+      - join_path: trino_weather_daily.trino_stations
+        includes: [country, elevation, latitude, longitude]
+      - join_path: trino_weather_daily.trino_dates
+        includes: [year, quarter, month]
+      - join_path: trino_station_years
+        includes:
+          - median_station_annual_prcp
+          - name: year
+            alias: station_year
+

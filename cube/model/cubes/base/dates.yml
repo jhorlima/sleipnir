@@ -1,0 +1,22 @@
+# dim_date. Engine cubes extend base_dates and set data_source and sql_table (cubes/<engine>/dates.yml).
+# base_* cubes are never queried: placeholder data source, not public.
+cubes:
+  - name: base_dates
+    data_source: default
+    sql_table: placeholder.dim_date
+    public: false
+
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+      - name: year
+        sql: "{CUBE}.year"
+        type: number
+      - name: quarter
+        sql: "{CUBE}.quarter"
+        type: number
+      - name: month
+        sql: "{CUBE}.month"
+        type: number
