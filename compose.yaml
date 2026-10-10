@@ -6,3 +6,5 @@ include:
     project_directory: .
   - path: compose/proxy.yaml
     project_directory: .
+  - path: compose/engines.yaml
+    project_directory: .

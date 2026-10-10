@@ -62,7 +62,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 | `bench_*` | harness | tabelas temporárias de experimentos de layout (apagadas com `PURGE`) |
 | `postgres_bronze/silver/gold` | DuckDB + dbt-postgres | baseline, em schemas do Postgres (fora do lake) |
 
-- **Acesso ao S3:** o warehouse não tem STS, então não há vended credentials. Trino/Spark/StarRocks usam remote signing ou chaves estáticas; o DuckDB não suporta remote signing e usa `ACCESS_DELEGATION_MODE 'none'` + secret S3 estático (path-style, sem SSL).
+- **Acesso ao S3:** o warehouse não tem STS, então não há vended credentials. O Trino 483 não oferece remote signing para o catálogo REST e usa chaves estáticas (`s3.aws-access-key`); Spark/StarRocks seguem o mesmo caminho salvo se a fase 2 mostrar outro; o DuckDB não suporta remote signing e usa `ACCESS_DELEGATION_MODE 'none'` + secret S3 estático (path-style, sem SSL).
 - Os readers leem `trino_gold` por padrão (`GOLD_NAMESPACE`). Cenário extra: ler `spark_gold` para medir o efeito do layout gerado por cada writer.
 
 ## 4. Componentes
@@ -134,7 +134,7 @@ Regras:
 ## 7. Modelo de dados (medalhão)
 
 ### Bronze — cópia fiel da fonte (`duckdb_bronze`)
-- `ghcn_daily_raw` — colunas da fonte + `_source_file`, `_batch_id`, `_ingested_at`. **Append-only**, particionado por `_batch_id`. Criada com `CREATE TABLE ... PARTITIONED BY (_batch_id) WITH ('format-version'='2', 'write.parquet.compression-codec'=...)` e carregada com `INSERT` (o codec padrão do DuckDB é snappy; o valor vem do B6). O DuckDB nomeia o campo de partição `identity__batch_id_<id>` — a leitura por Trino/Spark/StarRocks é validada na fase 1.
+- `ghcn_daily_raw` — colunas da fonte + `_source_file`, `_batch_id`, `_ingested_at`. **Append-only**, particionado por `_batch_id`. Criada com `CREATE TABLE ... PARTITIONED BY (_batch_id) WITH ('format-version'='2', 'write.parquet.compression-codec'=...)` e carregada com `INSERT` (o codec padrão do DuckDB é snappy; o valor vem do B6). O DuckDB nomeia o campo de partição `identity__batch_id_<id>` — o Trino lê e poda essas partições normalmente; Spark e StarRocks são validados na fase 2.
 - `ghcn_stations_raw`, `ghcn_countries_raw` — substituídas a cada carga (são pequenas).
 
 ### Silver — limpo, tipado, deduplicado (`<engine>_silver`)
@@ -423,7 +423,7 @@ docs/SPEC.en.md           # ao estabilizar
 
 | # | Validação | Quando | Fallback |
 |---|---|---|---|
-| V1 | ✅ Resolvido: DuckDB 1.5.6 escreve Iceberg v2 (CREATE, INSERT, particionado) via Lakekeeper com `ACCESS_DELEGATION_MODE 'none'` + secret S3 estático (detalhes em `spikes/V1/README.md`). A validar: leitura por outros engines do campo de partição gerado pelo DuckDB | Fase 1 | — |
+| V1 | ✅ Resolvido: DuckDB 1.5.6 escreve Iceberg v2 (CREATE, INSERT, particionado) via Lakekeeper com `ACCESS_DELEGATION_MODE 'none'` + secret S3 estático (detalhes em `spikes/V1/README.md`). Trino 483 lê as tabelas do DuckDB com poda de partição; Spark e StarRocks validados na fase 2 | Fase 1 | — |
 | V2 | Trino MV no conector Iceberg com catálogo REST | Fase 2 | Tabela equivalente via dbt |
 | V3 | StarRocks reescreve automaticamente para MV de join sobre Iceberg | Fase 2 | Documentar limitação; Cube aponta para a MV |
 | V4 | ✅ Resolvido: dbt-trino suporta `microbatch` desde 1.9.0; `concurrent_batches` desde 1.10.2 (detalhes em `spikes/V4/README.md`). A validar na prática: `event_time` DATE comparado com literais TIMESTAMP e conflitos de commit com `concurrent_batches` | Fase 1 | — |
