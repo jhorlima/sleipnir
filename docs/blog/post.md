@@ -67,7 +67,8 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - **Gotcha:** Trino renamed the native S3 switch from `fs.native-s3.enabled` to `fs.s3.enabled`.
 - **Storage and catalog up** (RustFS 1.0.1, Postgres 18.6, Lakekeeper 0.14.0, Traefik 3.7). `make init` creates the bucket and the Iceberg warehouse and is safe to run twice.
 - **Gotchas:** RustFS answers its bare root with an S3-style 403 (the console lives under `/rustfs/console/`, so the proxy redirects). RustFS has no STS, so the Lakekeeper warehouse uses the `s3-compat` flavor with `sts-enabled: false` — engines either use remote signing or their own keys.
-- _(next: Trino on the REST catalog, spike V1 — can DuckDB write Iceberg through the REST catalog?)_
+- **Spike V1 — can DuckDB write Iceberg through the REST catalog?** Yes: DuckDB 1.5.6 creates and appends partitioned Iceberg v2 tables through Lakekeeper (~2–6M rows/s on a 2M-row sample, unthrottled). The catch: DuckDB does not support remote signing and the local warehouse has no STS, so vended credentials fail (`404`). It needs `ACCESS_DELEGATION_MODE 'none'` plus a static S3 secret. Also: DuckDB defaults to snappy, not zstd, and names partition fields `identity__batch_id_<id>`.
+- _(next: Trino on the REST catalog, and whether every engine reads DuckDB-written tables)_
 
 ### Phase 2 — benchmark
 
