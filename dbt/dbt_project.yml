@@ -1,0 +1,35 @@
+name: sleipnir
+version: "0.1.0"
+config-version: 2
+profile: sleipnir
+
+require-dbt-version: [">=1.12.0", "<2.0.0"]
+packages-install-path: "{{ env_var('DBT_PACKAGES_DIR', 'dbt_packages') }}"
+
+flags:
+  send_anonymous_usage_stats: false
+  require_certificate_validation: true
+
+vars:
+  # merge | delete+insert | microbatch (SPEC §7.1); used by every incremental model.
+  incremental_strategy: delete+insert
+  # Each ingest batch repeats the last days of the previous one (SPEC §5).
+  overlap_days: 7
+  # First microbatch batch; must not be later than the first bronze date.
+  microbatch_begin: "2025-01-01"
+  # Post-hook maintenance on incremental models; measured runs pass false (benchmark-integrity §8).
+  maintenance: true
+  optimize_file_size_threshold: 128MB
+  # SPEC §10.4 keeps only the latest snapshot.
+  snapshot_retention: 0s
+  orphan_file_retention: 0s
+
+models:
+  sleipnir:
+    # Drop-and-create instead of rename: the old table's files are purged instead of
+    # lingering in a backup table that counts against the storage budget.
+    +on_table_exists: drop
+    silver:
+      +materialized: table
+    gold:
+      +materialized: table

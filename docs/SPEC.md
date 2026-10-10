@@ -63,6 +63,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 | `bench_*` | harness | tabelas temporárias de experimentos de layout (apagadas com `PURGE`) |
 | `postgres_bronze/silver/gold` | DuckDB + dbt-postgres | baseline, em schemas do Postgres (fora do lake) |
 
+- **Trino (não padrão, em `config/trino/`):** spill-to-disk ligado e `optimizer.optimize-top-n-ranking=false` — o `ROW_NUMBER() ... = 1` do dedup vira um operador TopNRanking que não faz spill e estoura a memória por query do perfil M.
 - **Acesso ao S3 — o mesmo caminho para todos os engines:** o warehouse tem `sts-enabled: false` e `remote-signing-enabled: false`, então todos leem e escrevem com as mesmas chaves S3 estáticas. Sem isso, Spark/PyIceberg cairiam em silêncio no remote signing pelo Lakekeeper, enquanto Trino (sem remote signing para REST), DuckDB e StarRocks (que não suportam) usariam chaves — caminhos de I/O diferentes contaminariam a comparação. Spark envia também `X-Iceberg-Access-Delegation: client-managed`; DuckDB usa `ACCESS_DELEGATION_MODE 'none'` + secret S3. Warehouse com `key-prefix: lakehouse` e `delete-profile: hard`.
 - Os readers leem `trino_gold` por padrão (`GOLD_NAMESPACE`). Cenário extra: ler `spark_gold` para medir o efeito do layout gerado por cada writer.
 
@@ -146,7 +147,7 @@ Regras:
 - `ghcn_stations_raw`, `ghcn_countries_raw` — substituídas a cada carga (são pequenas).
 
 ### Silver — limpo, tipado, deduplicado (`<engine>_silver`)
-- `ghcn_daily` — tipos corretos, `value` convertido (décimos → unidades), linhas com `q_flag` preenchido removidas, **dedup** pela chave natural. Incremental (estratégia em §7.1). Partição `month(date)` (granularidade validada no B6).
+- `ghcn_daily` — só os elementos `TMAX, TMIN, PRCP, SNOW, SNWD`; tipos corretos; `value` convertido (TMAX/TMIN em décimos de °C e PRCP em décimos de mm → unidades; SNOW/SNWD já vêm em mm); **dedup** pela chave natural; o filtro de QC (`q_flag` preenchido) roda depois do dedup, para uma revisão reprovada esconder a versão anterior. Incremental (estratégia em §7.1). Partição `month(date)` (granularidade validada no B6).
 - `stations` — parse do fixed-width, país via `ghcnd-countries`.
 
 ### Gold — marts (`<engine>_gold`)
@@ -155,7 +156,7 @@ Regras:
 - `agg_weather_monthly_country` — agregado mensal por país. Incremental por mês.
 
 ### 7.1 Estratégias incrementais (matriz do B2)
-Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada é medida por engine; a vencedora vira o padrão daquele engine.
+Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada é medida por engine; a vencedora vira o padrão daquele engine. Padrão atual no Trino: **`delete+insert`** (janela derivada dos dados, substitui datas inteiras). O microbatch do dbt é guiado pelo relógio: em dados históricos precisa de `--event-time-start/--event-time-end` explícitos.
 
 | Estratégia | Trino | Spark | Postgres | Observação |
 |---|---|---|---|---|
@@ -188,11 +189,11 @@ Executados como etapa própria (`dbt test`), separados do tempo dos models.
 | `unique_combination_of_columns` (dbt_utils) | `silver.ghcn_daily` | `(station_id, date, element)` |
 | `unique` + `not_null` | PKs do gold | — |
 | `relationships` | fato → dims | — |
-| `accepted_values` | `element` | `TMAX, TMIN, PRCP, SNOW, SNWD, ...` |
+| `accepted_values` | `element` | `TMAX, TMIN, PRCP, SNOW, SNWD` |
 | `accepted_range` (dbt_utils) | silver/gold | `tmax`, `tmin` entre −90 e 60 °C; `prcp ≥ 0`; `latitude` −90..90; `longitude` −180..180 |
 | `expression_is_true` (dbt_utils) | `fct_weather_daily` | `tmax >= tmin` (quando ambos existem) |
-| `fewer_rows_than` (dbt_utils) | silver × bronze | dedup nunca aumenta linhas |
-| `recency` (dbt_utils) | `fct_weather_daily` | última data ≥ limite esperado do último lote |
+| Teste singular | silver × bronze | dedup nunca aumenta linhas (`dbt_utils.fewer_rows_than` não funciona no Trino) |
+| Teste singular | `fct_weather_daily` | a fato alcança a última data do lote mais recente do bronze (`dbt_utils.recency` compara com o relógio, inútil para dados históricos) |
 | **Unit tests** (dbt ≥ 1.8) | `silver.ghcn_daily` | dedup (vence o maior `_ingested_at`) e conversão de unidades |
 | `source freshness` | `duckdb_bronze.ghcn_daily_raw` | por `_ingested_at` |
 

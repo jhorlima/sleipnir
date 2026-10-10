@@ -10,3 +10,5 @@ include:
     project_directory: .
   - path: compose/ingest.yaml
     project_directory: .
+  - path: compose/transform.yaml
+    project_directory: .

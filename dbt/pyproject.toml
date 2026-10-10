@@ -1,0 +1,9 @@
+[project]
+name = "sleipnir-dbt"
+version = "0.1.0"
+description = "dbt project that builds the silver and gold layers of the lakehouse."
+requires-python = "==3.12.*"
+dependencies = [
+    "dbt-core==1.12.5",
+    "dbt-trino==1.10.6",
+]

@@ -78,7 +78,11 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - **Gotcha:** a whole-table `GROUP BY` on the natural key exceeds Trino's default per-query memory on the M profile (~1.8 GB). Deduplication has to work per batch window, or Trino needs spill-to-disk.
 - **Gotcha:** sorting rows before writing halved the Parquet size (7.9 vs 16.5 MB per batch). Bronze keeps the source order to stay a faithful copy; sort order becomes a layout variable for B6.
 - **Gotcha:** with Docker Desktop's VM at 8 GB, Trino on the M profile (8 GB limit) was OOM-killed (exit 137) while an image build and the infra ran beside it. Container limits are not reservations, so the VM needs room for the engine profile plus ~3 GB of infra. For the L profile, give the VM ≥ 16 GB.
-- _(next: dbt bronze → gold on Trino, Cube on Trino)_
+- **dbt on Trino, bronze → silver → gold.** 6 models, 32 data tests + 2 unit tests. The full build takes 64.7 s on profile M (silver 42.7 s, fact 9.0 s), and an incremental build with nothing new takes 13.3 s. Silver keeps 28.6 M rows from 34.6 M core-element bronze rows (−17%: overlap duplicates plus QC). Lakehouse total: 0.23 GB.
+- **First strategy numbers (silver, one run each):** from scratch, merge 52.8 s, delete+insert 52.6 s, microbatch 26.3 s (12 monthly batches). Loading one new batch: 6.95 s, 7.41 s and 5.3 s. All three produce identical rows and `sum(value)`. Default: delete+insert, because its window comes from the data. dbt's microbatch follows the wall clock, so on historical data it needs explicit event-time bounds.
+- **Gotcha:** dedup with `ROW_NUMBER() = 1` failed on profile M even with spill-to-disk on. Trino rewrites it into a TopNRanking operator, which cannot spill. `optimizer.optimize-top-n-ranking=false` fixes it, and it is recorded as a non-default engine setting.
+- **Gotchas:** GHCN publishes SNOW/SNWD in mm, not tenths. `dbt_utils.fewer_rows_than` breaks on Trino, and `dbt_utils.recency` compares to the wall clock (useless for historical data), so both became singular tests. The `tmax >= tmin` test warns on 4 rows created by the simulated revisions, which is exactly what it should catch.
+- _(next: Cube on Trino)_
 
 ### Phase 2 — benchmark
 

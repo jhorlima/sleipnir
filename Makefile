@@ -1,11 +1,21 @@
 .DEFAULT_GOAL := help
-.PHONY: help env up down ps logs init clean engine-up engine-down trino-cli ingest-build download ingest storage-report
+.PHONY: help env up down ps logs init clean engine-up engine-down trino-cli ingest-build download ingest storage-report \
+	dbt-image dbt-debug dbt-build dbt-run dbt-test dbt-full-refresh dbt-shell drop-run
 
 ENGINE ?= trino
 PROFILE ?= m
+DBT_TARGET ?= trino
+# Optional dbt passthrough: VARS='{maintenance: false}', ARGS='--select ghcn_daily', RUN_ID=<id>.
+VARS ?=
+ARGS ?=
+RUN_ID ?=
+
+dbt_vars = $(if $(VARS),--vars '$(VARS)')
+dbt = docker compose --env-file .env --env-file env/$(PROFILE).env --profile dbt run --rm \
+	-e DBT_TARGET=$(DBT_TARGET) -e RUN_ID=$(RUN_ID) dbt
 
 help: ## List the available targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-15s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-17s %s\n", $$1, $$2}'
 
 env: ## Create .env from .env.example if .env does not exist yet
 	@test -f .env || cp .env.example .env
@@ -46,6 +56,31 @@ ingest: ## Load all batches of GHCN_YEARS into duckdb_bronze, skipping loaded on
 
 storage-report: ## Object-store bytes of duckdb_bronze + ENGINE_* namespaces; fails over STORAGE_BUDGET_GB
 	docker compose --profile ingest run --rm -e ENGINE=$(ENGINE) storage-report
+
+dbt-image: ## Build the dbt image (sleipnir-dbt:DBT_VERSION) with its packages baked in
+	docker compose --profile dbt build dbt
+
+dbt-debug: ## Check the dbt connection to DBT_TARGET (default trino)
+	$(dbt) debug
+
+dbt-build: ## dbt build (models + tests) on DBT_TARGET; VARS='{maintenance: false}' ARGS=... RUN_ID=...
+	$(dbt) build $(dbt_vars) $(ARGS)
+
+dbt-run: ## dbt run (models only); same VARS/ARGS/RUN_ID passthrough as dbt-build
+	$(dbt) run $(dbt_vars) $(ARGS)
+
+dbt-test: ## dbt test (data + unit tests); same VARS/ARGS/RUN_ID passthrough
+	$(dbt) test $(dbt_vars) $(ARGS)
+
+dbt-full-refresh: ## dbt build --full-refresh: rebuild the incremental models from bronze
+	$(dbt) build --full-refresh $(dbt_vars) $(ARGS)
+
+dbt-shell: ## Open a shell in the dbt container (project mounted at /app)
+	docker compose --env-file .env --env-file env/$(PROFILE).env --profile dbt run --rm \
+		-e DBT_TARGET=$(DBT_TARGET) -e RUN_ID=$(RUN_ID) --entrypoint bash dbt
+
+drop-run: ## Drop the bench_RUN_ID_* namespaces via Trino and wait until their files are purged
+	scripts/drop-run-namespaces.sh $(RUN_ID)
 
 clean: ## DESTRUCTIVE: stop the stack and delete its volumes (all lake data and catalog metadata)
 	docker compose --profile init down --volumes --remove-orphans

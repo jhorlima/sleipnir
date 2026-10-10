@@ -1,0 +1,19 @@
+services:
+  # One-shot dbt runner. No depends_on: the engine (DBT_TARGET) is started on its own, with its profile.
+  dbt:
+    image: sleipnir-dbt:${DBT_VERSION:?set in .env}
+    build: ./dbt
+    profiles: [dbt]
+    environment:
+      DBT_TARGET: ${DBT_TARGET:-trino}
+      DBT_THREADS: ${DBT_THREADS:-4}
+      RUN_ID: ${RUN_ID:-}
+    # The project is mounted for development; packages stay baked in the image (/opt/dbt_packages).
+    volumes:
+      - ./dbt:/app
+    # Small on purpose: the engine is what is measured, dbt only sends SQL.
+    deploy:
+      resources:
+        limits:
+          cpus: "${DBT_CPUS:-1}"
+          memory: ${DBT_MEMORY:-1g}
