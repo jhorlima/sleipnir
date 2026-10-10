@@ -25,6 +25,7 @@
 
 - Host: macOS, 12 CPU, 24 GB RAM. Docker Desktop: limites globais removidos durante as execuções do benchmark.
 - **Docker Compose** (sem Swarm): `deploy.resources.limits` (cpus/memory) por serviço, `profiles` para subir só o necessário e `include` para separar os arquivos por domínio.
+- **Memória da VM:** limites de container não são reservas; a VM do Docker precisa caber o perfil do engine + ~3 GB de infra (perfil L → VM ≥ 16 GB). Com 8 GB, só o perfil M sem outros processos pesados ao lado.
 - **Um engine sob teste por vez:** nunca duas transformações ao mesmo tempo (ex.: Trino e Spark em paralelo). Dentro de uma execução, o dbt pode rodar models em paralelo com `threads = DBT_THREADS` (**mesmo valor para todos os engines**, padrão 4); o resto do paralelismo fica a cargo de cada engine.
 - Números absolutos vêm de uma VM em macOS; o valor está na **comparação relativa**.
 - **Disco:** os CSVs são baixados **antes** da ingestão para `LANDING_DIR` (padrão `./landing`; pode apontar para um SSD externo) e o DuckDB lê de lá — download nunca entra na medição. Para mais espaço no lake, mover a **imagem de disco do Docker Desktop** para o SSD (Settings → Resources → Disk image location) e manter os volumes nomeados: bind mount de disco externo passa pelo compartilhamento de arquivos da VM e adicionaria overhead de I/O ao RustFS.
@@ -108,7 +109,7 @@ Versões pinadas em `.env`; nenhuma tag `latest`.
 - Downloads são idempotentes: arquivo já presente em `landing/` com o mesmo tamanho/ETag não é baixado de novo.
 
 ### Simulação de duplicados
-Ingestão em **lotes incrementais com janela sobreposta**: cada lote `n` inclui os últimos 30 dias do lote `n-1`, mais ~1% de linhas reemitidas com `value` alterado (simula revisão da fonte). A revisão **substitui** a cópia sobreposta dentro do lote (uma linha por chave por lote), para que "vence o maior `_ingested_at`" nunca empate. Chave natural: `(station_id, date, element)`; vence o maior `_ingested_at`. Como `date` faz parte da chave, um duplicado sempre cai no mesmo batch temporal — isso viabiliza microbatch/insert_overwrite sem perder o dedup.
+Ingestão em **lotes incrementais com janela sobreposta**: cada lote `n` inclui os últimos 7 dias do lote `n-1`, mais ~1% de linhas reemitidas com `value` alterado (simula revisão da fonte). A revisão **substitui** a cópia sobreposta dentro do lote (uma linha por chave por lote), para que "vence o maior `_ingested_at`" nunca empate. Chave natural: `(station_id, date, element)`; vence o maior `_ingested_at`. Como `date` faz parte da chave, um duplicado sempre cai no mesmo batch temporal — isso viabiliza microbatch/insert_overwrite sem perder o dedup.
 
 ## 6. Orçamento de storage (≤ 10 GB)
 
@@ -157,7 +158,7 @@ Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada �
 | `microbatch` (`event_time = date`, `batch_size = month`) | ✅ | ✅ | ✅ | `concurrent_batches` com o mesmo valor em todos os engines. Tempo medido **por batch**. |
 
 - No Trino, o microbatch é `DELETE` + `INSERT` por batch filtrado por `event_time` (ignora `unique_key`; usa tabela temporária). Cada batch gera dois snapshots e position deletes, então a manutenção (§10.4) pesa mais nessa estratégia.
-- Janela incremental: datas presentes no último `_batch_id` + `lookback` igual à sobreposição dos lotes (30 dias).
+- Janela incremental: datas presentes no último `_batch_id` + `lookback` igual à sobreposição dos lotes (7 dias).
 - Cada execução de B2 é de um engine × uma estratégia, a partir do mesmo estado inicial do bronze (`duckdb_bronze` é só lido).
 - **Correção do incremental:** ao fim de cada execução, o resultado incremental é comparado com um `--full-refresh` em `bench_*` (`audit_helper.compare_relations`). Divergência invalida a medição daquela estratégia.
 

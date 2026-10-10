@@ -34,8 +34,8 @@ def read_batch(con, batch_id):
 
 
 def main():
-    assert batches.batch_window(202503) == ("20250130", "20250301", "20250401")
-    assert batches.batch_window(202512) == ("20251101", "20251201", "20260101")
+    assert batches.batch_window(202503) == ("20250222", "20250301", "20250401")
+    assert batches.batch_window(202512) == ("20251124", "20251201", "20260101")
 
     con = duckdb.connect()
     make_observations(con)
@@ -45,8 +45,8 @@ def main():
     second = read_batch(con, 202503)
     assert first == second, "batch files must be identical across runs"
 
-    # 31 days of March plus 30 days of overlap (Jan 30 - Feb 28).
-    assert len(first) == 61, len(first)
+    # 31 days of March plus 7 days of overlap (Feb 22 - Feb 28).
+    assert len(first) == 38, len(first)
     revised = 0
     for row in first:
         if row[3] != 100:

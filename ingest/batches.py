@@ -1,6 +1,6 @@
 """Split the GHCN year files into monthly batch CSVs that simulate an incremental source (SPEC §5).
 
-Batch YYYYMM holds the rows of month MM plus the 30 days before it (the tail of the previous
+Batch YYYYMM holds the rows of month MM plus the 7 days before it (the tail of the previous
 batch). About 1% of the batch's rows are revisions: overlap rows re-sent with a changed value.
 Revisions replace the overlap copy instead of being added next to it, because two versions
 of a row in the same batch would share `_ingested_at` and "latest wins" would be ambiguous.
@@ -15,9 +15,9 @@ import os
 
 from settings import BATCHES_DIR, LANDING_DIR, year_file_name
 
-OVERLAP_DAYS = 30
-# Overlap rows are about half of a batch, so revising 1 in 50 of them is about 1% of the batch.
-REVISION_MODULUS = 50
+OVERLAP_DAYS = 7
+# Overlap rows are about a fifth of a batch, so revising 1 in 18 of them is about 1% of the batch.
+REVISION_MODULUS = 18
 
 SOURCE_COLUMNS = {
     "id": "VARCHAR",
