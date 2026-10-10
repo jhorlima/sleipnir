@@ -102,6 +102,24 @@ _(to fill)_
 
 ## 6. Results
 
+### 6.0 Early numbers (phase 1, before the benchmark protocol)
+
+These come from building the MVP, not from the harness: a single run each, no cold/warm split, one year of data (GHCN 2025), and a VM on macOS. Treat them as orders of magnitude.
+
+| Step | Engine / profile | Number |
+|---|---|---|
+| Ingest, 12 monthly batches → `duckdb_bronze` (43.97 M rows, 1.31 GB of source CSV) | DuckDB 1.5.6, M (4 CPU / 8 GB) | 0.47–0.79 s per batch, 4.7–7.4 M rows/s |
+| Ingest, stations reference (133 k rows, fixed-width) | DuckDB, M | 0.30 s |
+| dbt full build, 6 models + 34 tests | Trino 483, M | 64.7 s |
+| dbt incremental build, nothing new | Trino, M | 13.3 s |
+| Silver `ghcn_daily` from scratch | Trino, M | merge 52.8 s · delete+insert 52.6 s · microbatch 26.3 s |
+| Silver `ghcn_daily`, one new batch | Trino, M | merge 6.95 s · delete+insert 7.41 s · microbatch 5.3 s |
+| Gold `fct_weather_daily` / monthly aggregate (full build) | Trino, M | 9.0 s / 3.4 s |
+| Lakehouse size (bronze + silver + gold) | — | 0.23 GB (bronze 0.116, silver 0.068, gold 0.047) |
+| Whole flow from `make clean` to Cube answering Q1–Q6 | Trino M for dbt, S for Cube | ~3 min |
+
+Correctness so far: Cube Q1–Q3 match direct Trino SQL; all three incremental strategies produce identical rows and `sum(value)`.
+
 | Suite | Headline | Chart |
 |---|---|---|
 | B1 Ingestion | | |
