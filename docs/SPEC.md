@@ -434,6 +434,8 @@ docs/SPEC.en.md           # ao estabilizar
 | Repositório público | Código em inglês, `README.md` (arquitetura, como reproduzir, resultados), licença Apache-2.0, `SPEC.en.md`. |
 | Resultados | `results/*.parquet` + relatório gerado (tabelas e gráficos) versionados, com versões e `engine_config` de cada execução. |
 | Artigo | Blog (versão completa) + post no LinkedIn (resumo com 2–3 gráficos e link). |
+| Rascunho | `docs/blog/post.md` — esqueleto do artigo e diário do projeto, atualizado a cada decisão, spike e resultado. |
+| Assets | Capa; cards com os números (resultados renderizados como imagem); diagrama da arquitetura; screenshots das UIs; vídeo explicativo da ferramenta e dos benchmarks (skill `/brag`). |
 
 Estrutura do artigo:
 1. Motivação e perguntas do estudo.

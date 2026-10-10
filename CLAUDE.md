@@ -19,6 +19,10 @@ This repo will be published. Never reference private projects, companies, client
 - Specs describe the **current** state only. When something changes, rewrite the affected text; never leave superseded options, strike-throughs or "previously" notes. History lives in git.
 - `docs/SPEC.md` is the project overview; detailed specs per phase/feature go to `docs/specs/<topic>.md` and are linked from it.
 
+## Article notebook
+
+`docs/blog/post.md` is the article draft and the project's lab notebook. Whenever a decision is made, a spike is resolved, a gotcha is found or a suite produces numbers, add it to the matching section in the same change (story tone, no internal references). The author writes the motivation section.
+
 ## Rules
 
 - `.claude/rules/code-style.md` — readability rules for bash, Makefile, Python, SQL, Compose.
