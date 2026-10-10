@@ -435,6 +435,7 @@ docs/SPEC.en.md           # ao estabilizar
 | V9 | Medidas multi-stage e não aditivas do Cube com pre-aggregations no Cube Store | Fase 2 | Q7–Q10 ficam fora do B5c e o motivo é documentado |
 | V10 | STS do RustFS (AssumeRole) com a session policy do Lakekeeper → vended credentials para todos os engines | Fase 4 | Manter chaves estáticas |
 | V11 | Cosmos: `ExecutionMode.WATCHER` (dbt instalado na imagem do Airflow/worker) × `ExecutionMode.DOCKER` (dbt numa imagem própria, uma task por model) — overhead e isolamento | Fase 3 | `DockerOperator` chamando `dbt build` |
+| V12 | "Modo seguro": IdP OIDC leve (Dex ou Zitadel) + Lakekeeper com autenticação OIDC (sem OpenFGA) + vended credentials via STS do RustFS (depende do V10); engines com OAuth2 client credentials (DuckDB `CLIENT_ID`/`CLIENT_SECRET`/`OAUTH2_SERVER_URI`). Medido como cenário à parte; o cenário sem auth e com chaves estáticas segue como linha de base | Fase 4 | Manter chaves estáticas sem auth |
 
 ## 16. Publicação
 
