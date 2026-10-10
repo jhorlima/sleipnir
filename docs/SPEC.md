@@ -108,6 +108,13 @@ Versões pinadas em `.env`; nenhuma tag `latest`.
 - O volume é definido pelo **orçamento de storage (§6)**, não pelo tamanho do CSV. O CSV pode passar de 10 GB, desde que o lakehouse resultante caiba no orçamento.
 - Downloads são idempotentes: arquivo já presente em `landing/` com o mesmo tamanho/ETag não é baixado de novo.
 
+### Evolução da ingestão (depois que o fluxo estiver validado)
+Adicionar uma fonte nova não deve exigir código novo:
+- **Uma fonte = um arquivo de configuração** (`ingest/sources/<nome>.yaml`): URLs/padrão de arquivos, formato (CSV, gzip, fixed-width), colunas e tipos, regra de lotes, tabela de destino em `duckdb_bronze` e partição.
+- **Um único comando genérico** na imagem `sleipnir-ingest`: `ingest run --source <nome> [--batch <id>]`, com download e carga idempotentes.
+- **Orquestração:** uma task por fonte no Airflow/Dagster via `DockerOperator` chamando essa imagem (DuckDB → Iceberg no S3), sem dependências de ingestão na imagem do orquestrador.
+- GHCN-Daily passa a ser a primeira fonte descrita nesse formato.
+
 ### Simulação de duplicados
 Ingestão em **lotes incrementais com janela sobreposta**: cada lote `n` inclui os últimos 7 dias do lote `n-1`, mais ~1% de linhas reemitidas com `value` alterado (simula revisão da fonte). A revisão **substitui** a cópia sobreposta dentro do lote (uma linha por chave por lote), para que "vence o maior `_ingested_at`" nunca empate. Chave natural: `(station_id, date, element)`; vence o maior `_ingested_at`. Como `date` faz parte da chave, um duplicado sempre cai no mesmo batch temporal — isso viabiliza microbatch/insert_overwrite sem perder o dedup.
 
