@@ -1,0 +1,23 @@
+# dim_date, rendered once per data source.
+cubes:
+{%- for data_source in data_sources() %}
+  - name: {{ data_source }}_dates
+    data_source: {{ data_source }}
+    sql_table: {{ gold_table(data_source, 'dim_date') }}
+    public: false
+
+    dimensions:
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+        primary_key: true
+      - name: year
+        sql: "{CUBE}.year"
+        type: number
+      - name: quarter
+        sql: "{CUBE}.quarter"
+        type: number
+      - name: month
+        sql: "{CUBE}.month"
+        type: number
+{%- endfor %}

@@ -1,0 +1,16 @@
+{
+  "measures": ["trino_weather.avg_tmax_7d"],
+  "dimensions": ["trino_weather.station_id"],
+  "filters": [
+    {
+      "member": "trino_weather.station_id",
+      "operator": "equals",
+      "values": ["USW00094728", "USW00023174", "GME00127786", "SPE00120278"]
+    }
+  ],
+  "timeDimensions": [
+    {"dimension": "trino_weather.date", "granularity": "day", "dateRange": ["2025-01-01", "2025-03-31"]}
+  ],
+  "order": [["trino_weather.station_id", "asc"], ["trino_weather.date", "asc"]],
+  "limit": 50000
+}

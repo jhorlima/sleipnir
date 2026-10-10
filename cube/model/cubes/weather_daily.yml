@@ -1,0 +1,133 @@
+# fct_weather_daily (one row per station and day), rendered once per data source (SPEC §8.2, §8.3).
+cubes:
+{%- for data_source in data_sources() %}
+{#- Cube references to sibling cubes, e.g. {trino_stations}; Jinja needs the braces spelled out. #}
+{%- set stations = ('{' ~ data_source ~ '_stations}') | safe %}
+{%- set dates = ('{' ~ data_source ~ '_dates}') | safe %}
+  - name: {{ data_source }}_weather_daily
+    data_source: {{ data_source }}
+    sql_table: {{ gold_table(data_source, 'fct_weather_daily') }}
+    public: false
+
+    joins:
+      - name: {{ data_source }}_stations
+        relationship: many_to_one
+        sql: "{CUBE}.station_id = {{ stations }}.station_id"
+      - name: {{ data_source }}_dates
+        relationship: many_to_one
+        sql: "{CUBE}.date = {{ dates }}.date"
+
+    dimensions:
+      - name: id
+        sql: "CONCAT({CUBE}.station_id, '|', CAST({CUBE}.date AS VARCHAR))"
+        type: string
+        primary_key: true
+        public: false
+      - name: station_id
+        sql: "{CUBE}.station_id"
+        type: string
+      - name: date
+        sql: "{CUBE}.date"
+        type: time
+
+    measures:
+      - name: observation_count
+        type: count
+      - name: station_count
+        sql: "{CUBE}.station_id"
+        type: count_distinct
+      - name: days_with_rain
+        type: count
+        filters:
+          - sql: "{CUBE}.prcp > 0"
+      - name: avg_tmax
+        sql: "{{ to_double(data_source, '{CUBE}.tmax') }}"
+        type: avg
+      - name: avg_tmin
+        sql: "{{ to_double(data_source, '{CUBE}.tmin') }}"
+        type: avg
+      - name: total_prcp
+        sql: "{{ to_double(data_source, '{CUBE}.prcp') }}"
+        type: sum
+
+      # Derived ratios: never rolled up, so no cast on the result.
+      - name: temp_range
+        sql: "{avg_tmax} - {avg_tmin}"
+        type: number
+      - name: rain_day_ratio
+        sql: "{{ to_double(data_source, '{days_with_rain}') }} / NULLIF({observation_count}, 0)"
+        type: number
+        format: percent
+
+      # Percentiles: the engine's own function; not re-aggregated by Cube Store.
+      - name: median_tmax
+        sql: "{{ percentile(data_source, '{CUBE}.tmax', 0.5) }}"
+        type: number
+      - name: p95_tmax
+        sql: "{{ percentile(data_source, '{CUBE}.tmax', 0.95) }}"
+        type: number
+      - name: p95_prcp
+        sql: "{{ percentile(data_source, '{CUBE}.prcp', 0.95) }}"
+        type: number
+
+      # Q5: 7-day moving average (the window ends on the row's day).
+      - name: avg_tmax_7d
+        sql: "{{ to_double(data_source, '{CUBE}.tmax') }}"
+        type: avg
+        rolling_window:
+          trailing: 7 day
+
+      # Share of total (multi-stage). The *_total helpers are hidden from the view.
+      - name: total_prcp_all
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: sum
+        grain:
+          keep_only: []
+      - name: prcp_share_of_total
+        multi_stage: true
+        sql: "{total_prcp} / NULLIF({total_prcp_all}, 0)"
+        type: number
+        format: percent
+      - name: total_prcp_country
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: sum
+        grain:
+          keep_only: [{{ data_source }}_stations.country]
+      - name: prcp_share_of_country
+        multi_stage: true
+        sql: "{total_prcp} / NULLIF({total_prcp_country}, 0)"
+        type: number
+        format: percent
+
+      # Period over period (multi-stage time_shift). The *_prior_* helpers are hidden from the view
+      # except avg_tmax_prior_year, which SPEC §8.3 exposes.
+      - name: avg_tmax_prior_year
+        multi_stage: true
+        sql: "{avg_tmax}"
+        type: number
+        time_shift:
+          - time_dimension: date
+            interval: 1 year
+            type: prior
+      - name: tmax_yoy_delta
+        multi_stage: true
+        sql: "{avg_tmax} - {avg_tmax_prior_year}"
+        type: number
+      - name: total_prcp_prior_month
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: number
+        time_shift:
+          - time_dimension: date
+            interval: 1 month
+            type: prior
+      - name: prcp_mom_ratio
+        multi_stage: true
+        sql: "{total_prcp} / NULLIF({total_prcp_prior_month}, 0)"
+        type: number
+
+    # Cube Store rollups (monthly_country, yearly_station) are added here in B5c (SPEC §8.4).
+    pre_aggregations: []
+{%- endfor %}

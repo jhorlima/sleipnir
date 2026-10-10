@@ -16,6 +16,10 @@ Use the native patterns from the Cube data-modeling recipes instead of hand-writ
 - **Period over period:** `multi_stage: true` measure with `time_shift: [{interval: 1 year, type: prior}]`, combined in a multi-stage ratio/delta with `NULLIF`.
 - Non-additive measures (percentiles, medians, ratios) are not re-aggregated by Cube Store; only a rollup at the exact query grain can serve them.
 
+## Jinja
+- Cube's Jinja auto-escapes strings: return `SafeString` from Python helpers and use `| safe` on built `{cube}` references, or names render as `"trino"_stations`.
+- Engine-specific SQL lives in `cube/model/globals.py` helpers keyed by data source; YAML templates stay engine-agnostic.
+
 ## Precision in pre-aggregations
 Cube's SQL drivers send DECIMAL columns to Cube Store as `Decimal(18,5)`: sums lose everything past 5 decimals and values below 1e-5 become 0. `CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE` does not fix it.
 

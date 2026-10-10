@@ -1,0 +1,26 @@
+# dim_station, rendered once per data source.
+cubes:
+{%- for data_source in data_sources() %}
+  - name: {{ data_source }}_stations
+    data_source: {{ data_source }}
+    sql_table: {{ gold_table(data_source, 'dim_station') }}
+    public: false
+
+    dimensions:
+      - name: station_id
+        sql: "{CUBE}.station_id"
+        type: string
+        primary_key: true
+      - name: country
+        sql: "{CUBE}.country_code"
+        type: string
+      - name: elevation
+        sql: "{CUBE}.elevation"
+        type: number
+      - name: latitude
+        sql: "{CUBE}.latitude"
+        type: number
+      - name: longitude
+        sql: "{CUBE}.longitude"
+        type: number
+{%- endfor %}

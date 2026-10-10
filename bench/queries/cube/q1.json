@@ -1,0 +1,5 @@
+{
+  "measures": ["trino_weather.observation_count"],
+  "timeDimensions": [{"dimension": "trino_weather.date", "granularity": "year"}],
+  "order": {"trino_weather.date": "asc"}
+}

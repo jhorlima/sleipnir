@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help env up down ps logs init clean engine-up engine-down trino-cli ingest-build download ingest storage-report \
-	dbt-image dbt-debug dbt-build dbt-run dbt-test dbt-full-refresh dbt-shell drop-run
+	dbt-image dbt-debug dbt-build dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
+	cube-up cube-down cube-query cube-sql
 
 ENGINE ?= trino
 PROFILE ?= m
@@ -9,6 +10,9 @@ DBT_TARGET ?= trino
 VARS ?=
 ARGS ?=
 RUN_ID ?=
+# cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENDPOINT=load (rows) or sql (generated SQL).
+Q ?=
+ENDPOINT ?= load
 
 dbt_vars = $(if $(VARS),--vars '$(VARS)')
 dbt = docker compose --env-file .env --env-file env/$(PROFILE).env --profile dbt run --rm \
@@ -81,6 +85,19 @@ dbt-shell: ## Open a shell in the dbt container (project mounted at /app)
 
 drop-run: ## Drop the bench_RUN_ID_* namespaces via Trino and wait until their files are purged
 	scripts/drop-run-namespaces.sh $(RUN_ID)
+
+cube-up: ## Start Cube (API, refresh worker) and Cube Store; the engines are started on their own
+	docker compose --profile cube up -d --wait cube-api cube-refresh-worker cubestore-router cubestore-worker
+
+cube-down: ## Stop and remove the Cube and Cube Store containers (the Cube Store volume is kept)
+	docker compose --profile cube rm --stop --force cube-api cube-refresh-worker cubestore-router cubestore-worker
+
+cube-query: ## Run bench/queries/cube/qQ.json on the Cube REST API and print the result (Q=1..10; ENDPOINT=sql for the SQL)
+	scripts/cube-query.sh $(Q) $(ENDPOINT)
+
+cube-sql: ## Open psql on Cube's SQL API (Postgres protocol), from inside the postgres container
+	docker compose exec -e PGPASSWORD=$$(docker compose exec -T cube-api printenv CUBEJS_SQL_PASSWORD) \
+		postgres psql -h cube-api -p 15432 -U cube cube
 
 clean: ## DESTRUCTIVE: stop the stack and delete its volumes (all lake data and catalog metadata)
 	docker compose --profile init down --volumes --remove-orphans

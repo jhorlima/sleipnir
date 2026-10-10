@@ -204,7 +204,7 @@ Regras de modelagem em `.claude/rules/cube-models.md`.
 O Cube lê **somente pelos engines** (SQL nas tabelas gold). Ele não importa nem depende de artefatos do dbt (manifest, semantic models); o schema do Cube é mantido à parte.
 
 ### 8.1 Deploy
-- Cube e Cube Store na **mesma versão** (`v1.7.18` como ponto de partida, pinada em `.env`); imagem do Cube Store com `${CUBESTORE_ARCH_SUFFIX}` (`-arm64v8` no Apple Silicon).
+- Cube e Cube Store na **mesma versão** (`v1.7.50`, uma única variável `CUBE_VERSION`); imagem do Cube Store com `${CUBESTORE_ARCH_SUFFIX}` (`-arm64v8` no Apple Silicon).
 - Serviços: `cube-api` (REST + SQL API, `CUBEJS_REFRESH_WORKER=false`), `cube-refresh-worker` (`CUBEJS_REFRESH_WORKER=true`), `cubestore-router` + `cubestore-worker` (1 worker local). Env comum via anchor `x-cube-env-common`.
 - Flags: `CUBEJS_TESSERACT_SQL_PLANNER=true`, `CUBEJS_SCHEDULED_REFRESH_TIMEZONES=UTC`, `CUBEJS_DEV_MODE=false` nas execuções medidas.
 - Modelos só em YAML.
@@ -231,12 +231,16 @@ Cubes (internos, `public: false`): `weather_daily` (sobre `fct_weather_daily`), 
 | Medidas | `avg_tmax`, `avg_tmin`, `total_prcp`, `days_with_rain`, `station_count`, `observation_count` |
 | Dimensões | `country`, `station_id`, `elevation`, `latitude`, `longitude`, `date` (day/month/year) |
 | Derivadas | `temp_range = avg_tmax - avg_tmin`, `rain_day_ratio = days_with_rain / observation_count` |
-| Percentis | `median_tmax`, `p95_prcp` — `type: number` com a função de cada engine (Trino `approx_percentile`, StarRocks `PERCENTILE_CONT(x, p)`, DuckDB/Postgres `PERCENTILE_CONT(p) WITHIN GROUP (ORDER BY x)`) |
-| Agregado aninhado | `median_station_annual_prcp` — soma anual por estação (cube interno + dimensão `sub_query: true`), mediana entre estações |
-| Share of total | `prcp_share_of_total` — multi-stage, helper `grain: keep_only: []`, `format: percent`; variante por país com `keep_only: [country]` |
+| Janela móvel | `avg_tmax_7d` (`rolling_window` trailing 7 day; Q5) |
+| Percentis | `median_tmax`, `p95_tmax`, `p95_prcp` — `type: number` com a função de cada engine (Trino `approx_percentile`, StarRocks `PERCENTILE_CONT(x, p)`, DuckDB/Postgres `PERCENTILE_CONT(p) WITHIN GROUP (ORDER BY x)`) |
+| Agregado aninhado | `median_station_annual_prcp` — soma anual por estação no cube interno `station_years` (estação × ano, dimensão `sub_query: true`), mediana entre estações |
+| Share of total | `prcp_share_of_total` — multi-stage, helper `grain: keep_only: []`, `format: percent`; `prcp_share_of_country` com `keep_only: [country]` (também remove o grão de tempo do denominador) |
 | Period-over-period | `avg_tmax_prior_year` (`time_shift` 1 year prior), `tmax_yoy_delta`, `prcp_mom_ratio` (1 month prior) |
 
-- Multi-stage (`multi_stage`, `grain`, `time_shift`) depende do Tesseract, ligado por padrão a partir do Cube 1.7.
+- Multi-stage (`multi_stage`, `grain`, `time_shift`) depende do Tesseract, ligado por padrão a partir do Cube 1.7. Queries multi-stage podem trazer linhas extras do período deslocado com medidas NULL.
+- O SQL específico de cada engine fica em `cube/model/globals.py` (`gold_table`, `to_double`, `percentile`), chaveado por data source; os YAML são agnósticos.
+- O data source `default` é obrigatório no Cube: aponta para um DuckDB em memória que nenhum cube usa.
+- `approx_percentile` (Trino) não é determinístico: Q7/Q8 são validadas com tolerância (§10.6).
 - Medidas não aditivas (percentis, mediana) não são reagregadas pelo Cube Store; só usam rollup se ele tiver exatamente a mesma granularidade da query (⚠️ V9).
 - **Precisão em pre-aggregations:** os drivers SQL do Cube mandam DECIMAL para o Cube Store como `Decimal(18,5)` (trunca em 5 casas; `CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE` não resolve). Toda medida que entra em rollup é feita com `CAST(... AS DOUBLE)` (`DOUBLE PRECISION` no Postgres). Detalhes em `.claude/rules/cube-models.md`.
 - Sintaxe específica por engine (ex.: `PERCENTILE_CONT` no StarRocks recebe 2 argumentos) fica no template, por data source.
@@ -328,7 +332,7 @@ D2: 22 queries TPC-H (dialeto ajustado por engine, semântica igual).
 - **Cold:** reiniciar o engine e limpar os caches → 1 execução.
 - **Warm:** 1 warm-up descartado + **5 execuções** medidas.
 - Timeout: 300 s por query (registra `timeout` e segue).
-- Validar o resultado (row count + checksum) contra a referência DuckDB; resultado divergente invalida a medição.
+- Validar o resultado (row count + checksum) contra a referência DuckDB; resultado divergente invalida a medição. Exceção: medidas aproximadas (percentis via `approx_percentile`) são comparadas com tolerância relativa de 5%, e a tolerância é registrada no resultado.
 - Coletar `docker stats` (CPU/mem) durante cada execução.
 
 ### 10.7 Formato dos resultados

@@ -82,7 +82,10 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - **First strategy numbers (silver, one run each):** from scratch, merge 52.8 s, delete+insert 52.6 s, microbatch 26.3 s (12 monthly batches). Loading one new batch: 6.95 s, 7.41 s and 5.3 s. All three produce identical rows and `sum(value)`. Default: delete+insert, because its window comes from the data. dbt's microbatch follows the wall clock, so on historical data it needs explicit event-time bounds.
 - **Gotcha:** dedup with `ROW_NUMBER() = 1` failed on profile M even with spill-to-disk on. Trino rewrites it into a TopNRanking operator, which cannot spill. `optimizer.optimize-top-n-ranking=false` fixes it, and it is recorded as a non-default engine setting.
 - **Gotchas:** GHCN publishes SNOW/SNWD in mm, not tenths. `dbt_utils.fewer_rows_than` breaks on Trino, and `dbt_utils.recency` compares to the wall clock (useless for historical data), so both became singular tests. The `tmax >= tmin` test warns on 4 rows created by the simulated revisions, which is exactly what it should catch.
-- _(next: Cube on Trino)_
+- **Cube 1.7.50 on Trino.** One template per cube, rendered per data source. All ten questions answer through the REST API, and Q1–Q3 match direct Trino SQL exactly (Q3 differs only at ~1e-12 from float summation order). Every modern pattern worked on Trino: `approx_percentile`, a nested aggregate through a `sub_query` dimension, share of total with multi-stage `grain`, `time_shift` period-over-period and a 7-day rolling window.
+- **Gotcha:** Trino's `approx_percentile` is not deterministic (the same median came back as 627–645 across runs), so percentile queries get a 5% tolerance instead of an exact checksum.
+- **Gotchas:** Cube requires a `default` data source even when no cube uses it (here, an in-memory DuckDB). Cube's Jinja auto-escapes strings, so generated names rendered as `"trino"_stations` until helpers returned `SafeString`. The official images ship without curl, so the healthchecks use `node` fetch and bash `/dev/tcp`.
+- _(next: phase 1 acceptance — the whole flow from a clean state — then phase 2, the benchmark harness and the other engines)_
 
 ### Phase 2 — benchmark
 
