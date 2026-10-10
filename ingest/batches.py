@@ -1,4 +1,4 @@
-"""Split the GHCN year files into monthly batch CSVs that simulate an incremental source (SPEC §5).
+"""Split the GHCN year files into monthly gzipped batch CSVs that simulate an incremental source (SPEC §5).
 
 Batch YYYYMM holds the rows of month MM plus the 7 days before it (the tail of the previous
 batch). About 1% of the batch's rows are revisions: overlap rows re-sent with a changed value.
@@ -50,7 +50,7 @@ def batch_ids_for_year(year):
 
 
 def batch_path(batch_id):
-    return BATCHES_DIR / f"{batch_id}.csv"
+    return BATCHES_DIR / f"{batch_id}.csv.gz"
 
 
 def batch_window(batch_id):
@@ -120,7 +120,7 @@ def write_batch(con, batch_id):
                 obs_time
             FROM observations
             WHERE date >= '{window_start}' AND date < '{next_month_start}'
-        ) TO '{partial}' (FORMAT csv, HEADER false)
+        ) TO '{partial}' (FORMAT csv, HEADER false, COMPRESSION gzip)
     """)
     os.replace(partial, target)
     return True
