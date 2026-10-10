@@ -1,0 +1,8 @@
+[project]
+name = "sleipnir-bench-harness"
+version = "0.1.0"
+description = "Runs benchmark suites, samples docker stats and appends results/<suite>.parquet."
+requires-python = "==3.12.*"
+dependencies = [
+    "duckdb==1.5.6",
+]

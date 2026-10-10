@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help env up down ps logs init clean engine-up engine-down trino-cli ingest-build download ingest storage-report \
-	dbt-image dbt-debug dbt-build dbt-backfill dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
-	cube-up cube-down cube-query cube-sql
+	dbt-image dbt-debug dbt-build dbt-backfill dbt-check-unique dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
+	cube-up cube-down cube-query cube-sql bench report
 
 ENGINE ?= trino
 PROFILE ?= m
@@ -16,6 +16,10 @@ BACKFILL_END ?= 2026-01-01
 # cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENDPOINT=load (rows) or sql (generated SQL).
 Q ?=
 ENDPOINT ?= load
+# bench: SUITE=b1|b2; B1 always measures DuckDB. ARGS is passed to dbt (B2).
+SUITE ?=
+bench_engine = $(if $(filter b1,$(SUITE)),duckdb,$(ENGINE))
+harness = uv run --directory bench/harness
 
 dbt_vars = $(if $(VARS),--vars '$(VARS)')
 dbt = docker compose --env-file .env --env-file env/$(PROFILE).env --profile dbt run --rm \
@@ -81,6 +85,9 @@ dbt-backfill: ## Build silver/gold from scratch one month at a time (BACKFILL_ST
 	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_gold.fct_weather_daily}'
 	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_gold.agg_weather_monthly_country}'
 
+dbt-check-unique: ## Check the silver natural key over the whole table, one year per query (after a backfill; not measured)
+	$(dbt) run-operation assert_unique_by_year --args '{relation: $(DBT_TARGET)_silver.ghcn_daily, key_columns: [station_id, date, element]}'
+
 dbt-run: ## dbt run (models only); same VARS/ARGS/RUN_ID passthrough as dbt-build
 	$(dbt) run $(dbt_vars) $(ARGS)
 
@@ -109,6 +116,12 @@ cube-query: ## Run bench/queries/cube/qQ.json on the Cube REST API and print the
 cube-sql: ## Open psql on Cube's SQL API (Postgres protocol), from inside the postgres container
 	docker compose exec -e PGPASSWORD=$$(docker compose exec -T cube-api printenv CUBEJS_SQL_PASSWORD) \
 		postgres psql -h cube-api -p 15432 -U cube cube
+
+bench: ## Run one measured suite and append results/SUITE.parquet (SUITE=b1|b2 ENGINE=trino PROFILE=m ARGS=...)
+	$(harness) python run.py $(SUITE) --engine $(bench_engine) --profile $(PROFILE) --args '$(ARGS)'
+
+report: ## Print p50/p95 per engine x profile x scenario and time per step from results/*.parquet
+	$(harness) python report.py
 
 clean: ## DESTRUCTIVE: stop the stack and delete its volumes (all lake data and catalog metadata)
 	docker compose --profile init down --volumes --remove-orphans
