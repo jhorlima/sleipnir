@@ -85,7 +85,8 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - **Cube 1.7.50 on Trino.** One template per cube, rendered per data source. All ten questions answer through the REST API, and Q1–Q3 match direct Trino SQL exactly (Q3 differs only at ~1e-12 from float summation order). Every modern pattern worked on Trino: `approx_percentile`, a nested aggregate through a `sub_query` dimension, share of total with multi-stage `grain`, `time_shift` period-over-period and a 7-day rolling window.
 - **Gotcha:** Trino's `approx_percentile` is not deterministic (the same median came back as 627–645 across runs), so percentile queries get a 5% tolerance instead of an exact checksum.
 - **Gotchas:** Cube requires a `default` data source even when no cube uses it (here, an in-memory DuckDB). Cube's Jinja auto-escapes strings, so generated names rendered as `"trino"_stations` until helpers returned `SafeString`. The official images ship without curl, so the healthchecks use `node` fetch and bash `/dev/tcp`.
-- _(next: phase 1 acceptance — the whole flow from a clean state — then phase 2, the benchmark harness and the other engines)_
+- **Phase 1 accepted.** From `make clean` to Cube answering the questions, everything ran in one go in about 3 minutes: ingest 12 batches → dbt build (39 tests passing, 1 expected warning) → storage report (0.23 GB, well under the 10 GB budget) → Cube Q1–Q6.
+- _(next: phase 2 — benchmark harness, Spark and Postgres as writers, StarRocks/DuckDB/Postgres as readers, TPC-H, acceleration and layout suites)_
 
 ### Phase 2 — benchmark
 

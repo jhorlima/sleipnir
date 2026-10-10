@@ -398,8 +398,8 @@ docs/SPEC.en.md           # ao estabilizar
 
 | Fase | Entrega | Pronto quando |
 |---|---|---|
-| **0 — Specs** | Este documento | Aprovado; pendências viram spikes (§15) |
-| **1 — MVP lakehouse** | Spikes V1/V4; storage + Lakekeeper + Trino + Traefik; ingestão D1 (1 ano → dimensionar); dbt-trino bronze→gold com testes; Cube sobre Trino | `make up ingest dbt` do zero sem erro; testes dbt passam; Cube responde às 6 perguntas; `storage-report` dentro do teto |
+| **0 — Specs** ✅ | Este documento | Aprovado; pendências viram spikes (§15) |
+| **1 — MVP lakehouse** ✅ | Spikes V1/V4; storage + Lakekeeper + Trino + Traefik; ingestão D1 (1 ano → dimensionar); dbt-trino bronze→gold com testes; Cube sobre Trino | `make up ingest dbt` do zero sem erro; testes dbt passam; Cube responde às 6 perguntas; `storage-report` dentro do teto |
 | **2 — Benchmark** | Harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
 | **3 — Orquestração** | Airflow 3 + Cosmos (`ExecutionMode.WATCHER`, CeleryExecutor) executando o fluxo do §9; tarefas que não são dbt (ingestão DuckDB, manutenção, refresh de MV, harness) rodam como **containers** via `DockerOperator` com imagens do projeto, para a imagem do Airflow ter só Cosmos, o provider Docker e as connections dos engines | DAG ponta a ponta; tempos por model ≈ fase 2; overhead do orquestrador registrado |
 | **4 — Extras** | R2 (+ R2 Data Catalog); Superset via Cube; observabilidade e linhagem (§10.8); Polaris; Airbyte se necessário; `SPEC.en.md` | Resultado documentado por item |
