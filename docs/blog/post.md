@@ -44,6 +44,7 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - Each transformation step (dbt model, microbatch batch, maintenance operation, MV refresh) is timed on its own.
 - Maintenance runs as a post-hook in normal use, but is switched off inside measured runs and timed separately.
 - A single run must fit in 10 GB of object storage, so it can be repeated on a free-tier bucket (Cloudflare R2).
+- Locally there is no such limit: if ingesting the 10 GB scale is fast and only bounded by download speed, the local scale grows to ~20 GB or ~30 minutes of ingestion, whichever comes first. Numbers from different scales are never compared.
 
 ## 4. The data
 

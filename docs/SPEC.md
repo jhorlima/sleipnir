@@ -119,6 +119,10 @@ Ingestão em **lotes incrementais com janela sobreposta**: cada lote `n` inclui 
 
 Regras:
 - O teto vale para **uma execução** (bronze + silver/gold de um único writer + D2). Comparar vários writers lado a lado é feito **localmente**, onde não há teto.
+- **Duas escalas de dados**, escolhidas por `DATA_SCALE`:
+  - `r2` — cabe no teto de 10 GB por execução; usada no cenário R2 e como escala padrão.
+  - `local` — se a ingestão da escala `r2` for rápida e o limite for só throughput de download/rede, a escala local cresce (mais anos de D1, SF maior em D2) até **~20 GB ou ~30 min de ingestão (B1)**, o que vier primeiro. O tamanho final é fixado após a primeira medição do B1 e registrado nos resultados.
+  - Resultados de escalas diferentes nunca são comparados entre si; `results` registra a escala de cada execução.
 - Fora do bucket: `landing/` (CSV em disco local), baseline Postgres, MVs do StarRocks (storage local do BE) e Cube Store.
 - **Dimensionamento empírico:** na fase 1, ingerir 1 ano de D1, medir o tamanho por namespace e calcular quantos anos cabem no teto de uma execução. Para D2, gerar SF1, medir e escalar o SF.
 - Manutenção após cada carga (§10.4): snapshots antigos contam no orçamento.
@@ -318,7 +322,7 @@ D2: 22 queries TPC-H (dialeto ajustado por engine, semântica igual).
 
 ### 10.7 Formato dos resultados
 `results/<suite>.parquet`, uma linha por etapa/execução:
-`run_id, ts, suite, scenario, step, dataset, engine, engine_version, engine_config, profile, strategy, query_id, batch, run_type, latency_ms, rows, files_written, checksum_ok, status, peak_mem_mb, avg_cpu_pct, file_count, storage_bytes, notes`
+`run_id, ts, suite, scenario, step, dataset, data_scale, engine, engine_version, engine_config, profile, strategy, query_id, batch, run_type, latency_ms, rows, files_written, checksum_ok, status, peak_mem_mb, avg_cpu_pct, file_count, storage_bytes, notes`
 
 Relatório: script DuckDB que gera p50/p95 por engine × perfil × cenário e o tempo por etapa da transformação.
 
@@ -434,7 +438,7 @@ docs/SPEC.en.md           # ao estabilizar
 | Repositório público | Código em inglês, `README.md` (arquitetura, como reproduzir, resultados), licença Apache-2.0, `SPEC.en.md`. |
 | Resultados | `results/*.parquet` + relatório gerado (tabelas e gráficos) versionados, com versões e `engine_config` de cada execução. |
 | Artigo | Blog (versão completa) + post no LinkedIn (resumo com 2–3 gráficos e link). |
-| Rascunho | `docs/blog/post.md` — esqueleto do artigo e diário do projeto, atualizado a cada decisão, spike e resultado. |
+| Rascunho | `docs/blog/post.md` — esqueleto do artigo e diário do projeto, atualizado a cada decisão, spike e resultado. Escrito em inglês; tradução para PT-BR quando estiver pronto. |
 | Assets | Capa; cards com os números (resultados renderizados como imagem); diagrama da arquitetura; screenshots das UIs; vídeo explicativo da ferramenta e dos benchmarks (skill `/brag`). |
 
 Estrutura do artigo:
