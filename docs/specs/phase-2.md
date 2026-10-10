@@ -4,10 +4,11 @@ Detalha a fase 2 do §13 do [SPEC](../SPEC.md). Regras de medição em `.claude/
 
 ## Restrição que define a ordem
 
-A VM do Docker tem 8 GB e 6 CPUs. O perfil `M` dá 8 GB ao engine sob teste, e a infra (RustFS, Lakekeeper, Postgres, Traefik) usa cerca de 1 GB a mais. Por isso:
+A VM do Docker tem 8 CPUs, 16 GB e 2 GB de swap. O perfil `M` dá 8 GB ao engine sob teste e o `L` dá 12 GB. A infra (RustFS, Lakekeeper, Postgres, Traefik) usa cerca de 2 GB, e o Cube com o Cube Store mais uns 3 GB. Por isso:
 
-- **Só um engine fica de pé por vez**, inclusive nas validações dos workers, e não apenas nas medições. Workers escrevem código em paralelo, mas sobem engines em fila, um de cada vez.
-- Antes das medições no perfil `M`, a VM sobe para **≥ 12 GB** (para o perfil `L`, ≥ 16 GB). Com 8 GB, quatro testes dbt simultâneos sobre a `r2` derrubaram o Trino por OOM (exit 137). Os limites usados ficam registrados no post.
+- **Só um engine fica de pé por vez**, inclusive nas validações dos workers, e não apenas nas medições. Workers escrevem código em paralelo, mas sobem engines em fila, um de cada vez. Engine + Cube cabem juntos no perfil `M`.
+- Os containers dos engines têm `memswap_limit` igual ao limite de memória: sem swap, um engine sem memória falha em vez de ficar lento sem que ninguém perceba.
+- Com a VM de 8 GB, quatro testes dbt simultâneos sobre a `r2` derrubaram o Trino por OOM (exit 137). É por isso que a VM tem 16 GB.
 - O macOS não pode dormir durante uma execução: o sono congela a VM e o Trino perde as tasks (`ABANDONED_TASK`). Execuções longas rodam sob `caffeinate -i`, e o harness recusa medir sem isso.
 
 ## Etapas
