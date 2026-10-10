@@ -134,6 +134,7 @@ Regras:
   - `r2` — cabe no teto de 10 GB por execução; usada no cenário R2 e como escala padrão.
   - `local` — se a ingestão da escala `r2` for rápida e o limite for só throughput de download/rede, a escala local cresce (mais anos de D1, SF maior em D2) até **~20 GB ou ~30 min de ingestão (B1)**, o que vier primeiro. O tamanho final é fixado após a primeira medição do B1 e registrado nos resultados.
   - Resultados de escalas diferentes nunca são comparados entre si; `results` registra a escala de cada execução.
+  - **Plano (primeiro passo da fase 2):** com só 2025 (0,23 GB), overhead fixo e cache dominam e o B6 não tem o que compactar. Escala `r2` = **GHCN 2010–2025** (16 anos; estimativa ~21 GB de CSV na origem, ~2,7 GB comprimido para baixar, bronze ~1,9 GB, lakehouse ~3,5 GB) + TPC-H no SF que couber no teto; escala `local` = mais anos para trás até ~20 GB de bronze ou ~30 min de B1. Os lotes intermediários em `landing/batches` passam a ser gravados como `.csv.gz` (~3 GB em vez de ~25 GB). Tamanhos finais fixados pelo `make storage-report` após a carga. **Avisar o autor antes de iniciar**, com a estimativa de disco, para liberar espaço ou conectar o SSD.
 - Fora do bucket: `landing/` (CSV em disco local), baseline Postgres, MVs do StarRocks (storage local do BE) e Cube Store.
 - **Dimensionamento empírico:** na fase 1, ingerir 1 ano de D1, medir o tamanho por namespace e calcular quantos anos cabem no teto de uma execução. Para D2, gerar SF1, medir e escalar o SF.
 - Manutenção após cada carga (§10.4): snapshots antigos contam no orçamento.
@@ -400,7 +401,7 @@ docs/SPEC.en.md           # ao estabilizar
 |---|---|---|
 | **0 — Specs** ✅ | Este documento | Aprovado; pendências viram spikes (§15) |
 | **1 — MVP lakehouse** ✅ | Spikes V1/V4; storage + Lakekeeper + Trino + Traefik; ingestão D1 (1 ano → dimensionar); dbt-trino bronze→gold com testes; Cube sobre Trino | `make up ingest dbt` do zero sem erro; testes dbt passam; Cube responde às 6 perguntas; `storage-report` dentro do teto |
-| **2 — Benchmark** | Harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
+| **2 — Benchmark** | Carga das escalas `r2` (GHCN 2010–2025) e `local` (§6); harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
 | **3 — Orquestração** | Airflow 3 + Cosmos (`ExecutionMode.WATCHER`, CeleryExecutor) executando o fluxo do §9; tarefas que não são dbt (ingestão DuckDB, manutenção, refresh de MV, harness) rodam como **containers** via `DockerOperator` com imagens do projeto, para a imagem do Airflow ter só Cosmos, o provider Docker e as connections dos engines | DAG ponta a ponta; tempos por model ≈ fase 2; overhead do orquestrador registrado |
 | **4 — Extras** | R2 (+ R2 Data Catalog); Superset via Cube; observabilidade e linhagem (§10.8); Polaris; Airbyte se necessário; `SPEC.en.md` | Resultado documentado por item |
 | **5 — Comparação de orquestração** | Dagster + dbt (`dagster-dbt`) executando o mesmo fluxo | Overhead Dagster × Airflow/Cosmos documentado |

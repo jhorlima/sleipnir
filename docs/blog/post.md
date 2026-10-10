@@ -86,7 +86,8 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - **Gotcha:** Trino's `approx_percentile` is not deterministic (the same median came back as 627–645 across runs), so percentile queries get a 5% tolerance instead of an exact checksum.
 - **Gotchas:** Cube requires a `default` data source even when no cube uses it (here, an in-memory DuckDB). Cube's Jinja auto-escapes strings, so generated names rendered as `"trino"_stations` until helpers returned `SafeString`. The official images ship without curl, so the healthchecks use `node` fetch and bash `/dev/tcp`.
 - **Phase 1 accepted.** From `make clean` to Cube answering the questions, everything ran in one go in about 3 minutes: ingest 12 batches → dbt build (39 tests passing, 1 expected warning) → storage report (0.23 GB, well under the 10 GB budget) → Cube Q1–Q6.
-- _(next: phase 2 — benchmark harness, Spark and Postgres as writers, StarRocks/DuckDB/Postgres as readers, TPC-H, acceleration and layout suites)_
+- **Too little data to benchmark.** At 0.23 GB, fixed overheads (planning, catalog round trips, JVM, Cube) and caches dominate, cold and warm would look the same, and there is nothing for compaction to fix. Phase 2 therefore starts by scaling up: GHCN 2010–2025 for the 10 GB scale (lakehouse ~3.5 GB estimated) and more years for the local scale.
+- _(next: phase 2 — bigger data first, then the benchmark harness, Spark and Postgres as writers, StarRocks/DuckDB/Postgres as readers, TPC-H, acceleration and layout suites)_
 
 ### Phase 2 — benchmark
 
