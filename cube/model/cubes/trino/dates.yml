@@ -1,0 +1,6 @@
+# Trino: dim_date. Everything else comes from base_dates.
+cubes:
+  - name: trino_dates
+    extends: base_dates
+    data_source: trino
+    sql_table: lakehouse.trino_gold.dim_date

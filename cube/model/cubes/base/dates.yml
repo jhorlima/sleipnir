@@ -1,9 +1,9 @@
-# dim_date, rendered once per data source.
+# dim_date. Engine cubes extend base_dates and set data_source and sql_table (cubes/<engine>/dates.yml).
+# base_* cubes are never queried: placeholder data source, not public.
 cubes:
-{%- for data_source in data_sources() %}
-  - name: {{ data_source }}_dates
-    data_source: {{ data_source }}
-    sql_table: {{ gold_table(data_source, 'dim_date') }}
+  - name: base_dates
+    data_source: default
+    sql_table: placeholder.dim_date
     public: false
 
     dimensions:
@@ -20,4 +20,3 @@ cubes:
       - name: month
         sql: "{CUBE}.month"
         type: number
-{%- endfor %}

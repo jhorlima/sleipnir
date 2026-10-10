@@ -65,7 +65,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 
 - **Trino (não padrão, em `config/trino/`):** spill-to-disk ligado e `optimizer.optimize-top-n-ranking=false` — o `ROW_NUMBER() ... = 1` do dedup vira um operador TopNRanking que não faz spill e estoura a memória por query do perfil M.
 - **Acesso ao S3 — o mesmo caminho para todos os engines:** o warehouse tem `sts-enabled: false` e `remote-signing-enabled: false`, então todos leem e escrevem com as mesmas chaves S3 estáticas. Sem isso, Spark/PyIceberg cairiam em silêncio no remote signing pelo Lakekeeper, enquanto Trino (sem remote signing para REST), DuckDB e StarRocks (que não suportam) usariam chaves — caminhos de I/O diferentes contaminariam a comparação. Spark envia também `X-Iceberg-Access-Delegation: client-managed`; DuckDB usa `ACCESS_DELEGATION_MODE 'none'` + secret S3. Warehouse com `key-prefix: lakehouse` e `delete-profile: hard`.
-- Os readers leem `trino_gold` por padrão (`GOLD_NAMESPACE`). Cenário extra: ler `spark_gold` para medir o efeito do layout gerado por cada writer.
+- Os readers diretos (B3) leem `trino_gold` por padrão (`GOLD_NAMESPACE`); no Cube o namespace é fixo em cada arquivo de engine. Cenário extra: ler `spark_gold` para medir o efeito do layout gerado por cada writer.
 
 ## 4. Componentes
 
@@ -216,12 +216,12 @@ Uma única instância do Cube com **multi data source**:
 
 | Data source | Driver | Observação |
 |---|---|---|
-| `trino` | `trino` | catálogo `lakehouse`, schema `GOLD_NAMESPACE` |
+| `trino` | `trino` | catálogo `lakehouse`, tabelas `lakehouse.trino_gold.*` |
 | `starrocks` | `mysql` (porta 9030 do FE) | nomes em três partes: `lakehouse.<gold_namespace>.<tabela>` |
 | `duckdb` | `duckdb` | init SQL carrega `iceberg`/`httpfs` e faz `ATTACH` no Lakekeeper |
 | `postgres` | `postgres` | schema `postgres_gold` |
 
-- O `data_source` é fixo em cada cube, então os cubes são gerados por data source a partir de **um único template** (Jinja do Cube, um laço simples sobre a lista de data sources), com prefixo: `trino_weather_daily`, `starrocks_weather_daily`, etc.
+- O `data_source` é fixo em cada cube. Os membros são escritos uma vez em `cube/model/cubes/base/` (cubes `base_*`, data source placeholder, não públicos) e cada engine tem arquivos curtos em `cube/model/cubes/<engine>/` com `extends`, `data_source`, `sql_table` e só o que difere (percentis, joins e referências a outros cubes, que o `extends` não renomeia). Nomes com prefixo: `trino_weather_daily`, `starrocks_weather_daily`, etc. Sem Jinja.
 - Joins e rollups não cruzam data sources (limitação do Cube; irrelevante aqui).
 
 ### 8.3 Modelo
@@ -239,12 +239,11 @@ Cubes (internos, `public: false`): `weather_daily` (sobre `fct_weather_daily`), 
 | Period-over-period | `avg_tmax_prior_year` (`time_shift` 1 year prior), `tmax_yoy_delta`, `prcp_mom_ratio` (1 month prior) |
 
 - Multi-stage (`multi_stage`, `grain`, `time_shift`) depende do Tesseract, ligado por padrão a partir do Cube 1.7. Queries multi-stage podem trazer linhas extras do período deslocado com medidas NULL.
-- O SQL específico de cada engine fica em `cube/model/globals.py` (`gold_table`, `to_double`, `percentile`), chaveado por data source; os YAML são agnósticos.
 - O data source `default` é obrigatório no Cube: aponta para um DuckDB em memória que nenhum cube usa.
 - `approx_percentile` (Trino) não é determinístico: Q7/Q8 são validadas com tolerância (§10.6).
 - Medidas não aditivas (percentis, mediana) não são reagregadas pelo Cube Store; só usam rollup se ele tiver exatamente a mesma granularidade da query (⚠️ V9).
 - **Precisão em pre-aggregations:** os drivers SQL do Cube mandam DECIMAL para o Cube Store como `Decimal(18,5)` (trunca em 5 casas; `CUBEJS_DB_PRECISE_DECIMAL_IN_CUBESTORE` não resolve). Toda medida que entra em rollup é feita com `CAST(... AS DOUBLE)` (`DOUBLE PRECISION` no Postgres). Detalhes em `.claude/rules/cube-models.md`.
-- Sintaxe específica por engine (ex.: `PERCENTILE_CONT` no StarRocks recebe 2 argumentos) fica no template, por data source.
+- Sintaxe específica por engine (ex.: `PERCENTILE_CONT` no StarRocks recebe 2 argumentos) fica no arquivo daquele engine, sobrescrevendo o membro da base.
 
 ### 8.4 Pre-aggregations (só no B5c)
 - Rollup `monthly_country` (país × mês) e `yearly_station` (estação × ano), `partition_granularity: month`/`year`, índices pelas dimensões filtradas.
@@ -427,7 +426,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-13 | Spark 4.1.x + Iceberg ≥ 1.11 (Scala 2.13), `local[N]` ajustado ao perfil | Versão mais recente; um JVM evita overhead de cluster em um nó. |
 | D-14 | Um engine por vez; dbt com `threads` igual para todos; medição por model | Comparação justa sem disputa entre engines; o paralelismo interno é mérito de cada engine. |
 | D-15 | Codec/tamanho de arquivo/partição definidos pelo B6 | Escolha baseada em medição, não em suposição. |
-| D-16 | Uma instância do Cube com multi data source; cubes gerados por template | Um só schema para todos os engines, sem duplicar definições. |
+| D-16 | Uma instância do Cube com multi data source; membros na base e engines via `extends` | Semântica idêntica entre engines sem template; cada arquivo de engine mostra só o que difere. |
 | D-17 | Medidas de rollup sempre `CAST AS DOUBLE` | Drivers truncam DECIMAL a 5 casas no Cube Store. |
 | D-18 | Cube lê só pelos engines, sem integração com dbt | O benchmark mede o caminho engine → Cube; schema do Cube independente. |
 | D-19 | Medidas avançadas via recursos nativos do Cube (multi-stage, `time_shift`, `sub_query`) | Abordagem atual recomendada pelo Cube; gera SQL mais exigente para os engines. |

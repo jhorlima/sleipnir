@@ -1,9 +1,9 @@
-# dim_station, rendered once per data source.
+# dim_station. Engine cubes extend base_stations and set data_source and sql_table (cubes/<engine>/stations.yml).
+# base_* cubes are never queried: placeholder data source, not public.
 cubes:
-{%- for data_source in data_sources() %}
-  - name: {{ data_source }}_stations
-    data_source: {{ data_source }}
-    sql_table: {{ gold_table(data_source, 'dim_station') }}
+  - name: base_stations
+    data_source: default
+    sql_table: placeholder.dim_station
     public: false
 
     dimensions:
@@ -23,4 +23,3 @@ cubes:
       - name: longitude
         sql: "{CUBE}.longitude"
         type: number
-{%- endfor %}

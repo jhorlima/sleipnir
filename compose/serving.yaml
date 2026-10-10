@@ -7,7 +7,6 @@ x-cube-env-common: &cube-env-common
   CUBEJS_SCHEDULED_REFRESH_TIMEZONES: UTC
   CUBEJS_CUBESTORE_HOST: cubestore-router
   CUBEJS_LOG_LEVEL: warn
-  GOLD_NAMESPACE: ${GOLD_NAMESPACE:-trino_gold}
 
   # Cube refuses CUBEJS_DATASOURCES without `default`, which reads the un-prefixed CUBEJS_DB_* vars.
   # No cube uses it: it is an in-memory DuckDB, so it needs no running engine and never fails /readyz.
@@ -19,7 +18,7 @@ x-cube-env-common: &cube-env-common
   CUBEJS_DS_TRINO_DB_PORT: "8080"
   CUBEJS_DS_TRINO_DB_USER: cube
   CUBEJS_DS_TRINO_DB_PRESTO_CATALOG: lakehouse
-  CUBEJS_DS_TRINO_DB_SCHEMA: ${GOLD_NAMESPACE:-trino_gold}
+  CUBEJS_DS_TRINO_DB_SCHEMA: trino_gold
 
 x-cube-healthcheck: &cube-healthcheck
   test: ["CMD", "node", "-e", "fetch('http://localhost:4000/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
