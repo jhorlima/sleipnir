@@ -114,6 +114,7 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
   - PyHive always sends `USE default`, so an empty `default` namespace has to exist in the catalog.
   - Spark has no delete+insert strategy, so its default is merge.
   - Spark refuses to remove orphan files younger than 24 h, so its maintenance is not identical to Trino's. The difference is recorded with the B6 numbers.
+- **Postgres moves to its own scale.** As a row store, Postgres needs ~65 bytes per row against Parquet's ~2.7. Scale r2 would take ~90 GB inside Postgres, more than the whole Docker disk. Postgres stays as the baseline, but on a `small` scale (2025 only, 44 M bronze rows, ~6 GB in Postgres), where every other engine also runs B2/B3. That way it is compared on the same data and never against a bigger scale.
 - **Goal: billions of rows inside 10 GB.** At ~2.7 bytes per bronze row, the 6.5 GB reserved for one writer's lakehouse fits ~1.3 billion bronze rows with today's layout, and more if sorting before writing pays off as it did in phase 1. The benchmark runs first on the current 742 M rows; after the layout suite (B6), `r2` grows by years until it fills the budget, and the suites run again. The Cloudflare R2 run comes last, after every local phase.
 - **Scale `local`** will be the whole GHCN history, 1750–2025 (~14.4 GB to download, ~19 GB of lakehouse). At 5 M rows/s, ingestion would need far more data than GHCN has to reach 30 minutes, so the history's size is the limit.
 

@@ -61,7 +61,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 | `trino_silver`, `trino_gold` | Trino via dbt | silver/gold oficiais (fonte padrão dos readers) |
 | `spark_silver`, `spark_gold` | Spark via dbt | mesmo projeto dbt, escrito pelo Spark |
 | `bench_*` | harness | tabelas temporárias de experimentos de layout (apagadas com `PURGE`) |
-| `postgres_bronze/silver/gold` | DuckDB + dbt-postgres | baseline, em schemas do Postgres (fora do lake) |
+| `postgres_bronze/silver/gold` | DuckDB + dbt-postgres | baseline só na escala `small` (D-23), em schemas de um Postgres próprio do benchmark (fora do lake, separado do Postgres do catálogo) |
 
 - **Trino (não padrão, em `config/trino/`):** spill-to-disk ligado e `optimizer.optimize-top-n-ranking=false` — o `ROW_NUMBER() ... = 1` do dedup vira um operador TopNRanking que não faz spill e estoura a memória por query do perfil M.
 - **Acesso ao S3 — o mesmo caminho para todos os engines:** o warehouse tem `sts-enabled: false` e `remote-signing-enabled: false`, então todos leem e escrevem com as mesmas chaves S3 estáticas. Sem isso, Spark/PyIceberg cairiam em silêncio no remote signing pelo Lakekeeper, enquanto Trino (sem remote signing para REST), DuckDB e StarRocks (que não suportam) usariam chaves — caminhos de I/O diferentes contaminariam a comparação. Spark envia também `X-Iceberg-Access-Delegation: client-managed`; DuckDB usa `ACCESS_DELEGATION_MODE 'none'` + secret S3. Warehouse com `key-prefix: lakehouse` e `delete-profile: hard`.
@@ -76,7 +76,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 | Formato | **Parquet + Iceberg v2** | Iceberg v3 (V6) | Codec e tamanho de arquivo definidos pelo B6. |
 | Ingestão | **DuckDB 1.5** | Airbyte (se precisar de conectores) | Escreve Iceberg v2 direto no Lakekeeper (V1). |
 | Transformação | **dbt Core 1.12** + dbt-trino 1.10 (Trino 483) | dbt Core v2 quando houver adapter Trino/Postgres | `dbt-trino`, `dbt-spark`, `dbt-postgres`. |
-| Engines de transformação | **Trino**, **Spark 4.1.x** | — | Postgres como baseline. |
+| Engines de transformação | **Trino**, **Spark 4.1.x** | — | Postgres como baseline na escala `small`. |
 | Engines de leitura | **StarRocks**, Trino, DuckDB, Postgres | — | StarRocks via external catalog. |
 | Aceleração | **StarRocks async MV**, Trino MV, **Cube Store** | — | §10.3. |
 | Semantic layer | **Cube** | — | Drivers oficiais: Trino, DuckDB, Postgres; StarRocks via driver MySQL. Sem Spark. |
@@ -137,6 +137,7 @@ Regras:
 | Escala | D1 (GHCN) | Download | Lotes `.csv.gz` | Bronze | Lakehouse (bronze + 1 writer) | Status |
 |---|---|---|---|---|---|---|
 | `r2` (padrão) | hoje 2010–2025: 192 lotes mensais, 741,9 M linhas no bronze. **Meta: ≥ 1 bi linhas no bronze dentro do teto**; anos ampliados depois do B6 | 2,81 GB | 3,36 GB | 1,98 GB | **3,75 GB** (silver 1,02, gold 0,75) + D2 ≤ 2 GB | Medida pelo `make storage-report` |
+| `small` | só 2025: 12 lotes mensais, ~44 M linhas no bronze | 0,17 GB | ~0,2 GB | ~0,12 GB | ~0,23 GB (no Postgres: ~6 GB) | Medida na fase 1; escala da comparação com o Postgres (D-23) |
 | `local` | histórico completo, 1750–2025 | ~14,4 GB | ~17 GB | ~10 GB | ~19 GB | Estimada; carga na etapa 10 de [`specs/phase-2.md`](specs/phase-2.md), com aviso de disco antes |
 
   - **Meta da `r2`: bilhões de linhas dentro de 10 GB.** Na `r2` atual o bronze ocupa ~2,7 bytes/linha e o lakehouse 3,75 GB, só ~38% do orçamento. O teto de 6,5 GB do D1 comporta ~1,3 bi linhas no bronze com o layout atual. Se o B6 confirmar o ganho de ordenar antes de gravar (o Parquet caiu à metade na fase 1), comporta mais. As medições começam na `r2` atual; depois do B6, a `r2` é ampliada em anos até encher o teto e as suítes são repetidas ([plano](specs/phase-2.md), etapa 10).
@@ -227,7 +228,7 @@ Uma única instância do Cube com **multi data source**:
 | `trino` | `trino` | catálogo `lakehouse`, tabelas `lakehouse.trino_gold.*` |
 | `starrocks` | `mysql` (porta 9030 do FE) | nomes em três partes: `lakehouse.<gold_namespace>.<tabela>` |
 | `duckdb` | `duckdb` | DuckDB 1.5.5 **embutido no processo do Cube** (a ingestão usa 1.5.6). Extensões via `CUBEJS_DS_DUCKDB_DB_DUCKDB_EXTENSIONS`; `CREATE SECRET` + `ATTACH` no Lakekeeper exigem um `driverFactory` no `cube.js` (V13). Usa os limites de CPU/memória do container do Cube; nas medições valem os do perfil (D-22). `cube/cube.js` monta o init SQL; o Cube depende do Lakekeeper saudável, porque um init SQL que falha fica em cache |
-| `postgres` | `postgres` | schema `postgres_gold` |
+| `postgres` | `postgres` | schema `postgres_gold` do Postgres do benchmark; só na escala `small` |
 
 - O `data_source` é fixo em cada cube. Os membros são escritos uma vez em `cube/model/cubes/base/` (cubes `base_*`, data source placeholder, não públicos) e cada engine tem arquivos curtos em `cube/model/cubes/<engine>/` com `extends`, `data_source`, `sql_table` e só o que difere (percentis, joins e referências a outros cubes, que o `extends` não renomeia). Nomes com prefixo: `trino_weather_daily`, `starrocks_weather_daily`, etc. Sem Jinja.
 - Joins e rollups não cruzam data sources (limitação do Cube; irrelevante aqui).
@@ -442,6 +443,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-20 | Manutenção numa macro única: post-hook no uso normal, desligada e medida à parte nos benchmarks | Um só código para operação e benchmark; tempo dos models não é contaminado. |
 | D-21 | Construção do zero em janelas mensais (`make dbt-backfill`: microbatch e manutenção uma vez por tabela) | Na `r2`, o dedup do silver numa query só (~740 M linhas) e o teste de unicidade da tabela inteira estouram o spill de 10 GB do perfil `M`. Por mês, cada lote leva 2–9 s. |
 | D-22 | Nas medições do DuckDB via Cube (B4/B5), o `cube-api` recebe os limites do perfil (`ENGINE_CPUS`/`ENGINE_MEMORY`), e o DuckDB recebe 75% dessa memória e `ENGINE_CPUS` threads; tudo registrado em `engine_config` | O DuckDB roda dentro do processo do Cube. Com os limites padrão do Cube (1 CPU / 1 GB, DuckDB 512 MB), a Q8 estoura a memória na `r2`. O overhead do Node fica dentro do mesmo orçamento, e isso é citado junto dos números. |
+| D-23 | Postgres (writer e reader) só na escala `small` (GHCN 2025), num container próprio com os limites do perfil; nessa escala todos os engines rodam B2/B3 para a comparação | Em linhas, o Postgres usa ~65 bytes/linha contra ~2,7 do Parquet: a `r2` daria ~90 GB e não cabe no disco do Docker. A escala `small` mantém o Postgres como baseline com os mesmos dados que os outros engines. |
 
 ## 15. Validações pendentes (spikes)
 
