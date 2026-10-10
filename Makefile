@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 .PHONY: help env up down ps logs init clean engine-up engine-down trino-cli ingest-build download ingest storage-report \
-	dbt-image dbt-debug dbt-build dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
+	dbt-image dbt-debug dbt-build dbt-backfill dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
 	cube-up cube-down cube-query cube-sql
 
 ENGINE ?= trino
@@ -10,6 +10,9 @@ DBT_TARGET ?= trino
 VARS ?=
 ARGS ?=
 RUN_ID ?=
+# dbt-backfill: months to build from scratch (default: the r2 scale, GHCN 2010-2025).
+BACKFILL_START ?= 2010-01-01
+BACKFILL_END ?= 2026-01-01
 # cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENDPOINT=load (rows) or sql (generated SQL).
 Q ?=
 ENDPOINT ?= load
@@ -69,6 +72,14 @@ dbt-debug: ## Check the dbt connection to DBT_TARGET (default trino)
 
 dbt-build: ## dbt build (models + tests) on DBT_TARGET; VARS='{maintenance: false}' ARGS=... RUN_ID=...
 	$(dbt) build $(dbt_vars) $(ARGS)
+
+dbt-backfill: ## Build silver/gold from scratch one month at a time (BACKFILL_START/BACKFILL_END); needed from scale r2 up
+	$(dbt) run --vars '{incremental_strategy: microbatch, microbatch_begin: "$(BACKFILL_START)", maintenance: false}' \
+		--event-time-start $(BACKFILL_START) --event-time-end $(BACKFILL_END) $(ARGS)
+	# In a microbatch run the maintenance post-hook would run once per batch, so it runs once per table here.
+	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_silver.ghcn_daily}'
+	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_gold.fct_weather_daily}'
+	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_gold.agg_weather_monthly_country}'
 
 dbt-run: ## dbt run (models only); same VARS/ARGS/RUN_ID passthrough as dbt-build
 	$(dbt) run $(dbt_vars) $(ARGS)
