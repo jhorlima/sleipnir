@@ -22,7 +22,7 @@
     batch overlap. With nothing new it returns a far-future date, so the run processes no rows.
     Computed at run time (not in SQL) so engines prune files on a literal predicate. -#}
 {% macro incremental_start_date() -%}
-    {%- if not execute or not is_incremental() -%}
+    {%- if not execute or not is_incremental() or var('incremental_strategy') == 'microbatch' -%}
         {{ return(none) }}
     {%- endif -%}
     {%- set last_batch_query -%}
@@ -38,13 +38,4 @@
     {%- endif -%}
     {%- set first_date = modules.datetime.datetime.strptime(first_new_date, '%Y%m%d').date() -%}
     {{ return(first_date - modules.datetime.timedelta(days=var('overlap_days'))) }}
-{%- endmacro %}
-
-
-{#- Current microbatch bounds as dates, or none outside a microbatch run. -#}
-{% macro microbatch_bounds() -%}
-    {%- if model.batch is defined and model.batch -%}
-        {{ return([model.batch.event_time_start.date(), model.batch.event_time_end.date()]) }}
-    {%- endif -%}
-    {{ return(none) }}
 {%- endmacro %}

@@ -8,11 +8,11 @@
     begin=var('microbatch_begin'),
     concurrent_batches=false,
     on_schema_change='fail',
-    post_hook=maintenance_post_hook(),
+    post_hook="{{ maintain_table(this) if var('maintenance', true) else '' }}",
 ) }}
 {{ config(**partitioned_by_month('date')) }}
 
-{%- set start_date = incremental_start_date() if microbatch_bounds() is none else none %}
+{%- set start_date = incremental_start_date() %}
 
 with observations as (
     select

@@ -9,11 +9,6 @@
 {%- endmacro %}
 
 
-{% macro maintenance_post_hook() -%}
-    {{ return("{{ maintain_table(this) if var('maintenance', true) else '' }}") }}
-{%- endmacro %}
-
-
 {% macro trino__maintain_table(relation) -%}
     {%- set catalog = target.database -%}
     {#- Trino refuses retentions below these session minimums (7d by default). -#}

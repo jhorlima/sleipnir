@@ -12,13 +12,17 @@
     begin=var('microbatch_begin'),
     concurrent_batches=false,
     on_schema_change='fail',
-    post_hook=maintenance_post_hook(),
+    post_hook="{{ maintain_table(this) if var('maintenance', true) else '' }}",
 ) }}
 {{ config(**partitioned_by_month('date')) }}
 
-{%- set batch = microbatch_bounds() -%}
-{%- set start_date = incremental_start_date() if batch is none else batch[0] -%}
-{%- set end_date = none if batch is none else batch[1] %}
+{%- if var('incremental_strategy') == 'microbatch' and model.batch is defined -%}
+    {%- set start_date = model.batch.event_time_start.date() -%}
+    {%- set end_date = model.batch.event_time_end.date() -%}
+{%- else -%}
+    {%- set start_date = incremental_start_date() -%}
+    {%- set end_date = none -%}
+{%- endif %}
 
 with bronze_observations as (
     select
