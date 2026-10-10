@@ -1,0 +1,32 @@
+# Merge over the repo compose when running the proof (see run.sh):
+#   docker compose -f compose.yaml -f spikes/V3/compose.starrocks.yaml --profile starrocks up -d starrocks
+# Not part of the repo compose yet; the real service goes to compose/engines.yaml once V3 is confirmed.
+services:
+  starrocks:
+    # all-in-one: FE + BE in one container, so one cgroup limit is the FE+BE sum (SPEC §10.1).
+    image: starrocks/allin1-ubuntu:${STARROCKS_VERSION:-4.1.6}
+    profiles: [starrocks]
+    healthcheck:
+      # Alive column of SHOW BACKENDS: the BE has registered with the FE and answers.
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -P 9030 -u root -N -e 'SHOW BACKENDS' | grep -q true"]
+      start_period: 60s
+      start_interval: 3s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "${ENGINE_CPUS:-4}"
+          memory: ${ENGINE_MEMORY:-8g}
+    memswap_limit: ${ENGINE_MEMORY:-8g}
+    volumes:
+      - starrocks-data:/data/deploy/starrocks
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+
+volumes:
+  starrocks-data:
