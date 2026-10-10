@@ -71,7 +71,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 
 | Camada | Escolha | Futuro / alternativa | Notas |
 |---|---|---|---|
-| Object storage | **RustFS** | R2 (fase 4) | MinIO community descontinuado. |
+| Object storage | **RustFS** | R2 (fase 6) | MinIO community descontinuado. |
 | Catálogo | **Lakekeeper** (Iceberg REST) | Polaris, R2 Data Catalog | Backend Postgres. |
 | Formato | **Parquet + Iceberg v2** | Iceberg v3 (V6) | Codec e tamanho de arquivo definidos pelo B6. |
 | Ingestão | **DuckDB 1.5** | Airbyte (se precisar de conectores) | Escreve Iceberg v2 direto no Lakekeeper (V1). |
@@ -134,9 +134,10 @@ Regras:
 
 | Escala | D1 (GHCN) | Download | Lotes `.csv.gz` | Bronze | Lakehouse (bronze + 1 writer) | Status |
 |---|---|---|---|---|---|---|
-| `r2` (padrão) | 2010–2025, 192 lotes mensais, 741,9 M linhas no bronze | 2,81 GB | 3,36 GB | 1,98 GB | **3,75 GB** (silver 1,02, gold 0,75) + D2 ≤ 2 GB | Medida pelo `make storage-report` |
+| `r2` (padrão) | hoje 2010–2025: 192 lotes mensais, 741,9 M linhas no bronze. **Meta: ≥ 1 bi linhas no bronze dentro do teto**; anos ampliados depois do B6 | 2,81 GB | 3,36 GB | 1,98 GB | **3,75 GB** (silver 1,02, gold 0,75) + D2 ≤ 2 GB | Medida pelo `make storage-report` |
 | `local` | histórico completo, 1750–2025 | ~14,4 GB | ~17 GB | ~10 GB | ~19 GB | Estimada; carga na etapa 10 de [`specs/phase-2.md`](specs/phase-2.md), com aviso de disco antes |
 
+  - **Meta da `r2`: bilhões de linhas dentro de 10 GB.** Na `r2` atual o bronze ocupa ~2,7 bytes/linha e o lakehouse 3,75 GB, só ~38% do orçamento. O teto de 6,5 GB do D1 comporta ~1,3 bi linhas no bronze com o layout atual. Se o B6 confirmar o ganho de ordenar antes de gravar (o Parquet caiu à metade na fase 1), comporta mais. As medições começam na `r2` atual; depois do B6, a `r2` é ampliada em anos até encher o teto e as suítes são repetidas ([plano](specs/phase-2.md), etapa 10).
   - A escala `local` é limitada pelo tamanho do histórico, não pelo tempo: o B1 da `r2` levou 142 s de insert (5,2 M linhas/s), então ~30 min de B1 exigiriam muito mais dados do que o GHCN tem. O histórico completo chega a ~20 GB.
   - Os lotes de `landing/batches` são `.csv.gz` (3,4 GB em vez de ~25 GB). O DuckDB lê gzip na mesma vazão do CSV puro, e gerar os lotes (fora da medição) leva ~1 min por ano.
   - A partir da `r2`, silver e gold são construídos do zero mês a mês (`make dbt-backfill`, D-21).
@@ -192,7 +193,7 @@ Executados como etapa própria (`dbt test`), separados do tempo dos models.
 
 | Tipo | Onde | Regra |
 |---|---|---|
-| `unique_combination_of_columns` (dbt_utils) | `silver.ghcn_daily` | `(station_id, date, element)` |
+| Unicidade de `(station_id, date, element)` | `silver.ghcn_daily` | Teste singular só na janela que a última execução pode ter gravado (mês mais recente + 2 × overlap). A tabela inteira é checada ano a ano pela macro `assert_unique_by_year`, fora da medição, porque um `GROUP BY` único estoura o spill no perfil `M` a partir da `r2` |
 | `unique` + `not_null` | PKs do gold | — |
 | `relationships` | fato → dims | — |
 | `accepted_values` | `element` | `TMAX, TMIN, PRCP, SNOW, SNWD` |
@@ -407,9 +408,10 @@ docs/SPEC.en.md           # ao estabilizar
 | **1 — MVP lakehouse** ✅ | Spikes V1/V4; storage + Lakekeeper + Trino + Traefik; ingestão D1 (1 ano → dimensionar); dbt-trino bronze→gold com testes; Cube sobre Trino | `make up ingest dbt` do zero sem erro; testes dbt passam; Cube responde às 6 perguntas; `storage-report` dentro do teto |
 | **2 — Benchmark** ([plano](specs/phase-2.md)) | Carga das escalas `r2` (GHCN 2010–2025) e `local` (§6); harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
 | **3 — Orquestração** | Airflow 3 + Cosmos (`ExecutionMode.WATCHER`, CeleryExecutor) executando o fluxo do §9; tarefas que não são dbt (ingestão DuckDB, manutenção, refresh de MV, harness) rodam como **containers** via `DockerOperator` com imagens do projeto, para a imagem do Airflow ter só Cosmos, o provider Docker e as connections dos engines | DAG ponta a ponta; tempos por model ≈ fase 2; overhead do orquestrador registrado |
-| **4 — Extras** | R2 (+ R2 Data Catalog); Superset via Cube; observabilidade e linhagem (§10.8); Polaris; Airbyte se necessário; `SPEC.en.md` | Resultado documentado por item |
+| **4 — Extras** | Superset via Cube; observabilidade e linhagem (§10.8); Polaris; Airbyte se necessário; `SPEC.en.md` | Resultado documentado por item |
 | **5 — Comparação de orquestração** | Dagster + dbt (`dagster-dbt`) executando o mesmo fluxo | Overhead Dagster × Airflow/Cosmos documentado |
-| **6 — Publicação** | README em inglês, resultados, gráficos, artigo (§16); CI no GitHub Actions (`docker compose config`, SQLFluff, `dbt parse`) | Repo público; CI verde; qualquer pessoa reproduz com `make` |
+| **6 — Cloudflare R2** | A escala `r2` final (≥ 1 bi linhas no bronze) rodando com o bucket no R2 (+ R2 Data Catalog), depois de todas as fases locais | B1–B5 no R2 comparados com os mesmos passos no RustFS local; custo de operações dentro do free tier (V5) |
+| **7 — Publicação** | README em inglês, resultados, gráficos, artigo (§16); CI no GitHub Actions (`docker compose config`, SQLFluff, `dbt parse`) | Repo público; CI verde; qualquer pessoa reproduz com `make` |
 | **Futuro** | Iceberg v3; dbt Core v2 | — |
 
 ## 14. Decisões registradas
@@ -446,7 +448,7 @@ docs/SPEC.en.md           # ao estabilizar
 | V2 | Trino MV no conector Iceberg com catálogo REST | Fase 2 | Tabela equivalente via dbt |
 | V3 | StarRocks reescreve automaticamente para MV de join sobre Iceberg | Fase 2 | Documentar limitação; Cube aponta para a MV |
 | V4 | ✅ Resolvido: dbt-trino suporta `microbatch` desde 1.9.0; `concurrent_batches` desde 1.10.2 (detalhes em `spikes/V4/README.md`). A validar na prática: `event_time` DATE comparado com literais TIMESTAMP e conflitos de commit com `concurrent_batches` | Fase 1 | — |
-| V5 | Limites atuais do free tier do R2 (storage, ops Class A/B) | Antes da fase 4 | Reduzir repetições/volume |
+| V5 | Limites atuais do free tier do R2 (storage, ops Class A/B) | Antes da fase 6 | Reduzir repetições/volume |
 | V6 | Iceberg v3: escrita no Trino, deletion vectors no StarRocks, suporte no Lakekeeper | Revisão periódica | Manter v2 |
 | V7 | Endpoints de métricas e integração OpenLineage de cada engine na versão pinada | Fase 4 | Manter só cAdvisor + `dbt-ol` |
 | V8 | Cosmos `ExecutionMode.WATCHER` com Airflow 3 + CeleryExecutor + dbt-trino/dbt-spark | Fase 3 | `ExecutionMode.LOCAL` com `DbtTaskGroup` |

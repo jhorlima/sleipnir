@@ -23,10 +23,13 @@ A VM do Docker tem 8 CPUs, 16 GB e 2 GB de swap. O perfil `M` dá 8 GB ao engine
 | 4 | **Readers**: StarRocks (compose, `config/starrocks/`, external catalog `lakehouse`) e DuckDB (Cube `duckdb` data source); arquivos `cube/model/cubes/<engine>/` com `extends`; queries Q1–Q6 em `bench/queries/sql/q<n>.<engine>.sql` | 2 (para validar com o harness) | 2 × stack-worker (StarRocks; DuckDB), código em paralelo e validação em fila | Q1–Q6 batem o checksum da referência DuckDB; Cube Q1–Q10 respondem nos dois data sources |
 | 5 | **Writers**: Spark 4.1 (Thrift Server, target `spark`, `maintain_table` do Spark, §4.1) e Postgres (container **próprio** com os limites do perfil, separado do Postgres do catálogo; DuckDB carrega `postgres_bronze`; target `postgres`; Cube `postgres`) | 2 | 2 × stack-worker, código em paralelo e validação em fila | `dbt build` passa nos três targets; `audit_helper` iguala Spark/Postgres ao Trino |
 | 6 | **D2 TPC-H**: `dbgen` do DuckDB → namespace `duckdb_tpch` no SF que cabe em 2 GB; as 22 queries por engine; rótulo de fair use | 2, 4 | stack-worker | 22 queries validadas por checksum em todos os readers |
-| 7 | **Medições B1–B4** no perfil `M`, um engine por vez | 2, 4, 5, 6 | bench-runner, sequencial | `results/b1…b4.parquet` + relatório |
-| 8 | **B5**: a) MV `mv_weather_wide` do StarRocks com `EXPLAIN` obrigatório; b) MV do Trino (ou o fallback do V2); c) Cube Store sobre Trino e StarRocks | 3b, 7 | stack-worker por cenário (em fila) + bench-runner | `results/b5.parquet` com refresh, storage extra e validade de cada query |
-| 9 | **B6**: matriz codec × tamanho de arquivo × partição em `bench_*`, mais manutenção medida por engine; o vencedor vira padrão (D-15) | 7 | stack-worker + bench-runner | `results/b6.parquet`; §14 atualizado; B3 repetido se o padrão mudar |
-| 10 | **Escala `local`**: mais anos para trás até ~20 GB de bronze ou ~30 min de B1; avisar com a estimativa de disco antes | 7 (B1 medido) | sessão principal | Escala fixada no §6; B1–B4 repetidos nessa escala |
+| 7 | **B6 antes das medições**: matriz ordenação × codec × tamanho de arquivo × partição em `bench_*` (sobre a `r2` atual), manutenção medida por engine (Trino, Spark) e o efeito nas leituras com as queries do B3; o vencedor vira padrão (D-15) | 2, 4, 5 | stack-worker + bench-runner | `results/b6.parquet`; layout padrão em §14 |
+| 8 | **Medições B1–B4** na `r2` atual (2010–2025), perfil `M`, um engine por vez | 6, 7 | bench-runner, sequencial | `results/b1…b4.parquet` + relatório |
+| 9 | **B5**: a) MV `mv_weather_wide` do StarRocks com `EXPLAIN` obrigatório; b) tabela equivalente via dbt no Trino (o Trino 483 não cria MV no catálogo REST, V2), apontada pelo Cube; c) Cube Store sobre Trino e StarRocks | 3b, 8 | stack-worker por cenário (em fila) + bench-runner | `results/b5.parquet` com refresh, storage extra e validade de cada query |
+| 10 | **`r2` em bilhões**: com o layout do B6, ampliar os anos até encher os 6,5 GB do D1 (meta ≥ 1 bi linhas no bronze); avisar com a estimativa de disco antes; recarregar e repetir B1–B5 | 9 | sessão principal + bench-runner | `storage-report` ≤ 10 GB com D2; §6 com os anos finais |
+| 11 | **Escala `local`**: histórico completo do GHCN; avisar com a estimativa de disco antes | 10 | sessão principal | Escala fixada no §6; B1–B4 repetidos nessa escala |
+
+O teste no Cloudflare R2 é a fase 6 do SPEC, depois de todas as fases locais.
 
 ## O que roda em paralelo
 
