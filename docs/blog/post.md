@@ -92,7 +92,14 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 
 ### Phase 2 — benchmark
 
-_(to fill)_
+- **Scale `r2`: GHCN 2010–2025.** 16 yearly files, 2.81 GB gzipped. They become 192 monthly batches (3.36 GB) and 741.9 M bronze rows. After one writer's silver and gold, the lakehouse holds 3.75 GB: bronze 1.98, silver 1.02 (455.2 M rows), gold 0.75 (190.2 M fact rows). That is 16× phase 1 and still leaves room for TPC-H under the 10 GB budget. The estimate made before downloading (lakehouse ~4.0 GB, batches ~3.6 GB) was close.
+- **Batches are now gzipped CSV.** Uncompressed, the batches would take ~25 GB of landing space; gzipped they take 3.4 GB. The worry was that DuckDB would ingest slower, since it cannot split a gzip stream across threads. It did not: B1 ran at 5.24 M rows/s on profile M (0.65–1.13 s per batch, 142 s for all 192), the same as phase 1. Writing the batches is the slow part (~1 min per year, single-threaded gzip), and it stays outside the measurement because it stands in for the source system.
+- **Gotcha: the from-scratch build stopped fitting in one query.** On profile M, Trino ran the silver dedup (`ROW_NUMBER` over ~740 M rows) for 9 minutes and failed with `EXCEEDED_SPILL_LIMIT` at 10 GB of spill. The whole-table uniqueness test fails the same way. The fix was already in the project: build from scratch one month at a time with dbt's microbatch (`make dbt-backfill`). Each month takes 2–9 s. Silver took 506 s in total, the fact table 267 s and the monthly aggregate 244 s. Later incremental runs keep using delete+insert. A year-by-year check found zero duplicate keys.
+- **Gotcha: in a microbatch run, dbt runs the post-hook after every batch.** With maintenance as a post-hook, a 192-month backfill would compact and expire snapshots 192 times. The backfill turns the hook off and runs maintenance once per table at the end, about 2 s each.
+- **Gotcha: the laptop went to sleep in the middle of a run.** Two months of the backfill failed with Trino's `ABANDONED_TASK` after 20 and 7 minutes. Trino was fine. macOS had gone into idle sleep (`pmset -g log`), the Docker VM froze, and when it woke up the coordinator had lost track of its tasks. The clue was in the query IDs: they lagged the log clock by 27 minutes, because Trino stamps them from a monotonic clock that stops while the VM is suspended. Long runs now go under `caffeinate -i`, and the harness will refuse to measure without it.
+- **Gotcha: four dbt threads OOM-killed Trino on an 8 GB VM.** Four full-scan tests over 455 M rows at once pushed Trino's 6 GB heap plus native memory and the infra past the VM's 7.75 GiB, and the kernel killed it (exit 137). The tests pass with one thread. Before measuring on profile M, the Docker VM gets ≥ 12 GB.
+- **Data quality at this scale:** 32 tests pass. The `tmax >= tmin` warning now flags 98 rows from the simulated revisions (4 in phase 1).
+- **Scale `local`** will be the whole GHCN history, 1750–2025 (~14.4 GB to download, ~19 GB of lakehouse). At 5 M rows/s, ingestion would need far more data than GHCN has to reach 30 minutes, so the history's size is the limit.
 
 ### Phase 3 — orchestration (Airflow 3 + Cosmos watcher mode)
 
@@ -121,6 +128,21 @@ These come from building the MVP, not from the harness: a single run each, no co
 | Whole flow from `make clean` to Cube answering Q1–Q6 | Trino M for dbt, S for Cube | ~3 min |
 
 Correctness so far: Cube Q1–Q3 match direct Trino SQL; all three incremental strategies produce identical rows and `sum(value)`.
+
+### 6.1 Scale `r2` load (GHCN 2010–2025, profile M, one run, before the harness)
+
+| Step | Engine | Number |
+|---|---|---|
+| Download, 16 yearly files | — | 2.81 GB gzipped |
+| Batch files, 192 monthly `.csv.gz` (not measured) | DuckDB | 3.36 GB, ~1 min per year |
+| Ingest 192 batches → `duckdb_bronze` (741.9 M rows) | DuckDB 1.5.6 | 141.7 s, 5.24 M rows/s (0.65–1.13 s per batch) |
+| Silver `ghcn_daily` in one query | Trino 483 | fails after 548 s: spill limit (10 GB) |
+| Silver `ghcn_daily` by month (192 microbatches, 455.2 M rows) | Trino | 506 s in total, 2.0–9.1 s per month |
+| Gold `fct_weather_daily` by month (190.2 M rows) | Trino | 267 s, 1.1–3.4 s per month |
+| Gold `agg_weather_monthly_country` by month | Trino | 244 s, 1.0–2.0 s per month |
+| Maintenance after the backfill (optimize, manifests, expire, orphans) | Trino | ~2 s per table; storage 3.83 → 3.75 GB |
+| dbt tests (32 data + 2 unit), one thread | Trino | 467 s; the whole-table uniqueness test exceeds the spill limit |
+| Lakehouse size | — | 3.75 GB (bronze 1.98, silver 1.02, gold 0.75) |
 
 | Suite | Headline | Chart |
 |---|---|---|

@@ -130,13 +130,18 @@ Ingestão em **lotes incrementais com janela sobreposta**: cada lote `n` inclui 
 
 Regras:
 - O teto vale para **uma execução** (bronze + silver/gold de um único writer + D2). Comparar vários writers lado a lado é feito **localmente**, onde não há teto.
-- **Duas escalas de dados**, escolhidas por `DATA_SCALE`:
-  - `r2` — cabe no teto de 10 GB por execução; usada no cenário R2 e como escala padrão.
-  - `local` — se a ingestão da escala `r2` for rápida e o limite for só throughput de download/rede, a escala local cresce (mais anos de D1, SF maior em D2) até **~20 GB ou ~30 min de ingestão (B1)**, o que vier primeiro. O tamanho final é fixado após a primeira medição do B1 e registrado nos resultados.
-  - Resultados de escalas diferentes nunca são comparados entre si; `results` registra a escala de cada execução.
-  - **Plano (primeiro passo da fase 2):** com só 2025 (0,23 GB), overhead fixo e cache dominam e o B6 não tem o que compactar. Escala `r2` = **GHCN 2010–2025** (16 anos; estimativa ~21 GB de CSV na origem, ~2,7 GB comprimido para baixar, bronze ~1,9 GB, lakehouse ~3,5 GB) + TPC-H no SF que couber no teto; escala `local` = mais anos para trás até ~20 GB de bronze ou ~30 min de B1. Os lotes intermediários em `landing/batches` passam a ser gravados como `.csv.gz` (~3 GB em vez de ~25 GB). Tamanhos finais fixados pelo `make storage-report` após a carga. **Avisar o autor antes de iniciar**, com a estimativa de disco, para liberar espaço ou conectar o SSD.
+- **Duas escalas de dados**, escolhidas por `DATA_SCALE`. Resultados de escalas diferentes nunca são comparados entre si; `results` registra a escala de cada execução.
+
+| Escala | D1 (GHCN) | Download | Lotes `.csv.gz` | Bronze | Lakehouse (bronze + 1 writer) | Status |
+|---|---|---|---|---|---|---|
+| `r2` (padrão) | 2010–2025, 192 lotes mensais, 741,9 M linhas no bronze | 2,81 GB | 3,36 GB | 1,98 GB | **3,75 GB** (silver 1,02, gold 0,75) + D2 ≤ 2 GB | Medida pelo `make storage-report` |
+| `local` | histórico completo, 1750–2025 | ~14,4 GB | ~17 GB | ~10 GB | ~19 GB | Estimada; carga na etapa 10 de [`specs/phase-2.md`](specs/phase-2.md), com aviso de disco antes |
+
+  - A escala `local` é limitada pelo tamanho do histórico, não pelo tempo: o B1 da `r2` levou 142 s de insert (5,2 M linhas/s), então ~30 min de B1 exigiriam muito mais dados do que o GHCN tem. O histórico completo chega a ~20 GB.
+  - Os lotes de `landing/batches` são `.csv.gz` (3,4 GB em vez de ~25 GB). O DuckDB lê gzip na mesma vazão do CSV puro, e gerar os lotes (fora da medição) leva ~1 min por ano.
+  - A partir da `r2`, silver e gold são construídos do zero mês a mês (`make dbt-backfill`, D-21).
 - Fora do bucket: `landing/` (CSV em disco local), baseline Postgres, MVs do StarRocks (storage local do BE) e Cube Store.
-- **Dimensionamento empírico:** na fase 1, ingerir 1 ano de D1, medir o tamanho por namespace e calcular quantos anos cabem no teto de uma execução. Para D2, gerar SF1, medir e escalar o SF.
+- **Dimensionamento empírico do D2:** gerar SF1, medir e escalar o SF até o teto de 2 GB.
 - Manutenção após cada carga (§10.4): snapshots antigos contam no orçamento.
 - `make storage-report ENGINE=<engine>` mostra o uso por namespace e falha se bronze + `<engine>_*` + D2 passar do teto.
 - ⚠️ V5: confirmar os limites atuais do free tier do R2 (storage e operações Class A/B) e estimar os GETs do benchmark antes de rodar no R2.
@@ -400,7 +405,7 @@ docs/SPEC.en.md           # ao estabilizar
 |---|---|---|
 | **0 — Specs** ✅ | Este documento | Aprovado; pendências viram spikes (§15) |
 | **1 — MVP lakehouse** ✅ | Spikes V1/V4; storage + Lakekeeper + Trino + Traefik; ingestão D1 (1 ano → dimensionar); dbt-trino bronze→gold com testes; Cube sobre Trino | `make up ingest dbt` do zero sem erro; testes dbt passam; Cube responde às 6 perguntas; `storage-report` dentro do teto |
-| **2 — Benchmark** | Carga das escalas `r2` (GHCN 2010–2025) e `local` (§6); harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
+| **2 — Benchmark** ([plano](specs/phase-2.md)) | Carga das escalas `r2` (GHCN 2010–2025) e `local` (§6); harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
 | **3 — Orquestração** | Airflow 3 + Cosmos (`ExecutionMode.WATCHER`, CeleryExecutor) executando o fluxo do §9; tarefas que não são dbt (ingestão DuckDB, manutenção, refresh de MV, harness) rodam como **containers** via `DockerOperator` com imagens do projeto, para a imagem do Airflow ter só Cosmos, o provider Docker e as connections dos engines | DAG ponta a ponta; tempos por model ≈ fase 2; overhead do orquestrador registrado |
 | **4 — Extras** | R2 (+ R2 Data Catalog); Superset via Cube; observabilidade e linhagem (§10.8); Polaris; Airbyte se necessário; `SPEC.en.md` | Resultado documentado por item |
 | **5 — Comparação de orquestração** | Dagster + dbt (`dagster-dbt`) executando o mesmo fluxo | Overhead Dagster × Airflow/Cosmos documentado |
@@ -431,6 +436,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-18 | Cube lê só pelos engines, sem integração com dbt | O benchmark mede o caminho engine → Cube; schema do Cube independente. |
 | D-19 | Medidas avançadas via recursos nativos do Cube (multi-stage, `time_shift`, `sub_query`) | Abordagem atual recomendada pelo Cube; gera SQL mais exigente para os engines. |
 | D-20 | Manutenção numa macro única: post-hook no uso normal, desligada e medida à parte nos benchmarks | Um só código para operação e benchmark; tempo dos models não é contaminado. |
+| D-21 | Construção do zero em janelas mensais (`make dbt-backfill`: microbatch e manutenção uma vez por tabela) | Na `r2`, o dedup do silver numa query só (~740 M linhas) e o teste de unicidade da tabela inteira estouram o spill de 10 GB do perfil `M`. Por mês, cada lote leva 2–9 s. |
 
 ## 15. Validações pendentes (spikes)
 
@@ -448,6 +454,7 @@ docs/SPEC.en.md           # ao estabilizar
 | V10 | STS do RustFS (AssumeRole) com a session policy do Lakekeeper → vended credentials para todos os engines | Fase 4 | Manter chaves estáticas |
 | V11 | Cosmos: `ExecutionMode.WATCHER` (dbt instalado na imagem do Airflow/worker) × `ExecutionMode.DOCKER` (dbt numa imagem própria, uma task por model) — overhead e isolamento | Fase 3 | `DockerOperator` chamando `dbt build` |
 | V12 | "Modo seguro": IdP OIDC leve (Dex ou Zitadel) + Lakekeeper com autenticação OIDC (sem OpenFGA) + vended credentials via STS do RustFS (depende do V10); engines com OAuth2 client credentials (DuckDB `CLIENT_ID`/`CLIENT_SECRET`/`OAUTH2_SERVER_URI`). Medido como cenário à parte; o cenário sem auth e com chaves estáticas segue como linha de base | Fase 4 | Manter chaves estáticas sem auth |
+| V13 | Driver `duckdb` do Cube com init SQL (`iceberg`/`httpfs` + `ATTACH` no Lakekeeper) e versão do DuckDB embutida na imagem do Cube | Fase 2 | Ler os marts via Postgres ou Trino e documentar |
 
 ## 16. Publicação
 
