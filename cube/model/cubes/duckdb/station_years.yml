@@ -1,0 +1,23 @@
+# DuckDB: station_years. Everything else comes from base_station_years.
+cubes:
+  - name: duckdb_station_years
+    extends: base_station_years
+    data_source: duckdb
+    # Reads the gold tables written by dbt-trino (schema trino_gold).
+    sql: >
+      SELECT station.station_id, years.year
+      FROM lakehouse.trino_gold.dim_station AS station
+      CROSS JOIN (SELECT DISTINCT year FROM lakehouse.trino_gold.dim_date) AS years
+    joins:
+      - name: duckdb_weather_daily
+        relationship: one_to_many
+        sql: "{CUBE}.station_id = {duckdb_weather_daily}.station_id AND {CUBE}.year = EXTRACT(YEAR FROM {duckdb_weather_daily}.date)"
+    dimensions:
+      - name: annual_prcp
+        sql: "{duckdb_weather_daily.total_prcp}"
+        type: number
+        sub_query: true
+    measures:
+      - name: median_station_annual_prcp
+        sql: "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {annual_prcp})"
+        type: number

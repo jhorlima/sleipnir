@@ -1,0 +1,6 @@
+# DuckDB: dim_date. Everything else comes from base_dates.
+cubes:
+  - name: duckdb_dates
+    extends: base_dates
+    data_source: duckdb
+    sql_table: lakehouse.trino_gold.dim_date

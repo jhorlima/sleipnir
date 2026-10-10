@@ -218,13 +218,13 @@ O Cube lê **somente pelos engines** (SQL nas tabelas gold). Ele não importa ne
 
 ### 8.2 Data sources
 Uma única instância do Cube com **multi data source**:
-`CUBEJS_DATASOURCES=default,trino,starrocks,duckdb,postgres` + `CUBEJS_DS_<NOME>_DB_{TYPE,HOST,PORT,NAME,USER,PASS}`.
+`CUBEJS_DATASOURCES=default,trino,starrocks,duckdb,postgres` (hoje: `default,trino,duckdb`) + `CUBEJS_DS_<NOME>_DB_{TYPE,HOST,PORT,NAME,USER,PASS}`.
 
 | Data source | Driver | Observação |
 |---|---|---|
 | `trino` | `trino` | catálogo `lakehouse`, tabelas `lakehouse.trino_gold.*` |
 | `starrocks` | `mysql` (porta 9030 do FE) | nomes em três partes: `lakehouse.<gold_namespace>.<tabela>` |
-| `duckdb` | `duckdb` | DuckDB 1.5.5 **embutido no processo do Cube** (a ingestão usa 1.5.6). Extensões via `CUBEJS_DS_DUCKDB_DB_DUCKDB_EXTENSIONS`; `CREATE SECRET` + `ATTACH` no Lakekeeper exigem um `driverFactory` no `cube.js` (V13). Usa os limites de CPU/memória do container do Cube, não um perfil S/M/L |
+| `duckdb` | `duckdb` | DuckDB 1.5.5 **embutido no processo do Cube** (a ingestão usa 1.5.6). Extensões via `CUBEJS_DS_DUCKDB_DB_DUCKDB_EXTENSIONS`; `CREATE SECRET` + `ATTACH` no Lakekeeper exigem um `driverFactory` no `cube.js` (V13). Usa os limites de CPU/memória do container do Cube; nas medições valem os do perfil (D-22). `cube/cube.js` monta o init SQL; o Cube depende do Lakekeeper saudável, porque um init SQL que falha fica em cache |
 | `postgres` | `postgres` | schema `postgres_gold` |
 
 - O `data_source` é fixo em cada cube. Os membros são escritos uma vez em `cube/model/cubes/base/` (cubes `base_*`, data source placeholder, não públicos) e cada engine tem arquivos curtos em `cube/model/cubes/<engine>/` com `extends`, `data_source`, `sql_table` e só o que difere (percentis, joins e referências a outros cubes, que o `extends` não renomeia). Nomes com prefixo: `trino_weather_daily`, `starrocks_weather_daily`, etc. Sem Jinja.
@@ -439,6 +439,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-19 | Medidas avançadas via recursos nativos do Cube (multi-stage, `time_shift`, `sub_query`) | Abordagem atual recomendada pelo Cube; gera SQL mais exigente para os engines. |
 | D-20 | Manutenção numa macro única: post-hook no uso normal, desligada e medida à parte nos benchmarks | Um só código para operação e benchmark; tempo dos models não é contaminado. |
 | D-21 | Construção do zero em janelas mensais (`make dbt-backfill`: microbatch e manutenção uma vez por tabela) | Na `r2`, o dedup do silver numa query só (~740 M linhas) e o teste de unicidade da tabela inteira estouram o spill de 10 GB do perfil `M`. Por mês, cada lote leva 2–9 s. |
+| D-22 | Nas medições do DuckDB via Cube (B4/B5), o `cube-api` recebe os limites do perfil (`ENGINE_CPUS`/`ENGINE_MEMORY`), e o DuckDB recebe 75% dessa memória e `ENGINE_CPUS` threads; tudo registrado em `engine_config` | O DuckDB roda dentro do processo do Cube. Com os limites padrão do Cube (1 CPU / 1 GB, DuckDB 512 MB), a Q8 estoura a memória na `r2`. O overhead do Node fica dentro do mesmo orçamento, e isso é citado junto dos números. |
 
 ## 15. Validações pendentes (spikes)
 
@@ -456,7 +457,7 @@ docs/SPEC.en.md           # ao estabilizar
 | V10 | STS do RustFS (AssumeRole) com a session policy do Lakekeeper → vended credentials para todos os engines | Fase 4 | Manter chaves estáticas |
 | V11 | Cosmos: `ExecutionMode.WATCHER` (dbt instalado na imagem do Airflow/worker) × `ExecutionMode.DOCKER` (dbt numa imagem própria, uma task por model) — overhead e isolamento | Fase 3 | `DockerOperator` chamando `dbt build` |
 | V12 | "Modo seguro": IdP OIDC leve (Dex ou Zitadel) + Lakekeeper com autenticação OIDC (sem OpenFGA) + vended credentials via STS do RustFS (depende do V10); engines com OAuth2 client credentials (DuckDB `CLIENT_ID`/`CLIENT_SECRET`/`OAUTH2_SERVER_URI`). Medido como cenário à parte; o cenário sem auth e com chaves estáticas segue como linha de base | Fase 4 | Manter chaves estáticas sem auth |
-| V13 | Parcial (`spikes/V13/README.md`): o Cube v1.7.50 embute DuckDB 1.5.5; extensões por env, `CREATE SECRET` + `ATTACH` só via `driverFactory` no `cube.js`; o `ATTACH` com `ACCESS_DELEGATION_MODE 'none'` executa no 1.5.5. Pegadinhas: erro no init SQL é engolido e fica em cache até reiniciar o Cube (subir o Lakekeeper antes); `INSTALL` baixa extensões a cada start. A confirmar na prova: leitura real dos marts | Fase 2 | Ler os marts via Postgres ou Trino e documentar |
+| V13 | ✅ Resolvido: o Cube v1.7.50 embute DuckDB 1.5.5 e lê os marts Iceberg via Lakekeeper. Extensões por env; `CREATE SECRET` + `ATTACH` (`ACCESS_DELEGATION_MODE 'none'`) via `driverFactory` em `cube/cube.js`. Q1–Q10 respondem e Q1–Q3 batem com a referência DuckDB direta (detalhes em `spikes/V13/README.md`). Pegadinhas: erro no init SQL é engolido e fica em cache até reiniciar o Cube; `INSTALL` baixa extensões a cada start | Fase 2 | — |
 
 ## 16. Publicação
 

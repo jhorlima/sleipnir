@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Sends one Cube REST query (bench/queries/cube/q<n>.json) through Traefik and prints the JSON answer.
 # The JWT is signed (HS256) with the API secret read from the running cube-api container.
-# Usage: scripts/cube-query.sh <n> [load|sql]   (sql returns the SQL Cube generates instead of rows)
+# Usage: [ENGINE=trino|duckdb] scripts/cube-query.sh <n> [load|sql]   (sql returns the SQL Cube generates instead of rows)
+# The query files name the trino view; ENGINE rewrites it to <engine>_weather.
 set -euo pipefail
 
 query_number="${1:-}"
 endpoint="${2:-load}"
+engine="${ENGINE:-trino}"
 query_file="bench/queries/cube/q${query_number}.json"
 if [ -z "$query_number" ] || [ ! -f "$query_file" ]; then
   echo "usage: $0 <n> [load|sql]  (no ${query_file})" >&2
@@ -29,7 +31,7 @@ started=$(date +%s)
 while true; do
   response=$(curl -sS -H 'Host: cube.localhost' -H "Authorization: ${token}" \
     -H 'Content-Type: application/json' \
-    --data "{\"query\": $(cat "$query_file")}" \
+    --data "{\"query\": $(sed "s/trino_weather/${engine}_weather/g" "$query_file")}" \
     "http://127.0.0.1/cubejs-api/v1/${endpoint}")
   if ! grep -q '"Continue wait"' <<< "$response"; then
     break

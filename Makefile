@@ -13,7 +13,7 @@ RUN_ID ?=
 # dbt-backfill: months to build from scratch (default: the r2 scale, GHCN 2010-2025).
 BACKFILL_START ?= 2010-01-01
 BACKFILL_END ?= 2026-01-01
-# cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENDPOINT=load (rows) or sql (generated SQL).
+# cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENGINE=trino|duckdb picks the view; ENDPOINT=load (rows) or sql (generated SQL).
 Q ?=
 ENDPOINT ?= load
 # bench: SUITE=b1|b2; B1 always measures DuckDB. ARGS is passed to dbt (B2).
@@ -110,8 +110,8 @@ cube-up: ## Start Cube (API, refresh worker) and Cube Store; the engines are sta
 cube-down: ## Stop and remove the Cube and Cube Store containers (the Cube Store volume is kept)
 	docker compose --profile cube rm --stop --force cube-api cube-refresh-worker cubestore-router cubestore-worker
 
-cube-query: ## Run bench/queries/cube/qQ.json on the Cube REST API and print the result (Q=1..10; ENDPOINT=sql for the SQL)
-	scripts/cube-query.sh $(Q) $(ENDPOINT)
+cube-query: ## Run bench/queries/cube/qQ.json on the Cube REST API and print the result (Q=1..10; ENGINE=duckdb; ENDPOINT=sql for the SQL)
+	ENGINE=$(ENGINE) scripts/cube-query.sh $(Q) $(ENDPOINT)
 
 cube-sql: ## Open psql on Cube's SQL API (Postgres protocol), from inside the postgres container
 	docker compose exec -e PGPASSWORD=$$(docker compose exec -T cube-api printenv CUBEJS_SQL_PASSWORD) \
