@@ -2,14 +2,14 @@
 
 {#- merge upserts on the natural key; delete+insert replaces whole dates (or months) of the window,
     which also removes rows that a newer revision moved out (e.g. a q_flag set later);
-    microbatch ignores unique_key. -#}
+    insert_overwrite and microbatch ignore unique_key (they replace whole partitions). -#}
 {% macro incremental_unique_key(natural_key, window_key) -%}
     {%- set strategy = var('incremental_strategy') -%}
     {%- if strategy == 'merge' -%}
         {{ return(natural_key) }}
     {%- elif strategy == 'delete+insert' -%}
         {{ return(window_key) }}
-    {%- elif strategy == 'microbatch' -%}
+    {%- elif strategy in ['insert_overwrite', 'microbatch'] -%}
         {{ return(none) }}
     {%- else -%}
         {{ exceptions.raise_compiler_error("Unsupported incremental_strategy: " ~ strategy) }}

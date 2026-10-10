@@ -6,4 +6,5 @@ requires-python = "==3.12.*"
 dependencies = [
     "dbt-core==1.12.5",
     "dbt-trino==1.10.6",
+    "dbt-spark[PyHive]==1.11.0",
 ]

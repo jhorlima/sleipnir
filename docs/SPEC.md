@@ -87,7 +87,9 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 Versões pinadas em `.env`; nenhuma tag `latest`.
 
 ### 4.1 Spark 4.1.x
-- Iceberg runtime: `org.apache.iceberg:iceberg-spark-runtime-4.1_2.13` + `iceberg-aws-bundle` (Iceberg ≥ 1.11; Scala 2.13 obrigatório).
+- Imagem do projeto (`config/spark/Dockerfile`): `apache/spark:4.1.3-scala2.13-java21-ubuntu` + `iceberg-spark-runtime-4.1_2.13` e `iceberg-aws-bundle` do Iceberg 1.12.0, embutidos (nada é baixado durante uma medição). dbt-spark 1.11.0 com PyHive.
+- O PyHive sempre envia `USE default`, então o Thrift Server cria um namespace `lakehouse.default` vazio ao subir (também visível no Trino); o healthcheck conecta nele.
+- O `remove_orphan_files` do Spark não aceita retenção abaixo de 24 h; no Spark ela é de 25 h (no Trino, 0 s), e a diferença é registrada junto dos números do B6.
 - dbt-spark via **Spark Thrift Server** (`method: thrift`).
 - Ajuste ao container (valores derivados dos limites do perfil, não fixos):
   - `local[N]`, com N = CPUs do perfil (um único JVM, sem overhead de cluster);
@@ -163,7 +165,7 @@ Regras:
 - `agg_weather_monthly_country` — agregado mensal por país. Incremental por mês.
 
 ### 7.1 Estratégias incrementais (matriz do B2)
-Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada é medida por engine; a vencedora vira o padrão daquele engine. Padrão atual no Trino: **`delete+insert`** (janela derivada dos dados, substitui datas inteiras). O microbatch do dbt é guiado pelo relógio: em dados históricos precisa de `--event-time-start/--event-time-end` explícitos.
+Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada é medida por engine; a vencedora vira o padrão daquele engine. Padrão atual: **`delete+insert`** no Trino e **`merge`** no Spark (que não tem delete+insert), escolhido pelo target na var `incremental_strategy` (janela derivada dos dados, substitui datas inteiras). O microbatch do dbt é guiado pelo relógio: em dados históricos precisa de `--event-time-start/--event-time-end` explícitos.
 
 | Estratégia | Trino | Spark | Postgres | Observação |
 |---|---|---|---|---|
@@ -430,7 +432,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-10 | dbt Core 1.x | v2 sem adapter Trino/Postgres confirmado. |
 | D-11 | Traefik só para UIs HTTP; harness dentro da rede do Compose | Evita expor portas sem colocar proxy no caminho medido. |
 | D-12 | **Iceberg v2** | Trino ainda não escreve v3 (leitura experimental); StarRocks 4.1 rejeita tabelas v3 com deletion vectors; suporte do Lakekeeper não confirmado. |
-| D-13 | Spark 4.1.x + Iceberg ≥ 1.11 (Scala 2.13), `local[N]` ajustado ao perfil | Versão mais recente; um JVM evita overhead de cluster em um nó. |
+| D-13 | Spark 4.1.3 + Iceberg 1.12.0 (Scala 2.13) + dbt-spark 1.11.0 (Thrift), `local[N]` ajustado ao perfil | Versão mais recente; um JVM evita overhead de cluster em um nó. |
 | D-14 | Um engine por vez; dbt com `threads` igual para todos; medição por model | Comparação justa sem disputa entre engines; o paralelismo interno é mérito de cada engine. |
 | D-15 | Codec/tamanho de arquivo/partição definidos pelo B6 | Escolha baseada em medição, não em suposição. |
 | D-16 | Uma instância do Cube com multi data source; membros na base e engines via `extends` | Semântica idêntica entre engines sem template; cada arquivo de engine mostra só o que difere. |

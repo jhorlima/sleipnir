@@ -12,3 +12,13 @@ sleipnir:
       database: lakehouse
       schema: trino
       threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+    # Thrift Server on the Lakekeeper catalog (set as Spark's default catalog), so no database here.
+    spark:
+      type: spark
+      method: thrift
+      host: spark
+      port: 10000
+      schema: spark
+      connect_retries: 5
+      connect_timeout: 60
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"

@@ -10,9 +10,15 @@ flags:
   send_anonymous_usage_stats: false
   require_certificate_validation: true
 
+# Lets this project replace dbt's own dispatched macros (see spark__date_trunc).
+dispatch:
+  - macro_namespace: dbt
+    search_order: [sleipnir, dbt]
+
 vars:
-  # merge | delete+insert | microbatch (SPEC §7.1); used by every incremental model.
-  incremental_strategy: delete+insert
+  # merge | delete+insert | insert_overwrite | microbatch (SPEC §7.1); used by every incremental model.
+  # Spark has no delete+insert, so its default is merge (the reference strategy); Trino keeps delete+insert.
+  incremental_strategy: "{{ 'merge' if target.name == 'spark' else 'delete+insert' }}"
   # Each ingest batch repeats the last days of the previous one (SPEC §5).
   overlap_days: 7
   # First microbatch batch; must not be later than the first bronze date.
@@ -29,7 +35,14 @@ models:
     # Drop-and-create instead of rename: the old table's files are purged instead of
     # lingering in a backup table that counts against the storage budget.
     +on_table_exists: drop
+    # Spark needs `iceberg` to write Iceberg tables; dbt-trino turns this into the table property
+    # `format`, where PARQUET is the Iceberg connector's default.
+    +file_format: "{{ 'iceberg' if target.name == 'spark' else 'PARQUET' }}"
     silver:
       +materialized: table
     gold:
       +materialized: table
+      # Spark microbatch (insert_overwrite per batch) requires partition_by; the monthly aggregate
+      # is the only incremental model that does not get one from partitioned_by_month.
+      agg_weather_monthly_country:
+        +partition_by: ['months(month)']

@@ -3,7 +3,8 @@ version: 2
 sources:
   - name: duckdb_bronze
     description: Raw GHCN-Daily written by the DuckDB ingest (SPEC §7, bronze). Read-only for dbt.
-    database: lakehouse
+    # No `database`: each target already points at the lakehouse catalog, and dbt-spark rejects a
+    # source database that differs from its schema ("Cannot set database in spark!").
     schema: duckdb_bronze
     tables:
       - name: ghcn_daily_raw
