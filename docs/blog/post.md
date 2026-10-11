@@ -217,7 +217,9 @@ Takeaways: sorting is the one change that pays, and it becomes the default layou
 
 ## 7. What surprised me
 
-_(to fill as it happens)_
+- **Partitioning by month, the "obvious" choice, bought nothing.** Every gold table started partitioned by month, the textbook layout for time series. On the B6 measurements it did not pay: 190 M rows came to 0.38–0.73 GB, so each monthly partition held 2–4 MB. That is micro-partitioning. File size targets could not apply, and the engines spent their time opening small files and reading metadata. What made reads faster was sorting the data, a "cluster by" on (station_id, date): half the storage and a 37% faster yearly count. The partition rule we ended with: partition only when partitions are big (about 1 GB compressed each), or when the partition serves the writes (bronze by batch, silver by delete+insert window). Everywhere else, let the sort order prune. A second B6 round tests sort-only against partition + sort to close the question with numbers.
+- **A sleeping laptop looks like a distributed-systems bug.** Trino's `ABANDONED_TASK` turned out to be macOS idle sleep freezing the Docker VM. The clue was query IDs lagging the log clock.
+- **Materialized views have to match the query's shape, not its intent.** StarRocks' wide join MV served none of the SQL Cube generates. A boring copy of each table served all of it.
 
 ## 8. Limitations
 
