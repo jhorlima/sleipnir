@@ -172,6 +172,24 @@ These come from building the MVP, not from the harness: a single run each, no co
 
 Correctness so far: Cube Q1–Q3 match direct Trino SQL; all three incremental strategies produce identical rows and `sum(value)`.
 
+### 6.2 B6 — layout, one factor at a time (Trino 483, profile M, scale r2, `results/b6.parquet`)
+
+Each variant is a full copy of `fct_weather_daily` (190.2 M rows); reads are B3 Q1–Q6, 1 cold + 5 warm runs each, every answer checked against DuckDB.
+
+| Variant | Size (GB) | Files | Write (s) | Q1 warm p50 (ms) | Q2 | Q3 | Q4 | Q5 | Q6 |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline (zstd, month) | 0.732 | 192 | 57 | 806 | 455 | 385 | 232 | 217 | 120 |
+| target file 128 MB | 0.732 | 192 | 45 | 874 | 439 | 308 | 209 | 193 | 111 |
+| target file 256 MB | 0.733 | 192 | 51 | 991 | 412 | 326 | 230 | 207 | 119 |
+| target file 512 MB | 0.732 | 192 | 48 | 761 | 440 | 340 | 216 | 213 | 119 |
+| gzip | 0.713 | 192 | 54 | 786 | 414 | 317 | 272 | 233 | 130 |
+| snappy | 0.891 | 192 | 41 | 918 | 415 | 296 | 197 | 216 | 119 |
+| **sorted (station_id, date)** | **0.383** | 192 | 66 | **506** | 407 | 303 | 197 | 207 | 107 |
+| z-order (Spark) | 0.667 | 192 | 49 | 976 | 523 | 391 | 218 | 197 | 117 |
+| year(date) partition | 0.758 | 64 | 110 | 197,537 | 736 | 404 | 227 | 381 | 176 |
+
+Takeaways: sorting is the one change that pays, and it becomes the default layout. File size targets cannot matter when a monthly partition holds 2–4 MB. Snappy costs 22% more storage for no read gain. The yearly partition made the yearly count ~250× slower (one run timed out): an anomaly to explain before publishing.
+
 ### 6.1 Scale `r2` load (GHCN 2010–2025, profile M, one run, before the harness)
 
 | Step | Engine | Number |
@@ -194,7 +212,7 @@ Correctness so far: Cube Q1–Q3 match direct Trino SQL; all three incremental s
 | B3 Direct reads | | |
 | B4 Reads via Cube | | |
 | B5 Acceleration (StarRocks MV × Trino MV × Cube Store) | | |
-| B6 Maintenance and layout | | |
+| B6 Maintenance and layout | Sorting the fact table by station and date halves it (0.73 → 0.38 GB) and speeds up the yearly count by 37%, with no read getting worse; file size targets do nothing with monthly partitions | storage and warm p50 per variant |
 
 ## 7. What surprised me
 

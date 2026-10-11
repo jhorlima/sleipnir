@@ -336,7 +336,7 @@ Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+w
 - No Trino, a escrita das variantes é um `INSERT` por ano: um CTAS ordenado das 192 partições estoura a memória do `TableWriterOperator` no perfil `M`.
 - Com partição mensal, os arquivos ficam com 2–4 MB; o tamanho-alvo de arquivo (128/256/512 MB) só pesa se a partição for maior. A partição por ano é a variante que testa isso.
 - Hipótese a validar: **zstd** é o melhor equilíbrio entre tamanho e velocidade de leitura; gzip comprime parecido, mas descomprime mais devagar; snappy é o maior em disco. Com ~1–2 GB por camada, partições pequenas (por mês) limitam o tamanho real dos arquivos — por isso partição entra na matriz junto com o tamanho de arquivo.
-- O resultado do B6 define os padrões usados nas demais suítes (registrado em §14).
+- O resultado do B6 define os padrões usados nas demais suítes (D-15). Em aberto: a Q1 (contagem por ano) com partição `year(date)` levou 197 s quente e 58 s a frio no Trino, contra 0,8 s na partição mensal; entender com `EXPLAIN ANALYZE` antes de publicar.
 
 ### 10.5 Queries de leitura (D1)
 1. Contagem de observações por ano.
@@ -456,7 +456,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-12 | **Iceberg v2** | Trino ainda não escreve v3 (leitura experimental); StarRocks 4.1 rejeita tabelas v3 com deletion vectors; suporte do Lakekeeper não confirmado. |
 | D-13 | Spark 4.1.3 + Iceberg 1.12.0 (Scala 2.13) + dbt-spark 1.11.0 (Thrift), `local[N]` ajustado ao perfil | Versão mais recente; um JVM evita overhead de cluster em um nó. |
 | D-14 | Um engine por vez; dbt com `threads` igual para todos; medição por model | Comparação justa sem disputa entre engines; o paralelismo interno é mérito de cada engine. |
-| D-15 | Codec/tamanho de arquivo/partição definidos pelo B6 | Escolha baseada em medição, não em suposição. |
+| D-15 | Layout padrão de `fct_weather_daily`, definido pelo B6 (`results/b6.parquet`, Trino `M`, `r2`): zstd + partição `month(date)` + ordenação `(station_id, date)` (`sorted_by` no Trino, `WRITE ORDERED BY` no Spark) | Ordenar reduziu a fato de 0,732 para 0,383 GB (−48%) e a Q1 quente de 806 para 506 ms, sem piorar nenhuma leitura. O tamanho-alvo de arquivo não muda nada (arquivos mensais de 2–4 MB); snappy ocupa 22% a mais e gzip 3% a menos, com leituras no ruído; z-order não melhorou as leituras; partição por ano deixou a Q1 ~250× mais lenta (anomalia em investigação). |
 | D-16 | Uma instância do Cube com multi data source; membros na base e engines via `extends` | Semântica idêntica entre engines sem template; cada arquivo de engine mostra só o que difere. |
 | D-17 | Medidas de rollup sempre `CAST AS DOUBLE` | Drivers truncam DECIMAL a 5 casas no Cube Store. |
 | D-18 | Cube lê só pelos engines, sem integração com dbt | O benchmark mede o caminho engine → Cube; schema do Cube independente. |
