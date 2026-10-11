@@ -37,6 +37,10 @@ VARIANTS = {
     "year": {"writer": "trino", "partitioning": "year(date)", "properties": {}},
     "sorted": {"writer": "trino", "partitioning": MONTH, "properties": {"sorted_by": "ARRAY['station_id', 'date']"}},
     "zorder": {"writer": "spark", "partitioning": MONTH, "properties": {}},
+    # Second round (sort order against partitions, SPEC D-25): partitioning None means an unpartitioned table.
+    "sorted_nopart": {"writer": "trino", "partitioning": None, "properties": {"sorted_by": "ARRAY['station_id', 'date']"}},
+    "sorted_date_nopart": {"writer": "trino", "partitioning": None, "properties": {"sorted_by": "ARRAY['date', 'station_id']"}},
+    "year_sorted": {"writer": "trino", "partitioning": "year(date)", "properties": {"sorted_by": "ARRAY['station_id', 'date']"}},
 }
 ZORDER_SORT = "zorder(station_id, date)"
 # rewrite-all: without it the procedure skips a month that holds a single file, which is every month here.
@@ -75,18 +79,26 @@ def run_sql(engine, sql):
     return result.stdout.strip(), seconds
 
 
+def trino_properties(spec):
+    properties = {}
+    if spec["partitioning"] is not None:
+        properties["partitioning"] = f"ARRAY['{spec['partitioning']}']"
+    properties.update(spec["properties"])
+    return properties
+
+
 def table_properties_text(variant):
     spec = VARIANTS[variant]
     if spec["writer"] == "spark":
         return f"writer=spark; partitioning={spec['partitioning']}; write ordered: none; rewrite_data_files sort_order={ZORDER_SORT}"
-    properties = {"partitioning": f"ARRAY['{spec['partitioning']}']", **spec["properties"]}
-    text = ", ".join(f"{key}={value}" for key, value in properties.items())
+    properties = trino_properties(spec)
+    text =", ".join(f"{key}={value}" for key, value in properties.items())
     return f"writer=trino; {text}; catalog default codec ZSTD when compression_codec is not set"
 
 
 def write_trino(namespace, variant):
     spec = VARIANTS[variant]
-    properties = {"partitioning": f"ARRAY['{spec['partitioning']}']", **spec["properties"]}
+    properties = trino_properties(spec)
     with_clause = ", ".join(f"{key} = {value}" for key, value in properties.items())
     run_sql("trino", f"create schema if not exists lakehouse.{namespace}")
     first_year, last_year = run_sql("trino", f"select min(year(date)), max(year(date)) from {SOURCE}")[0].split()
