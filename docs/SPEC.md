@@ -165,6 +165,21 @@ Regras:
 - `fct_weather_daily` — 1 linha por estação/dia, pivot de `TMAX, TMIN, PRCP, SNOW`. Incremental.
 - `agg_weather_monthly_country` — agregado mensal por país. Incremental por mês.
 
+### Materialização por camada e model
+| Camada | Model / tabela | Materialização | Como atualiza | Primeira carga |
+|---|---|---|---|---|
+| Bronze | `ghcn_daily_raw` | tabela Iceberg (DuckDB) | **append** por lote mensal (`_batch_id`); nunca reescrita | os 192 lotes, um a um (B1) |
+| Bronze | `ghcn_stations_raw`, `ghcn_countries_raw` | tabela | **substituída** a cada carga (arquivos de referência pequenos) | idem |
+| Silver | `ghcn_daily` | **incremental** | estratégia do engine (§7.1): `delete+insert` no Trino e no Postgres, `merge` no Spark; janela = datas dos lotes novos − overlap | **por mês** com microbatch (`make dbt-backfill`, D-21) |
+| Silver | `stations` | `table` (**full refresh**) | reconstruída a cada execução (133 k linhas, ~1 s) | idem |
+| Gold | `fct_weather_daily` | **incremental** (ordenada, D-15) | igual ao silver | por mês com microbatch |
+| Gold | `agg_weather_monthly_country` | **incremental** | igual ao silver, por mês | por mês com microbatch |
+| Gold | `dim_station`, `dim_date` | `table` (**full refresh**) | reconstruídas a cada execução (pequenas) | idem |
+| Gold (só B5b, Trino) | `mv_weather_wide` | `table` (**full refresh**) | o "refresh" medido do B5b | idem |
+
+- Regra: tabelas grandes e com eixo de tempo são incrementais; tabelas pequenas de referência são reconstruídas inteiras, porque o custo é de segundos e não há janela para errar.
+- Do zero, nenhuma tabela grande é construída numa query só a partir da `r2`: o build é mês a mês (D-21). Depois disso, cada execução processa só a janela do lote novo.
+
 ### Regra de particionamento (D-25)
 - **A ordenação (*cluster by*) é o primeiro ajuste**: `sorted_by` no Trino, `WRITE ORDERED BY` no Spark. No B6, ela cortou a fato pela metade e acelerou as leituras sem piorar nenhuma.
 - **Partição por tempo continua valendo quando os filtros são por período**, mesmo com partições pequenas: na `r2`, tirar a partição mensal de uma fato já ordenada deixou as queries com filtro de período 60–80% mais lentas no Trino (Q2: 378 → 679 ms), com partições de 2–4 MB. Sem filtros alinhados à partição, ela não paga o custo de arquivos pequenos.
