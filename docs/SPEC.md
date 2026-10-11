@@ -201,6 +201,7 @@ Executados como etapa própria (`dbt test`), separados do tempo dos models.
 
 | Tipo | Onde | Regra |
 |---|---|---|
+| Unicidade de `(station_id, date)` | `gold.fct_weather_daily` | Igual à do silver: teste singular na janela da última execução e `assert_unique_by_year` fora da medição (`make dbt-check-unique` checa as duas tabelas); agrupar as 190 M linhas derruba o Trino no perfil `M` |
 | Unicidade de `(station_id, date, element)` | `silver.ghcn_daily` | Teste singular só na janela que a última execução pode ter gravado (mês mais recente + 2 × overlap). A tabela inteira é checada ano a ano pela macro `assert_unique_by_year`, fora da medição, porque um `GROUP BY` único estoura o spill no perfil `M` a partir da `r2` |
 | `unique` + `not_null` | PKs do gold | — |
 | `relationships` | fato → dims | — |
@@ -461,7 +462,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-12 | **Iceberg v2** | Trino ainda não escreve v3 (leitura experimental); StarRocks 4.1 rejeita tabelas v3 com deletion vectors; suporte do Lakekeeper não confirmado. |
 | D-13 | Spark 4.1.3 + Iceberg 1.12.0 (Scala 2.13) + dbt-spark 1.11.0 (Thrift), `local[N]` ajustado ao perfil | Versão mais recente; um JVM evita overhead de cluster em um nó. |
 | D-14 | Um engine por vez; dbt com `threads` igual para todos; medição por model | Comparação justa sem disputa entre engines; o paralelismo interno é mérito de cada engine. |
-| D-15 | Layout padrão de `fct_weather_daily`, definido pelo B6 (`results/b6.parquet`, Trino `M`, `r2`): zstd + partição `month(date)` + ordenação `(station_id, date)` (`sorted_by` no Trino, `WRITE ORDERED BY` no Spark) | Ordenar reduziu a fato de 0,732 para 0,383 GB (−48%) e a Q1 quente de 806 para 506 ms, sem piorar nenhuma leitura. O tamanho-alvo de arquivo não muda nada (arquivos mensais de 2–4 MB); snappy ocupa 22% a mais e gzip 3% a menos, com leituras no ruído; z-order não melhorou as leituras; partição por ano deixou a Q1 ~250× mais lenta (anomalia em investigação). |
+| D-15 | Layout padrão de `fct_weather_daily`, definido pelo B6 (`results/b6.parquet`, Trino `M`, `r2`): zstd + partição `month(date)` + ordenação `(station_id, date)`. No Trino, `sorted_by` ordena toda escrita; no Spark, `WRITE ORDERED BY` só existe depois da criação da tabela, então a ordenação é aplicada pela manutenção (`rewrite_data_files` com `strategy => 'sort'` e `rewrite-all`) | Ordenar reduziu a fato de 0,732 para 0,383 GB (−48%) e a Q1 quente de 806 para 506 ms, sem piorar nenhuma leitura. O tamanho-alvo de arquivo não muda nada (arquivos mensais de 2–4 MB); snappy ocupa 22% a mais e gzip 3% a menos, com leituras no ruído; z-order não melhorou as leituras; partição por ano deixou a Q1 ~250× mais lenta (anomalia em investigação). |
 | D-16 | Uma instância do Cube com multi data source; membros na base e engines via `extends` | Semântica idêntica entre engines sem template; cada arquivo de engine mostra só o que difere. |
 | D-17 | Medidas de rollup sempre `CAST AS DOUBLE` | Drivers truncam DECIMAL a 5 casas no Cube Store. |
 | D-18 | Cube lê só pelos engines, sem integração com dbt | O benchmark mede o caminho engine → Cube; schema do Cube independente. |

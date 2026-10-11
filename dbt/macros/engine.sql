@@ -40,28 +40,41 @@
 {%- endmacro %}
 
 
-{#- Returns model config entries; used as {{ config(**partitioned_by_month('date')) }}. -#}
-{% macro partitioned_by_month(column) -%}
-    {{ return(adapter.dispatch('partitioned_by_month', 'sleipnir')(column)) }}
+{#- Returns model config entries; used as {{ config(**partitioned_by_month('date')) }}.
+    sort_columns (fct_weather_daily, SPEC §14 D-15) adds the table's sort order. It is an argument, not a
+    second macro, because two config() calls replace each other's `properties`. -#}
+{% macro partitioned_by_month(column, sort_columns=[]) -%}
+    {{ return(adapter.dispatch('partitioned_by_month', 'sleipnir')(column, sort_columns)) }}
 {%- endmacro %}
 
-{% macro trino__partitioned_by_month(column) -%}
-    {{ return({'properties': {'partitioning': "ARRAY['month(" ~ column ~ ")']"}}) }}
+{% macro trino__partitioned_by_month(column, sort_columns) -%}
+    {%- set properties = {'partitioning': "ARRAY['month(" ~ column ~ ")']"} -%}
+    {%- if sort_columns -%}
+        {%- do properties.update({'sorted_by': "ARRAY['" ~ sort_columns | join("', '") ~ "']"}) -%}
+    {%- endif -%}
+    {{ return({'properties': properties}) }}
 {%- endmacro %}
 
 {#- Iceberg `months(col)` transform. Hash distribution makes each writer task receive whole partitions,
-    so a partitioned write does not leave one small file per task per month. -#}
-{% macro spark__partitioned_by_month(column) -%}
-    {{ return({
+    so a partitioned write does not leave one small file per task per month.
+    A sort order can only be set on an existing table, and dbt runs a model's post-hooks once per microbatch
+    run, so a build writes its batches unsorted; maintain_table then rewrites the table with the sort order.
+    Writes after the hook has run are sorted. -#}
+{% macro spark__partitioned_by_month(column, sort_columns) -%}
+    {%- set entries = {
         'partition_by': ['months(' ~ column ~ ')'],
         'tblproperties': {'write.distribution-mode': 'hash'},
-    }) }}
+    } -%}
+    {%- if sort_columns -%}
+        {%- do entries.update({'post_hook': "alter table {{ this }} write ordered by " ~ sort_columns | join(', ')}) -%}
+    {%- endif -%}
+    {{ return(entries) }}
 {%- endmacro %}
 
 {#- No partitioning on Postgres: the `small` scale is ~44 M rows, and dbt-postgres has no declarative
     partitioning config; an unpartitioned heap is the plain baseline. `config()` rejects an empty call,
     so the entry is Postgres' own default (a regular, logged table). -#}
-{% macro postgres__partitioned_by_month(column) -%}
+{% macro postgres__partitioned_by_month(column, sort_columns) -%}
     {{ return({'unlogged': false}) }}
 {%- endmacro %}
 

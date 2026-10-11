@@ -115,6 +115,7 @@ dbt-build: ## dbt build (models + tests) on DBT_TARGET; VARS='{maintenance: fals
 	$(dbt) build $(dbt_vars) $(ARGS)
 
 dbt-backfill: ## Build silver/gold from scratch one month at a time (BACKFILL_START/BACKFILL_END); needed from scale r2 up
+# An existing incremental table is only appended to: pass ARGS='--full-refresh --select ...' to rebuild its layout.
 	$(dbt) run --vars '{incremental_strategy: microbatch, microbatch_begin: "$(BACKFILL_START)", maintenance: false}' \
 		--event-time-start $(BACKFILL_START) --event-time-end $(BACKFILL_END) $(ARGS)
 	# In a microbatch run the maintenance post-hook would run once per batch, so it runs once per table here.
@@ -122,8 +123,9 @@ dbt-backfill: ## Build silver/gold from scratch one month at a time (BACKFILL_ST
 	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_gold.fct_weather_daily}'
 	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_gold.agg_weather_monthly_country}'
 
-dbt-check-unique: ## Check the silver natural key over the whole table, one year per query (after a backfill; not measured)
+dbt-check-unique: ## Check the silver and fact natural keys over the whole tables, one year per query (after a backfill; not measured)
 	$(dbt) run-operation assert_unique_by_year --args '{relation: $(DBT_TARGET)_silver.ghcn_daily, key_columns: [station_id, date, element]}'
+	$(dbt) run-operation assert_unique_by_year --args '{relation: $(DBT_TARGET)_gold.fct_weather_daily, key_columns: [station_id, date]}'
 
 dbt-run: ## dbt run (models only); same VARS/ARGS/RUN_ID passthrough as dbt-build
 	$(dbt) run $(dbt_vars) $(ARGS)

@@ -49,8 +49,18 @@
     {%- set orphan_cutoff = spark_retention_cutoff(var('orphan_file_retention'), 25 * 3600) -%}
     {#- prefix_listing lists the files through S3FileIO; the default lists through Hadoop's s3 filesystem, which is not installed. -#}
     {#- rewrite_data_files only touches files below min-file-size-bytes, like Trino's file_size_threshold. -#}
+    {#- A table with a write order (fct_weather_daily) is rewritten with it: dbt runs a model's post-hooks once
+        per microbatch run, so the batches of a build are written before the write order exists. rewrite-all:
+        without it the procedure skips a partition that holds fewer than 5 files, which is every month here. -#}
+    {%- set table_sort_order = run_query("show tblproperties " ~ relation ~ " ('sort-order')").rows[0][1] -%}
+    {%- set rewrite_options = "'min-file-size-bytes', '" ~ threshold_bytes ~ "'" -%}
+    {%- set strategy = "" -%}
+    {%- if 'ASC' in table_sort_order -%}
+        {%- set strategy = "strategy => 'sort', " -%}
+        {%- set rewrite_options = "'rewrite-all', 'true'" -%}
+    {%- endif -%}
     {%- set statements = [
-        "call " ~ procedures ~ ".rewrite_data_files(table => '" ~ relation ~ "', options => map('min-file-size-bytes', '" ~ threshold_bytes ~ "'))",
+        "call " ~ procedures ~ ".rewrite_data_files(table => '" ~ relation ~ "', " ~ strategy ~ "options => map(" ~ rewrite_options ~ "))",
         "call " ~ procedures ~ ".rewrite_manifests(table => '" ~ relation ~ "')",
         "call " ~ procedures ~ ".expire_snapshots(table => '" ~ relation ~ "', older_than => TIMESTAMP '" ~ snapshot_cutoff ~ "', retain_last => 1)",
         "call " ~ procedures ~ ".remove_orphan_files(table => '" ~ relation ~ "', older_than => TIMESTAMP '" ~ orphan_cutoff ~ "', prefix_listing => true)",
