@@ -23,6 +23,8 @@ vars:
   overlap_days: 7
   # First microbatch batch; must not be later than the first bronze date.
   microbatch_begin: "2025-01-01"
+  # B2 incremental scenarios: reprocess the bronze batches >= this batch id instead of the ones newer than the table.
+  reprocess_from_batch: null
   # Post-hook maintenance on incremental models; measured runs pass false (benchmark-integrity §8).
   maintenance: true
   optimize_file_size_threshold: 128MB

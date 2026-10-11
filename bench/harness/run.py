@@ -4,7 +4,9 @@ b3/b4/b5 start the `bench` container, which runs reads.py on the compose network
 Usage: python run.py b1|b2 --engine <engine> --profile <s|m|l> [--args "<dbt args>"]
        python run.py b3|b4|b5 --engine <engine> --profile <s|m|l> [--dataset ghcn|tpch] [--scenario b5a|b5b|b5c] [--queries q1,q2]
 Env: DATA_SCALE (default r2), STRATEGY (dbt incremental_strategy var, default: model default),
-     SCENARIO (default per suite), DBT_MAKE_TARGET (b2 only, default dbt-run).
+     SCENARIO (default per suite), DBT_MAKE_TARGET (b2 only, default dbt-run), REPROCESS_FROM_BATCH and
+     MICROBATCH_BEGIN (b2 only, dbt vars of the same name), SCHEMA_SUFFIX (b2: _small, read by dbt).
+b2.py drives this module for the whole B2 campaign (`make b2-campaign`).
 Measure microbatch with STRATEGY=microbatch and ARGS='--event-time-start ... --event-time-end ...',
 not with dbt-backfill: its maintenance run-operations would be timed and overwrite run_results.json.
 """
@@ -149,10 +151,19 @@ def run_b1(args):
 
 def dbt_vars():
     # benchmark-integrity §8: no maintenance inside a measured run.
-    strategy = os.environ.get("STRATEGY")
-    if strategy:
-        return f"{{maintenance: false, incremental_strategy: {strategy}}}"
-    return "{maintenance: false}"
+    entries = ["maintenance: false"]
+    if os.environ.get("STRATEGY"):
+        entries.append(f"incremental_strategy: {os.environ['STRATEGY']}")
+    if os.environ.get("REPROCESS_FROM_BATCH"):
+        entries.append(f"reprocess_from_batch: {os.environ['REPROCESS_FROM_BATCH']}")
+    if os.environ.get("MICROBATCH_BEGIN"):
+        entries.append(f'microbatch_begin: "{os.environ["MICROBATCH_BEGIN"]}"')
+    return "{" + ", ".join(entries) + "}"
+
+
+def compose_service(engine):
+    # The service `postgres` is the catalog Postgres; the benchmark one is postgres-bench.
+    return "postgres-bench" if engine == "postgres" else engine
 
 
 def run_b2(args):
@@ -167,11 +178,11 @@ def run_b2(args):
     ]
     # A stale file from an earlier run must never be read as this run's result.
     DBT_RUN_RESULTS.unlink(missing_ok=True)
-    lines, returncode, wall_seconds, sampler = run_measured(command, service=args.engine)
+    lines, returncode, wall_seconds, sampler = run_measured(command, service=compose_service(args.engine))
 
     common = {
         **base, **stats_fields(sampler),
-        "engine_version": read_engine_image(args.engine),
+        "engine_version": read_engine_image(compose_service(args.engine)),
         "engine_config": read_engine_config(args.engine),
     }
     rows = []
