@@ -51,8 +51,11 @@ ENGINE_SERVICE = {"trino": "trino", "starrocks": "starrocks", "postgres": "postg
 CUBE_SERVICE = "cube-api"
 GOLD_TABLES = ("fct_weather_daily", "dim_station", "dim_date")
 D1_QUERIES = ["q1", "q2", "q3", "q4", "q5", "q6"]
+# Through Cube (B4, B5b) all ten questions run; B5c only the ones a rollup serves (SPEC §8.4, spike V9).
+CUBE_QUERIES = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "q10"]
+CUBE_STORE_QUERIES = ["q2", "q3", "q7y", "q9", "q10"]
 # Trino's approx_percentile is not deterministic: the last N columns of these Cube queries match within 5%.
-APPROX_MEASURE_COLUMNS = {"q7": 2, "q8": 1}
+APPROX_MEASURE_COLUMNS = {"q7": 2, "q7y": 2, "q8": 1}
 HEALTHY_TIMEOUT_SECONDS = 900
 
 
@@ -205,6 +208,10 @@ def query_ids(setup):
     if setup.dataset == "tpch":
         paths = sorted(TPCH_DIR.glob(f"q*.{setup.engine}.sql"))
         return [path.name.split(".")[0] for path in paths]
+    if setup.pre_aggregation_gate:
+        return CUBE_STORE_QUERIES
+    if setup.via_cube:
+        return CUBE_QUERIES
     return D1_QUERIES
 
 
