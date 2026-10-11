@@ -145,7 +145,7 @@ Regras:
   - Os lotes de `landing/batches` são `.csv.gz` (3,4 GB em vez de ~25 GB). O DuckDB lê gzip na mesma vazão do CSV puro, e gerar os lotes (fora da medição) leva ~1 min por ano.
   - A partir da `r2`, silver e gold são construídos do zero mês a mês (`make dbt-backfill`, D-21).
 - Fora do bucket: `landing/` (CSV em disco local), baseline Postgres, MVs do StarRocks (storage local do BE) e Cube Store.
-- **Dimensionamento empírico do D2:** gerar SF1, medir e escalar o SF até o teto de 2 GB.
+- **D2 = TPC-H SF8: 1,875 GB** medidos (SF1 = 0,227 GB; SF9 passaria de 2 GB), em `lakehouse.duckdb_tpch`, gerado pelo DuckDB em ~65 s (`make tpch SF=8`). Na `r2`, bronze + um writer + D2 = 5,63 GB.
 - Manutenção após cada carga (§10.4): snapshots antigos contam no orçamento.
 - `make storage-report ENGINE=<engine>` mostra o uso por namespace e falha se bronze + `<engine>_*` + D2 passar do teto.
 - ⚠️ V5: confirmar os limites atuais do free tier do R2 (storage e operações Class A/B) e estimar os GETs do benchmark antes de rodar no R2.
@@ -337,7 +337,7 @@ Perguntas só via Cube (B4/B5), que geram SQL mais pesado (CTEs, window, subquer
 9. Share da precipitação por país sobre o total.
 10. Variação ano contra ano de `avg_tmax` por país, mês a mês.
 
-D2: 22 queries TPC-H (dialeto ajustado por engine, semântica igual).
+D2: 22 queries TPC-H com os parâmetros padrão (`bench/queries/tpch/`, um arquivo por engine), validadas por checksum contra o DuckDB em DuckDB, Trino e StarRocks. A fração da Q11 segue a especificação, `0.0001 / SF`; a Q15 usa CTE no lugar da view; Trino e StarRocks usam `substr` na Q22 e `GROUP BY l_suppkey` na Q15. Resultados rotulados "derived from TPC-H, not comparable to published TPC-H results".
 
 ### 10.6 Protocolo
 - Nunca dois engines ao mesmo tempo. Nas leituras (B3–B5), uma query por vez.

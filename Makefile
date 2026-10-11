@@ -1,9 +1,11 @@
 .DEFAULT_GOAL := help
-.PHONY: help env up down ps logs init clean engine-up engine-down postgres-load trino-cli starrocks-init starrocks-cli ingest-build download ingest storage-report \
+.PHONY: help env up down ps logs init clean engine-up engine-down postgres-load trino-cli starrocks-init starrocks-cli ingest-build download ingest tpch tpch-check storage-report \
 	dbt-image dbt-debug dbt-build dbt-backfill dbt-check-unique dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
 	cube-up cube-down cube-query cube-sql bench report
 
 ENGINE ?= trino
+# tpch: integer TPC-H scale factor for D2 (SPEC §6).
+SF ?= 1
 PROFILE ?= m
 DBT_TARGET ?= trino
 # Optional dbt passthrough: VARS='{maintenance: false}', ARGS='--select ghcn_daily', RUN_ID=<id>.
@@ -76,6 +78,12 @@ download: ## Download GHCN_YEARS (default 2025) + stations + countries into LAND
 
 ingest: ## Load all batches of GHCN_YEARS into duckdb_bronze, skipping loaded ones (BATCH=YYYYMM for one)
 	docker compose --env-file .env --env-file env/$(PROFILE).env --profile ingest run --rm ingest load.py
+
+tpch: ## Generate D2 (derived from TPC-H) into duckdb_tpch at SF=<n>; replaces the tables
+	docker compose --env-file .env --env-file env/$(PROFILE).env --profile ingest run --rm -e TPCH_SF=$(SF) ingest tpch.py
+
+tpch-check: ## Run the 22 TPC-H queries on ENGINE=duckdb|trino|starrocks and compare row count + checksum with DuckDB (engine up for trino/starrocks)
+	python3 bench/queries/tpch/check.py $(ENGINE)
 
 storage-report: ## Object-store bytes of duckdb_bronze + ENGINE_* namespaces; fails over STORAGE_BUDGET_GB
 	docker compose --profile ingest run --rm -e ENGINE=$(ENGINE) storage-report

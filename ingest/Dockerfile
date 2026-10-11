@@ -11,7 +11,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project
 
 # Extensions are baked in so a measured load never downloads them.
-RUN python -c "import duckdb; duckdb.sql('INSTALL iceberg; INSTALL httpfs; INSTALL avro; INSTALL postgres')"
+RUN python -c "import duckdb; duckdb.sql('INSTALL iceberg; INSTALL httpfs; INSTALL avro; INSTALL postgres; INSTALL tpch')"
 
 COPY *.py ./
 
