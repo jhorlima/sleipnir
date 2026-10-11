@@ -255,9 +255,20 @@ Cubes (internos, `public: false`): `weather_daily` (sobre `fct_weather_daily`), 
 - Sintaxe específica por engine (ex.: `PERCENTILE_CONT` no StarRocks recebe 2 argumentos) fica no arquivo daquele engine, sobrescrevendo o membro da base.
 
 ### 8.4 Pre-aggregations (só no B5c)
-- Rollup `monthly_country` (país × mês) e `yearly_station` (estação × ano), `partition_granularity: month`/`year`, índices pelas dimensões filtradas.
-- No benchmark, o build é disparado explicitamente no passo 6 do §9 (não pelo timer do refresh worker), e o tempo é medido.
-- Conferir que as colunas de medida no Cube Store são `Float`.
+Rollups provados no V9 (proposta em `spikes/V9/proof_model.diff`, a aplicar em cada engine no B5c):
+
+| Rollup | Grão | Serve |
+|---|---|---|
+| `monthly_country` | país × mês, só medidas aditivas | Q9 (as duas etapas multi-stage) |
+| `monthly_country_avg` | país × mês, médias no grão exato | Q2, Q10 (inclusive a etapa deslocada de 2024) |
+| `yearly_station` | estação × ano | Q3 |
+| `yearly_country_percentiles` | país × ano | Q7 só como variante com `granularity: year`, registrada à parte |
+| `yearly_median_station_prcp` (no cube `station_years`) | estação × ano | Q8, com diferença de 4,6% (percentil aproximado); fica fora do conjunto principal |
+
+- Q4 (filtros de lat/lon) não tem rollup e vai para o engine. Um `dateRange` sem `granularity` casa com rollup quando todas as medidas são aditivas (Q3, Q9); medidas não aditivas exigem o grão exato.
+- Os percentis precisam de `CAST(... AS DOUBLE)` dentro da função; com isso, todas as colunas de medida no Cube Store são `float`.
+- O cache de resultados do Cube fica no volume do Cube Store e sobrevive a reinícios: toda requisição medida no B4/B5 manda `renewQuery: true`, e o volume é recriado antes de uma execução completa.
+- No benchmark, o build é medido no passo 6 do §9. A API `/v1/pre-aggregations/jobs` recusou o JWT (`API scope is missing: jobs`); até resolver, o build é o do refresh worker, medido do início do refresh até a última partição pronta. Na prova (2024–2025): ~3 min 20 s com o Trino no perfil `M` e o refresh worker em 0,5 CPU; 31 MB no Cube Store.
 
 ## 9. Fluxo de uma execução completa
 
@@ -463,7 +474,7 @@ docs/SPEC.en.md           # ao estabilizar
 | V6 | Iceberg v3: escrita no Trino, deletion vectors no StarRocks, suporte no Lakekeeper | Revisão periódica | Manter v2 |
 | V7 | Endpoints de métricas e integração OpenLineage de cada engine na versão pinada | Fase 4 | Manter só cAdvisor + `dbt-ol` |
 | V8 | Cosmos `ExecutionMode.WATCHER` com Airflow 3 + CeleryExecutor + dbt-trino/dbt-spark | Fase 3 | `ExecutionMode.LOCAL` com `DbtTaskGroup` |
-| V9 | Parcial (pesquisa, `spikes/V9/README.md`): Q9 (share, só somas) e Q10 (`time_shift` na granularidade exata país × mês) devem casar com rollups; Q7 (percentis) só num rollup na granularidade exata e com `granularity` na query; Q8 (`sub_query`) sem evidência. A confirmar na prova: se `dateRange` sem `granularity` casa com rollup | Fase 2 | Q7/Q8 ficam fora do B5c e o motivo é documentado |
+| V9 | ✅ Resolvido no Trino (`spikes/V9/README.md` §8): Q2, Q3, Q9 e Q10 são servidas por rollups como estão escritas, com resultados iguais à fonte; Q7 só com `granularity: year`; Q8 é servida, mas difere 4,6% (percentil aproximado); Q4 não. Falta repetir no StarRocks | Fase 2 | — |
 | V10 | STS do RustFS (AssumeRole) com a session policy do Lakekeeper → vended credentials para todos os engines | Fase 4 | Manter chaves estáticas |
 | V11 | Cosmos: `ExecutionMode.WATCHER` (dbt instalado na imagem do Airflow/worker) × `ExecutionMode.DOCKER` (dbt numa imagem própria, uma task por model) — overhead e isolamento | Fase 3 | `DockerOperator` chamando `dbt build` |
 | V12 | "Modo seguro": IdP OIDC leve (Dex ou Zitadel) + Lakekeeper com autenticação OIDC (sem OpenFGA) + vended credentials via STS do RustFS (depende do V10); engines com OAuth2 client credentials (DuckDB `CLIENT_ID`/`CLIENT_SECRET`/`OAUTH2_SERVER_URI`). Medido como cenário à parte; o cenário sem auth e com chaves estáticas segue como linha de base | Fase 4 | Manter chaves estáticas sem auth |

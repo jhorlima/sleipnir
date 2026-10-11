@@ -1,6 +1,6 @@
 # V9: can Cube v1.7.50 (Tesseract) serve multi-stage / non-additive measures from Cube Store pre-aggregations?
 
-**Result: PARTIAL.** Research only (nothing run, no containers touched). Research date: 2026-10-10.
+**Result: PARTIAL (proved on Trino, see section 8).** Research 2026-10-10; local proof 2026-10-11.
 Labels: **[doc]** official docs/release notes/PRs, **[inf]** inferred, **[?]** unproven, needs the local proof.
 
 ## 1. What the docs say (applies to all four questions)
@@ -60,3 +60,45 @@ See `pre_aggregations.proposal.yml` (engine cube, `trino_weather_daily`): `month
 3. `spikes/V9/run.sh` (builds the rollups via `POST /v1/pre-aggregations/jobs` or the refresh worker, runs q2, q3, q4, q7..q10 plus the variants in `queries/`, prints `usedPreAggregations` per query).
 4. Compare each accelerated result with the unaccelerated result (rename the rollup or query a model without it); fill the per-question verdicts above and SPEC 8.4 / 10.3 B5c.
 5. `make cube-down`; remove the Cube Store volume if the proof leaves large rollups.
+
+## 8. Proof (Trino, Cube + Cube Store 1.7.50, run 2026-10-11)
+
+**Verified locally.** Gold tables at the small scale (190,214,772 daily rows, 133,039 stations). The rollups of `pre_aggregations.proposal.yml` were applied to `trino_weather_daily` / `trino_station_years` with the build range narrowed to 2024-01-01..2025-12-31 (enough for q2..q10 and the 2024 prior-year stage); the exact diff is `proof_model.diff` (it also casts the percentile inputs to DOUBLE). `cube/model` was reverted afterwards. Helpers: `cube_post.sh`, `proof.sh`, `compare.py`, `trino_builds.sh`, `cubestore_sql.sh`.
+
+Method: accelerated pass (rollups built by the refresh worker), then the same queries with the rollups removed from the model and `renewQuery: true` (baseline, source on Trino), compared per row with a 5 % tolerance (benchmark-integrity 5). `usedPreAggregations` read from the `/v1/load` response.
+
+### 8.1 Granularity answer
+
+A `dateRange` **without** `granularity` matches a rollup when every measure is additive: q3 (`yearly_station`) and q9 (`monthly_country`, both stages) hit as written. The docs' "the query must set a granularity" is not enforced for that case in 1.7.50 (a year/month rollup is re-aggregated over the range). It does **not** match for non-additive measures: q7 as written (percentiles, no granularity) went to Trino; q7 with `granularity: year` hit `yearly_country_percentiles`. The `q9_month_granularity` variant is therefore unnecessary for the hit (it also changes the output shape).
+
+### 8.2 Per question
+
+| Q | Rollup hit | Rollup used | Result equal to source | Notes |
+|---|---|---|---|---|
+| Q2 | yes | `monthly_country_avg` | yes (1951 rows, max rel. diff 2e-16) | exact grain country x month |
+| Q3 | yes | `yearly_station` | yes (20 rows, 3e-16) | `dateRange` only, no granularity |
+| Q4 | **no** | none | n/a (source both, equal) | `latitude`/`longitude` filters are not in any rollup; stays on Trino |
+| Q7 as written | **no** | none | n/a | non-additive + no granularity |
+| Q7 `granularity: year` | yes | `yearly_country_percentiles` | within tolerance (192 rows, max rel. diff 1.9 %) | extra `date` column; `approx_percentile` differs between plans (the unaccelerated q7 vs the source baseline already differs by 1.4 %) |
+| Q8 | yes | `trino_station_years.yearly_median_station_prcp` | within tolerance (16 rows, max rel. diff 4.6 %) | the rollup **builds** from a `sub_query` dimension (22 s) and is matched at exact grain (`station_year`); 4.6 % is `approx_percentile` over 133k per-station sums in two plans, close to the 5 % limit |
+| Q9 as written | yes | `monthly_country` (used twice: both stages) | yes (192 rows, 6e-16) | share of total computed by Cube Store CTEs; the month-granularity variant took 711 s on the source vs seconds from the rollup |
+| Q10 | yes | `monthly_country_avg` (used three times, incl. the 2024 stage) | yes (2246 rows, 2e-16) | exact grain only; the shifted stage needs the 2024 partitions built |
+
+Additional: `q9_month_granularity` hits `monthly_country`, equal (1951 rows).
+
+Not needed: `rollup_lambda`, `original_sql`, `rollup_join`, decomposition of `avg`.
+
+### 8.3 Float check
+
+Cube Store `information_schema.columns` for `prod_pre_aggregations`: 79 `float`, 51 `int`, 52 `text`, 52 `timestamp`; **no decimal column**. Includes the casted percentiles and the `sub_query` rollup (`median_station_annual_prcp` is `float`). Percentile inputs must be `CAST(... AS DOUBLE)` (done in the diff).
+
+### 8.4 Build time and storage
+
+Trino `m` profile, Cube refresh worker at 0.5 CPU, builds run by the scheduler, 53 partitions in total: all rollups finished about 3 min 20 s after the first build started. Per rollup (Cube Store `created_at`): `yearly_median_station_prcp` 1 partition, 22 s; `yearly_station` 2 partitions, about 15 s; `yearly_country_percentiles` 2 partitions, about 10 s; `monthly_country` and `monthly_country_avg` 24 partitions each, about 2.5 to 3 min each, interleaved (a partition costs 1 to 6 s of Trino). Cube Store `/cube/data`: 28 MB after the builds (31 MB after the queries) for the 2024-2025 range. Extrapolation to 2010..2025 (192 partitions per monthly rollup) is not measured.
+
+### 8.5 Gotchas found
+
+- **Stale query cache across runs.** Cube Store persists Cube's query result cache in the `cubestore-data` volume: two baseline answers (q8, q9) were the previous day's results (older `lastRefreshTime`, older model) until `renewQuery: true` was sent. B3/B4 must send `renewQuery: true` (or start from a fresh volume) so a cold Cube run is not a cache hit.
+- **`cube/cube.js` driverFactory error in the refresh worker.** `dataSource` is `undefined` for some scheduler calls (`Cannot read properties of undefined (reading 'toUpperCase')` at `cube.js:20`, logged as "Refresh Scheduler Error" once per cycle). The rollups still built; the fix is `(dataSource || 'default')`. Not touched here (outside scope).
+- `POST /v1/pre-aggregations/jobs` answers "API scope is missing: jobs" with the signed JWT (a `scope` claim did not help); the refresh worker builds on its own, so `run.sh` step 1 does not work as written.
+- Cube Store SQL is reachable on the router port 3306 (MySQL protocol) from a throwaway `mysql:8` container on `sleipnir_default`; `information_schema.columns` and `system.tables` work, `substr` over `table_name` does not (Utf8View).

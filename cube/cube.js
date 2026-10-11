@@ -13,7 +13,8 @@ const duckdbInitSql = `
 `;
 
 module.exports = {
-  driverFactory: ({ dataSource }) => {
+  // The refresh worker also calls this without a data source; that means `default`.
+  driverFactory: ({ dataSource = 'default' }) => {
     if (dataSource === 'duckdb') {
       return { type: 'duckdb', initSql: duckdbInitSql };
     }
