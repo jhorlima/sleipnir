@@ -149,6 +149,52 @@ Consequence for B5a: with one wide MV, the benchmark rewrite check (SPEC §10.3)
 - Q1-Q3 match a DuckDB reference over the same Iceberg tables (Q1 counts equal, Q2 1951 keys with 0 mismatches at 1e-9, Q3 20 stations with 0 mismatches).
 - **Q5 (rolling 7 days) fails**: Cube's rolling window SQL uses `WITH RECURSIVE` and `CAST(... AS DATETIME(6))`; StarRocks 4.1.6 answers "Recursive CTE is not supported" and a syntax error on `DATETIME(6)`.
 
+## 10. One MV per table (D-24)
+
+One async MV per gold table, each a plain copy of every column (`bench/sql/b5a_*.starrocks.sql`, managed by `scripts/starrocks-mv.sh`, `make starrocks-mv-create|refresh|drop`): `mv_fct_weather_daily` (partitioned by month, hash `station_id`, 16 buckets), `mv_dim_station` (hash `station_id`, 4 buckets), `mv_dim_date` (hash `date`, 4 buckets). `REFRESH DEFERRED MANUAL`, `force_external_table_query_rewrite = true`. Scale r2 (fct 190,214,772 rows), profile M, StarRocks 4.1.6.
+
+Proof: `cube_sql.sh` captures the SQL Cube generates for Q1-Q10 on the starrocks view (`04_cube_queries.sql`); `run_mv_per_table.sh` runs EXPLAIN on those plus the hand-written Q1-Q4 of `03_queries.sql`, counts the scans on an MV against the scans left on the Iceberg tables, and compares sorted results with and without rewrite (1e-9 relative).
+
+### Refresh and size
+| MV | Rows | Refresh (`WITH SYNC MODE`, `query_timeout=3600`) | Size right after refresh | Size after compaction |
+|---|---|---|---|---|
+| `mv_fct_weather_daily` | 190,214,772 | **382 s** (192 monthly partitions) | 2.70 GB | **1.30 GB** (1.94 GB after the first 27 min wait, 1.30 GB later) |
+| `mv_dim_station` | 133,039 | 2 s | 5 MB | 5 MB |
+| `mv_dim_date` | 5,844 | 1 s | 25 KB | 25 KB |
+
+- The BE compacts for more than 25 minutes after the fact refresh (`wait-compaction` returned after 27 min including the refresh tail); the size keeps shrinking slowly after that. Together the MVs are 1.3 GB, against 4.8 GB of the wide join MV of §9: copying the columns without the join is far cheaper.
+- `SHOW DATA` reports `RowCount 0` for a while after the refresh; the row counts appear once the statistics catch up.
+- After the compaction and a batch of queries the BE sat at 92% of its 4.5 GB limit (`SHOW BACKENDS`, `MemUsedPct`) with no query running, and every heavy query failed on memory until the container was restarted (2% afterwards). Restart StarRocks between the refresh and the first measured query.
+- The MVs stayed in place for the benchmark (Docker VM free disk 26 GB, BE storage 2.2 GB).
+
+### Rewrite per query
+"Scans on MV" counts `TABLE: mv_*` in the EXPLAIN; "scans on Iceberg" counts `TABLE: trino_gold.*` (rewrite off shows `TABLE: trino_gold.dim_date`, rewrite on `TABLE: mv_dim_date`, so the count discriminates). Session `enable_materialized_view_rewrite=true`, `enable_materialized_view_union_rewrite=false`.
+
+| Query | Tables scanned | Scans on MV | Scans on Iceberg | Verdict | Results equal with/without MV |
+|---|---|---|---|---|---|
+| Q1 hand-written, fact + `dim_date` | 2 | 2 | 0 | all | yes |
+| Q1 hand-written, three tables | 3 | 3 | 0 | all | yes |
+| Q2 hand-written | 3 | 3 | 0 | all | yes |
+| Q3 hand-written, fact + station | 2 | 2 | 0 | all | yes |
+| Q3 hand-written, fact only | 1 | 1 | 0 | all | yes |
+| Q4 control (bounding box, 7.2M rows) | 2 | 2 | 0 | all | yes |
+| Cube Q1 | 1 | 1 | 0 | all | yes |
+| Cube Q2 | 2 | 2 | 0 | all | yes |
+| Cube Q3 | 1 | 1 | 0 | all | yes |
+| Cube Q4 | 2 | 2 | 0 | all | yes |
+| Cube Q5 (rolling window) | - | - | - | not runnable: `WITH RECURSIVE` / `DATETIME(6)` (see §9) | - |
+| Cube Q6 | 1 | 1 | 0 | all | yes |
+| Cube Q7 (percentiles) | 2 | 2 | 0 | all | yes |
+| Cube Q8 (nested aggregate, cross join) | 5 | 5 | 0 | all | not run: fails on BE memory (4.5 GB) **with and without** the MVs |
+| Cube Q9 (share of total) | 4 | 4 | 0 | all | yes |
+| Cube Q10 (period over period) | 6 | 6 | 0 | all | yes |
+
+Every query the engine can run has all its Iceberg scans replaced by MV scans, whatever the join shape, subquery or CTE: the failure of §9 (wide join MV) does not repeat. Cube Q1-Q3 are the same shapes that were never rewritten with the wide MV.
+
+- Cube Q1 without rewrite (Iceberg scan) exceeds the default 300 s `query_timeout`; the script sets 3600 for both runs.
+- Q8 (`starrocks_station_years`: 133k stations x 17 years cross join, joined with the fact) exceeds the BE memory limit of profile M with or without rewrite; B4/B5a would record it as failed for StarRocks at this profile (or it needs a larger profile, which would apply to every engine, benchmark-integrity §2).
+- Cube Q5 cannot run on StarRocks 4.1.6 at all (§9).
+
 ## Sources
 
 - StarRocks 4.1 release notes: https://docs.starrocks.io/releasenotes/release-4.1/

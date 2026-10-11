@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help env up down ps logs init clean engine-up engine-down postgres-load trino-cli starrocks-init starrocks-cli ingest-build download ingest tpch tpch-check storage-report \
+.PHONY: help env up down ps logs init clean engine-up engine-down postgres-load trino-cli starrocks-init starrocks-mv-create starrocks-mv-refresh starrocks-mv-drop starrocks-cli ingest-build download ingest tpch tpch-check storage-report \
 	dbt-image dbt-debug dbt-build dbt-backfill dbt-check-unique dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
 	cube-up cube-down cube-query cube-sql bench report
 
@@ -66,6 +66,15 @@ trino-cli: ## Open the Trino CLI inside the trino container, on the lakehouse ca
 
 starrocks-init: ## Create the lakehouse external catalog and the MV database in the running StarRocks (idempotent)
 	scripts/starrocks-init.sh
+
+starrocks-mv-create: ## Create the B5a materialized views (one per gold table, empty until refreshed; idempotent)
+	scripts/starrocks-mv.sh create
+
+starrocks-mv-refresh: ## Refresh the B5a materialized views, one JSON line per MV with the seconds
+	scripts/starrocks-mv.sh refresh
+
+starrocks-mv-drop: ## Drop the B5a materialized views (the BE keeps the files for 1 h)
+	scripts/starrocks-mv.sh drop
 
 starrocks-cli: ## Open the mysql client inside the starrocks container
 	docker compose exec starrocks mysql -h 127.0.0.1 -P 9030 -u root
