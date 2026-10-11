@@ -332,6 +332,9 @@ Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+w
 | Partição de `ghcn_daily` / `fct_weather_daily` | `month(date)`, `year(date)` |
 | Ordenação (*cluster by*) de `fct_weather_daily` | nenhuma; `sorted_by (station_id, date)` (Trino) / `WRITE ORDERED BY` (Spark); z-order `(station_id, date)` via `rewrite_data_files(strategy => 'sort')` no Spark |
 
+- Execução (`make b6 VARIANT=… ENGINE=trino`, `make b6-all`): um fator por vez a partir da base (layout atual do gold), 9 variantes: `baseline`, `file128`/`file256`/`file512`, `snappy`, `gzip`, `year`, `sorted` (`sorted_by (station_id, date)` no Trino) e `zorder` (Spark: CTAS + `rewrite_data_files` com `zorder(station_id, date)` e `rewrite-all`, porque uma partição com um único arquivo é ignorada). Cada variante vive em `bench_<run>_<variante>` com a fato e cópias das dimensões (o DuckDB não lê views Iceberg), é lida pelo B3 e apagada com espera do purge antes da próxima.
+- No Trino, a escrita das variantes é um `INSERT` por ano: um CTAS ordenado das 192 partições estoura a memória do `TableWriterOperator` no perfil `M`.
+- Com partição mensal, os arquivos ficam com 2–4 MB; o tamanho-alvo de arquivo (128/256/512 MB) só pesa se a partição for maior. A partição por ano é a variante que testa isso.
 - Hipótese a validar: **zstd** é o melhor equilíbrio entre tamanho e velocidade de leitura; gzip comprime parecido, mas descomprime mais devagar; snappy é o maior em disco. Com ~1–2 GB por camada, partições pequenas (por mês) limitam o tamanho real dos arquivos — por isso partição entra na matriz junto com o tamanho de arquivo.
 - O resultado do B6 define os padrões usados nas demais suítes (registrado em §14).
 

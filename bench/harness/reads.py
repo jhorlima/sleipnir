@@ -7,7 +7,7 @@ Runs inside the `bench` compose container (started by `make bench`, see run.py),
 
 Per query: restart the engine (cold) -> 1 cold run, 1 discarded warm-up, 5 measured warm runs.
 Every run is compared with the DuckDB reference; a run that does not match is recorded as invalid.
-Env: DATA_SCALE, QUERY_TIMEOUT_S (default 300), ENGINE_CPUS/ENGINE_MEMORY (DuckDB limits), BENCH_IMAGE.
+Env: DATA_SCALE, RESULTS_SUITE/SCENARIO_LABEL/ENGINE_CONFIG_EXTRA (B6 relabels the rows as suite b6, scenario <variant>), QUERY_TIMEOUT_S (default 300), ENGINE_CPUS/ENGINE_MEMORY (DuckDB limits), BENCH_IMAGE.
 """
 
 import argparse
@@ -120,6 +120,8 @@ class Setup:
         self.dataset = args.dataset
         self.via_cube = args.suite == "b4" or args.scenario in ("b5b", "b5c")
         self.scenario = {"b3": "direct", "b4": "cube"}.get(args.suite, args.scenario)
+        self.results_suite = os.environ.get("RESULTS_SUITE") or args.suite
+        self.scenario_label = os.environ.get("SCENARIO_LABEL") or self.scenario
         self.timeout_seconds = float(os.environ.get("QUERY_TIMEOUT_S", "300"))
         self.explain_gate = args.scenario == "b5a"
         self.pre_aggregation_gate = args.scenario == "b5c"
@@ -375,9 +377,9 @@ def main():
         prepare_starrocks_for_cube()
 
     base = {
-        "run_id": new_run_id(), "suite": setup.suite, "scenario": setup.scenario, "dataset": setup.dataset,
+        "run_id": new_run_id(), "suite": setup.results_suite, "scenario": setup.scenario_label, "dataset": setup.dataset,
         "data_scale": setup.data_scale, "engine": setup.engine, "engine_version": engine_version,
-        "engine_config": engine_config, "profile": args.profile,
+        "engine_config": f"{engine_config}\n{os.environ.get('ENGINE_CONFIG_EXTRA', '')}".strip(), "profile": args.profile,
     }
     counts = {}
     for query_id, query, reference_sql in queries:
@@ -392,7 +394,7 @@ def main():
             )]
         else:
             rows = run_query(setup, query_id, query, reference, base)
-        target = append_rows(setup.suite, rows)
+        target = append_rows(setup.results_suite, rows)
         for row in rows:
             counts[row["status"]] = counts.get(row["status"], 0) + 1
     log(f"done, rows by status: {counts}; results in {target if queries else 'nothing run'}")

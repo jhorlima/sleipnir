@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help env up down ps logs init clean engine-up engine-down postgres-load trino-cli starrocks-init starrocks-mv-create starrocks-mv-refresh starrocks-mv-drop starrocks-cli ingest-build download ingest tpch tpch-check storage-report \
 	dbt-image dbt-debug dbt-build dbt-backfill dbt-check-unique dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
-	cube-up cube-down cube-query cube-sql bench bench-image bench-check report
+	cube-up cube-down cube-query cube-sql b6 b6-all bench bench-image bench-check report
 
 ENGINE ?= trino
 # tpch: integer TPC-H scale factor for D2 (SPEC §6).
@@ -25,6 +25,9 @@ SUITE ?=
 DATASET ?= ghcn
 SCENARIO ?=
 QUERIES ?=
+# b6: VARIANT (see `make help`), MAINTAIN=trino|spark.
+VARIANT ?=
+MAINTAIN ?=
 bench_engine = $(if $(filter b1,$(SUITE)),duckdb,$(ENGINE))
 harness = uv run --directory bench/harness
 
@@ -36,7 +39,7 @@ dbt = docker compose --env-file .env --env-file env/$(PROFILE).env --profile dbt
 	-e DBT_TARGET=$(DBT_TARGET) -e RUN_ID=$(RUN_ID) dbt
 
 help: ## List the available targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-17s %s\n", $$1, $$2}'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-17s %s\n", $$1, $$2}'
 
 env: ## Create .env from .env.example if .env does not exist yet
 	@test -f .env || cp .env.example .env
@@ -157,6 +160,12 @@ bench-image: ## Build the bench image (sleipnir-bench:BENCH_VERSION) used by the
 bench: ## Run one measured suite and append results/SUITE.parquet (SUITE=b1..b5 ENGINE=trino PROFILE=m DATASET=ghcn|tpch SCENARIO=b5a|b5b|b5c QUERIES=q1,q2 ARGS=...)
 	$(harness) python run.py $(SUITE) --engine $(bench_engine) --profile $(PROFILE) --args '$(ARGS)' \
 		--dataset $(DATASET) --scenario '$(SCENARIO)' --queries '$(QUERIES)'
+
+b6: ## B6 layout variant on bench_* (VARIANT=baseline|file128|file256|file512|snappy|gzip|year|sorted|zorder; MAINTAIN=trino|spark adds the maintenance step)
+	$(harness) python b6.py $(VARIANT) --engine $(ENGINE) --profile $(PROFILE) --maintain '$(MAINTAIN)'
+
+b6-all: ## B6 over every variant, one after the other (one namespace alive at a time)
+	$(harness) python b6.py all --engine $(ENGINE) --profile $(PROFILE) --maintain '$(MAINTAIN)'
 
 bench-check: ## Self-check of the harness: parsers, result comparison and the run protocol
 	$(harness) python parsers.py

@@ -213,9 +213,14 @@ def run_b2(args):
 
 def run_reads(args):
     """b3/b4/b5: reads.py runs in the bench container (engine restarts and docker stats go through its socket)."""
+    # B6 labels the rows of a variant through these (see reads.py); GOLD_NAMESPACE and RESULTS_DIR go through compose.
+    passthrough = []
+    for name in ("RESULTS_SUITE", "SCENARIO_LABEL", "ENGINE_CONFIG_EXTRA"):
+        if name in os.environ:
+            passthrough += ["-e", name]
     command = [
         "docker", "compose", "--env-file", ".env", "--env-file", f"env/{args.profile}.env",
-        "--profile", "bench", "run", "--rm", "-T", "bench",
+        "--profile", "bench", "run", "--rm", "-T", *passthrough, "bench",
         "python", "reads.py", "--suite", args.suite, "--engine", args.engine, "--profile", args.profile,
         "--dataset", args.dataset, "--scenario", args.scenario, "--queries", args.queries,
     ]
