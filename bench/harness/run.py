@@ -1,6 +1,8 @@
-"""Runs one measured suite (b1 or b2) by wrapping the existing make targets and appends its rows.
+"""Runs one measured suite (b1..b5) and appends its rows. b1/b2 wrap the existing make targets;
+b3/b4/b5 start the `bench` container, which runs reads.py on the compose network.
 
 Usage: python run.py b1|b2 --engine <engine> --profile <s|m|l> [--args "<dbt args>"]
+       python run.py b3|b4|b5 --engine <engine> --profile <s|m|l> [--dataset ghcn|tpch] [--scenario b5a|b5b|b5c] [--queries q1,q2]
 Env: DATA_SCALE (default r2), STRATEGY (dbt incremental_strategy var, default: model default),
      SCENARIO (default per suite), DBT_MAKE_TARGET (b2 only, default dbt-run).
 Measure microbatch with STRATEGY=microbatch and ARGS='--event-time-start ... --event-time-end ...',
@@ -209,15 +211,32 @@ def run_b2(args):
     return rows, returncode
 
 
+def run_reads(args):
+    """b3/b4/b5: reads.py runs in the bench container (engine restarts and docker stats go through its socket)."""
+    command = [
+        "docker", "compose", "--env-file", ".env", "--env-file", f"env/{args.profile}.env",
+        "--profile", "bench", "run", "--rm", "-T", "bench",
+        "python", "reads.py", "--suite", args.suite, "--engine", args.engine, "--profile", args.profile,
+        "--dataset", args.dataset, "--scenario", args.scenario, "--queries", args.queries,
+    ]
+    return subprocess.run(command, cwd=REPO_ROOT).returncode
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("suite", choices=["b1", "b2"])
+    parser.add_argument("suite", choices=["b1", "b2", "b3", "b4", "b5"])
     parser.add_argument("--engine", required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--args", default="", help="b2: extra dbt args, e.g. '--select dim_date'")
+    parser.add_argument("--dataset", default="ghcn", help="b3: ghcn (D1) or tpch (D2)")
+    parser.add_argument("--scenario", default="", help="b5: b5a, b5b or b5c")
+    parser.add_argument("--queries", default="", help="b3/b4/b5: comma list, e.g. q1,q2 (default: all)")
     args = parser.parse_args()
 
     reexec_under_caffeinate()
+
+    if args.suite in ("b3", "b4", "b5"):
+        sys.exit(run_reads(args))
 
     if args.suite == "b1":
         rows, returncode = run_b1(args)

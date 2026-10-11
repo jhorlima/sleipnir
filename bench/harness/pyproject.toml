@@ -5,4 +5,7 @@ description = "Runs benchmark suites, samples docker stats and appends results/<
 requires-python = "==3.12.*"
 dependencies = [
     "duckdb==1.5.6",
+    "psycopg[binary]==3.3.6",
+    "pymysql==1.2.3",
+    "trino==0.340.0",
 ]

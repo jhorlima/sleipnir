@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help env up down ps logs init clean engine-up engine-down postgres-load trino-cli starrocks-init starrocks-mv-create starrocks-mv-refresh starrocks-mv-drop starrocks-cli ingest-build download ingest tpch tpch-check storage-report \
 	dbt-image dbt-debug dbt-build dbt-backfill dbt-check-unique dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
-	cube-up cube-down cube-query cube-sql bench report
+	cube-up cube-down cube-query cube-sql bench bench-image bench-check report
 
 ENGINE ?= trino
 # tpch: integer TPC-H scale factor for D2 (SPEC §6).
@@ -18,8 +18,13 @@ BACKFILL_END ?= 2026-01-01
 # cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENGINE=trino|duckdb|starrocks picks the view; ENDPOINT=load (rows) or sql (generated SQL).
 Q ?=
 ENDPOINT ?= load
-# bench: SUITE=b1|b2; B1 always measures DuckDB. ARGS is passed to dbt (B2).
+# bench: SUITE=b1..b5; B1 always measures DuckDB. ARGS is passed to dbt (B2).
+# B3-B5 read suites: DATASET=ghcn|tpch (tpch: B3 only, set SF to the loaded scale factor), SCENARIO=b5a|b5b|b5c (B5),
+# QUERIES=q1,q2 to run a subset, DATA_SCALE to label the run (default r2, small for postgres, sf<SF> for tpch).
 SUITE ?=
+DATASET ?= ghcn
+SCENARIO ?=
+QUERIES ?=
 bench_engine = $(if $(filter b1,$(SUITE)),duckdb,$(ENGINE))
 harness = uv run --directory bench/harness
 
@@ -146,8 +151,16 @@ cube-sql: ## Open psql on Cube's SQL API (Postgres protocol), from inside the po
 	docker compose exec -e PGPASSWORD=$$(docker compose exec -T cube-api printenv CUBEJS_SQL_PASSWORD) \
 		postgres psql -h cube-api -p 15432 -U cube cube
 
-bench: ## Run one measured suite and append results/SUITE.parquet (SUITE=b1|b2 ENGINE=trino PROFILE=m ARGS=...)
-	$(harness) python run.py $(SUITE) --engine $(bench_engine) --profile $(PROFILE) --args '$(ARGS)'
+bench-image: ## Build the bench image (sleipnir-bench:BENCH_VERSION) used by the read suites
+	docker compose --profile bench build bench
+
+bench: ## Run one measured suite and append results/SUITE.parquet (SUITE=b1..b5 ENGINE=trino PROFILE=m DATASET=ghcn|tpch SCENARIO=b5a|b5b|b5c QUERIES=q1,q2 ARGS=...)
+	$(harness) python run.py $(SUITE) --engine $(bench_engine) --profile $(PROFILE) --args '$(ARGS)' \
+		--dataset $(DATASET) --scenario '$(SCENARIO)' --queries '$(QUERIES)'
+
+bench-check: ## Self-check of the harness: parsers, result comparison and the run protocol
+	$(harness) python parsers.py
+	$(harness) python checks.py
 
 report: ## Print p50/p95 per engine x profile x scenario and time per step from results/*.parquet
 	$(harness) python report.py

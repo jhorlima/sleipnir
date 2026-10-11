@@ -359,6 +359,8 @@ D2: 22 queries TPC-H com os parâmetros padrão (`bench/queries/tpch/`, um arqui
 - Timeout: 300 s por query (registra `timeout` e segue).
 - Validar o resultado (row count + checksum) contra a referência DuckDB; resultado divergente invalida a medição. Exceção: medidas aproximadas (percentis via `approx_percentile`) são comparadas com tolerância relativa de 5%, e a tolerância é registrada no resultado.
 - Coletar `docker stats` (CPU/mem) durante cada execução.
+- Implementação (`bench/harness/`, `make bench SUITE=b3|b4|b5 ENGINE=… DATASET=ghcn|tpch`): o cliente roda no container `bench`, na rede do Compose, com o socket do Docker para reiniciar o engine (frio), limpar o page cache da VM e amostrar `docker stats` entre e durante as execuções. As queries diretas ficam em `bench/queries/sql/qN.<engine>.sql`, escritas por engine. A referência DuckDB é calculada fora das etapas medidas. Execuções com timeout ou erro ficam como `timeout`/`failed`, resultados divergentes como `invalid`; o warm-up é gravado com `run_type=warmup` e fica fora do p50/p95.
+- No Cube 1.7.50, só `cache: "no-cache"` no topo do corpo do `/v1/load` força a execução (o `renewQuery: true` sozinho ainda devolveu resultado do cache). Toda requisição medida manda os dois, e isso fica registrado em `notes`.
 
 ### 10.7 Formato dos resultados
 `results/<suite>.parquet`, uma linha por etapa/execução:
