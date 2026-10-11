@@ -1,0 +1,21 @@
+# The public surface: one view per engine (<engine>_weather), written out for Postgres.
+views:
+  - name: postgres_weather
+    public: true
+    cubes:
+      - join_path: postgres_weather_daily
+        includes: "*"
+        excludes:
+          - id
+          - total_prcp_all
+          - total_prcp_country
+          - total_prcp_prior_month
+      - join_path: postgres_weather_daily.postgres_stations
+        includes: [country, elevation, latitude, longitude]
+      - join_path: postgres_weather_daily.postgres_dates
+        includes: [year, quarter, month]
+      - join_path: postgres_station_years
+        includes:
+          - median_station_annual_prcp
+          - name: year
+            alias: station_year

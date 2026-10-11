@@ -1,0 +1,54 @@
+# Postgres: fct_weather_daily. Everything else comes from base_weather_daily; only what differs is here.
+# The Postgres data is the `small` scale (GHCN 2025 only).
+cubes:
+  - name: postgres_weather_daily
+    extends: base_weather_daily
+    data_source: postgres
+    sql_table: postgres_gold.fct_weather_daily
+
+    # Joins and the country grain reference cubes by name, so they are restated for this engine.
+    joins:
+      - name: postgres_stations
+        relationship: many_to_one
+        sql: "{CUBE}.station_id = {postgres_stations}.station_id"
+      - name: postgres_dates
+        relationship: many_to_one
+        sql: "{CUBE}.date = {postgres_dates}.date"
+
+    measures:
+      # Postgres spells the double type DOUBLE PRECISION, so the casts of the base cube are restated.
+      - name: avg_tmax
+        sql: "CAST({CUBE}.tmax AS DOUBLE PRECISION)"
+        type: avg
+      - name: avg_tmin
+        sql: "CAST({CUBE}.tmin AS DOUBLE PRECISION)"
+        type: avg
+      - name: total_prcp
+        sql: "CAST({CUBE}.prcp AS DOUBLE PRECISION)"
+        type: sum
+      - name: rain_day_ratio
+        sql: "CAST({days_with_rain} AS DOUBLE PRECISION) / NULLIF({observation_count}, 0)"
+        type: number
+        format: percent
+      - name: avg_tmax_7d
+        sql: "CAST({CUBE}.tmax AS DOUBLE PRECISION)"
+        type: avg
+        rolling_window:
+          trailing: 7 day
+
+      # Percentiles: Postgres' exact PERCENTILE_CONT; not re-aggregated by Cube Store.
+      - name: median_tmax
+        sql: "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {CUBE}.tmax)"
+        type: number
+      - name: p95_tmax
+        sql: "PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY {CUBE}.tmax)"
+        type: number
+      - name: p95_prcp
+        sql: "PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY {CUBE}.prcp)"
+        type: number
+      - name: total_prcp_country
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: sum
+        grain:
+          keep_only: [postgres_stations.country]

@@ -9,6 +9,9 @@
         {{ return(natural_key) }}
     {%- elif strategy == 'delete+insert' -%}
         {{ return(window_key) }}
+    {%- elif strategy == 'microbatch' and target.type == 'postgres' -%}
+        {#- dbt-postgres runs each batch as a merge on unique_key and refuses microbatch without one. -#}
+        {{ return(natural_key) }}
     {%- elif strategy in ['insert_overwrite', 'microbatch'] -%}
         {{ return(none) }}
     {%- else -%}

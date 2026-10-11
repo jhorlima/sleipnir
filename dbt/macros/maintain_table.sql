@@ -62,3 +62,14 @@
         {%- do log("maintain_table " ~ relation ~ ": " ~ statement.split('.system.')[-1].split('(')[0] ~ " in " ~ '%.1f' | format(seconds) ~ " s", info=true) -%}
     {%- endfor -%}
 {%- endmacro %}
+
+
+{#- VACUUM cannot run inside a transaction block, and dbt-postgres opens one implicitly. A plain `commit`
+    ends it on the server; psycopg2 still believes it is inside one, so it sends the next statement as is. -#}
+{% macro postgres__maintain_table(relation) -%}
+    {%- do run_query("commit") -%}
+    {%- set started_at = modules.datetime.datetime.now() -%}
+    {%- do run_query("vacuum analyze " ~ relation) -%}
+    {%- set seconds = (modules.datetime.datetime.now() - started_at).total_seconds() -%}
+    {%- do log("maintain_table " ~ relation ~ ": vacuum analyze in " ~ '%.1f' | format(seconds) ~ " s", info=true) -%}
+{%- endmacro %}

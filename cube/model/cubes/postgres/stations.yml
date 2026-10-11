@@ -1,0 +1,6 @@
+# Postgres: dim_station. Everything else comes from base_stations.
+cubes:
+  - name: postgres_stations
+    extends: base_stations
+    data_source: postgres
+    sql_table: postgres_gold.dim_station

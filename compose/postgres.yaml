@@ -1,0 +1,62 @@
+services:
+  # Baseline writer and reader on its own small scale (SPEC D-23); separate from the catalog Postgres.
+  # Settings that follow the profile are computed in config/postgres-bench/entrypoint.sh.
+  postgres-bench:
+    image: postgres:${POSTGRES_VERSION:?set in .env}
+    profiles: [postgres]
+    entrypoint: ["/etc/sleipnir/entrypoint.sh"]
+    environment:
+      ENGINE_CPUS: ${ENGINE_CPUS:-4}
+      ENGINE_MEMORY: ${ENGINE_MEMORY:-8g}
+      POSTGRES_USER: sleipnir
+      POSTGRES_DB: sleipnir
+      # No password and no published port: reachable only from the compose network (local benchmark, like Trino).
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./config/postgres-bench/entrypoint.sh:/etc/sleipnir/entrypoint.sh:ro
+      - postgres-bench-data:/var/lib/postgresql
+    # A real query over TCP, not the init-time socket server.
+    healthcheck:
+      test: ["CMD", "psql", "-h", "127.0.0.1", "-U", "sleipnir", "-d", "sleipnir", "-tAc", "SELECT 1"]
+      start_period: 30s
+      start_interval: 3s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "${ENGINE_CPUS:-4}"
+          memory: ${ENGINE_MEMORY:-8g}
+    # Equal to the memory limit: no swap, so an engine out of memory fails instead of slowing down unseen.
+    memswap_limit: ${ENGINE_MEMORY:-8g}
+    # Parallel query workers use POSIX shared memory; Docker's default of 64 MB is too small for them.
+    shm_size: 1g
+
+  # Copies the `small` batches of duckdb_bronze into postgres_bronze (ingest image, run by `make postgres-load`).
+  postgres-load:
+    image: sleipnir-ingest:${INGEST_VERSION:-0.1.0}
+    profiles: [postgres-load]
+    entrypoint: ["python", "postgres_load.py"]
+    environment:
+      S3_REGION: ${S3_REGION:?set in .env}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+      S3_ENDPOINT: rustfs:9000
+      LAKEKEEPER_CATALOG_URL: http://lakekeeper:8181/catalog
+      LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE:?set in .env}
+      POSTGRES_BENCH_HOST: postgres-bench
+    deploy:
+      resources:
+        limits:
+          cpus: "${ENGINE_CPUS:-4}"
+          memory: ${ENGINE_MEMORY:-8g}
+    memswap_limit: ${ENGINE_MEMORY:-8g}
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+
+volumes:
+  postgres-bench-data:

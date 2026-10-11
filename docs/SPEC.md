@@ -325,7 +325,7 @@ Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+w
 ### 10.5 Queries de leitura (D1)
 1. Contagem de observações por ano.
 2. Média de `tmax` por país e mês (ano filtrado).
-3. Top 20 estações por precipitação total em um ano.
+3. Top 20 estações por precipitação total em um ano, só entre estações com precipitação (filtro `set` na medida: no `ORDER BY ... DESC` o Postgres põe os NULLs primeiro, e os outros engines por último).
 4. Join fato × `dim_station` com filtro geográfico (bounding box).
 5. Média móvel 7 dias de `tmax` para N estações (window function).
 6. Lookup pontual: uma estação, intervalo de 30 dias.
@@ -446,7 +446,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-20 | Manutenção numa macro única: post-hook no uso normal, desligada e medida à parte nos benchmarks | Um só código para operação e benchmark; tempo dos models não é contaminado. |
 | D-21 | Construção do zero em janelas mensais (`make dbt-backfill`: microbatch e manutenção uma vez por tabela) | Na `r2`, o dedup do silver numa query só (~740 M linhas) e o teste de unicidade da tabela inteira estouram o spill de 10 GB do perfil `M`. Por mês, cada lote leva 2–9 s. |
 | D-22 | Nas medições do DuckDB via Cube (B4/B5), o `cube-api` recebe os limites do perfil (`ENGINE_CPUS`/`ENGINE_MEMORY`), e o DuckDB recebe 75% dessa memória e `ENGINE_CPUS` threads; tudo registrado em `engine_config` | O DuckDB roda dentro do processo do Cube. Com os limites padrão do Cube (1 CPU / 1 GB, DuckDB 512 MB), a Q8 estoura a memória na `r2`. O overhead do Node fica dentro do mesmo orçamento, e isso é citado junto dos números. |
-| D-23 | Postgres (writer e reader) só na escala `small` (GHCN 2025), num container próprio com os limites do perfil; nessa escala todos os engines rodam B2/B3 para a comparação | Em linhas, o Postgres usa ~65 bytes/linha contra ~2,7 do Parquet: a `r2` daria ~90 GB e não cabe no disco do Docker. A escala `small` mantém o Postgres como baseline com os mesmos dados que os outros engines. |
+| D-23 | Postgres (writer e reader) só na escala `small` (GHCN 2025), num container próprio (`postgres-bench`, perfil `postgres`, auth `trust` só na rede do Compose) com os limites do perfil e `shared_buffers`/`effective_cache_size`/`work_mem` derivados dele (`config/postgres-bench/entrypoint.sh`); tabelas sem partição; o bronze é copiado do Iceberg pelo DuckDB (`make postgres-load`); nessa escala todos os engines rodam B2/B3 para a comparação | Em linhas, o Postgres usa ~65 bytes/linha contra ~2,7 do Parquet: a `r2` daria ~90 GB e não cabe no disco do Docker. A escala `small` mantém o Postgres como baseline com os mesmos dados que os outros engines. |
 | D-24 | B5a com uma MV do StarRocks por tabela do gold (cópia de todas as colunas, sem join e sem agregação), em vez de uma MV larga com os joins | O StarRocks só reescreve para MV de join quando a query junta as mesmas tabelas, e o Cube junta só os cubes usados. Com uma MV por tabela, cada leitura de tabela é trocada pela sua MV, qualquer que seja o join; é o padrão usado em produção pelo autor. O Cube continua lendo os marts, e o storage extra fica no BE, fora do bucket. |
 
 ## 15. Validações pendentes (spikes)

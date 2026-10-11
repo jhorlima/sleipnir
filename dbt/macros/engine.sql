@@ -30,6 +30,16 @@
 {%- endmacro %}
 
 
+{% macro postgres__parse_yyyymmdd(column) -%}
+    to_date({{ column }}, 'YYYYMMDD')
+{%- endmacro %}
+
+{#- dbt's default date_trunc returns a TIMESTAMP on Postgres; Trino returns a DATE. -#}
+{% macro postgres__date_trunc(datepart, date) -%}
+    cast(date_trunc('{{ datepart }}', {{ date }}) as date)
+{%- endmacro %}
+
+
 {#- Returns model config entries; used as {{ config(**partitioned_by_month('date')) }}. -#}
 {% macro partitioned_by_month(column) -%}
     {{ return(adapter.dispatch('partitioned_by_month', 'sleipnir')(column)) }}
@@ -46,4 +56,26 @@
         'partition_by': ['months(' ~ column ~ ')'],
         'tblproperties': {'write.distribution-mode': 'hash'},
     }) }}
+{%- endmacro %}
+
+{#- No partitioning on Postgres: the `small` scale is ~44 M rows, and dbt-postgres has no declarative
+    partitioning config; an unpartitioned heap is the plain baseline. `config()` rejects an empty call,
+    so the entry is Postgres' own default (a regular, logged table). -#}
+{% macro postgres__partitioned_by_month(column) -%}
+    {{ return({'unlogged': false}) }}
+{%- endmacro %}
+
+
+{#- 8-byte floating point: `double` on Trino and Spark, `double precision` on Postgres.
+    dbt's own type_float() is not used because some adapters map it to a 4-byte float. -#}
+{% macro type_double() -%}
+    {{ return(adapter.dispatch('type_double', 'sleipnir')()) }}
+{%- endmacro %}
+
+{% macro default__type_double() -%}
+    double
+{%- endmacro %}
+
+{% macro postgres__type_double() -%}
+    double precision
 {%- endmacro %}

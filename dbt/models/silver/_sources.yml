@@ -5,7 +5,8 @@ sources:
     description: Raw GHCN-Daily written by the DuckDB ingest (SPEC §7, bronze). Read-only for dbt.
     # No `database`: each target already points at the lakehouse catalog, and dbt-spark rejects a
     # source database that differs from its schema ("Cannot set database in spark!").
-    schema: duckdb_bronze
+    # The bronze schema is named after the writer of the copy: duckdb_bronze in the lake, postgres_bronze in Postgres.
+    schema: "{{ 'postgres_bronze' if target.name == 'postgres' else 'duckdb_bronze' }}"
     tables:
       - name: ghcn_daily_raw
         description: Source columns as loaded (date VARCHAR YYYYMMDD, value INTEGER) plus load metadata; append-only, partitioned by _batch_id (YYYYMM).

@@ -1,0 +1,22 @@
+# Postgres: station_years. Everything else comes from base_station_years.
+cubes:
+  - name: postgres_station_years
+    extends: base_station_years
+    data_source: postgres
+    sql: >
+      SELECT station.station_id, years.year
+      FROM postgres_gold.dim_station AS station
+      CROSS JOIN (SELECT DISTINCT year FROM postgres_gold.dim_date) AS years
+    joins:
+      - name: postgres_weather_daily
+        relationship: one_to_many
+        sql: "{CUBE}.station_id = {postgres_weather_daily}.station_id AND {CUBE}.year = EXTRACT(YEAR FROM {postgres_weather_daily}.date)"
+    dimensions:
+      - name: annual_prcp
+        sql: "{postgres_weather_daily.total_prcp}"
+        type: number
+        sub_query: true
+    measures:
+      - name: median_station_annual_prcp
+        sql: "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {annual_prcp})"
+        type: number

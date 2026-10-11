@@ -5,7 +5,7 @@
 {% macro assert_unique_by_year(relation, key_columns, date_column='date') -%}
     {%- set key_list = key_columns | join(', ') -%}
     {%- set bounds_query -%}
-        select min(year({{ date_column }})), max(year({{ date_column }})) from {{ relation }}
+        select min(extract(year from {{ date_column }})), max(extract(year from {{ date_column }})) from {{ relation }}
     {%- endset -%}
     {%- set bounds = run_query(bounds_query).rows[0] -%}
     {%- set first_year = bounds[0] | int -%}

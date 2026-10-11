@@ -67,8 +67,8 @@ select
     element,
     -- GHCN units: TMAX/TMIN in tenths of °C and PRCP in tenths of mm; SNOW/SNWD are already mm.
     case
-        when element in ('TMAX', 'TMIN', 'PRCP') then cast(raw_value as double) / 10
-        else cast(raw_value as double)
+        when element in ('TMAX', 'TMIN', 'PRCP') then cast(raw_value as {{ type_double() }}) / 10
+        else cast(raw_value as {{ type_double() }})
     end as value,
     _batch_id,
     _ingested_at
