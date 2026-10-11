@@ -147,6 +147,7 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
   - A microbatch backfill on an existing table only inserts. Changing a table's layout needs `--full-refresh`, or the old unsorted table silently stays.
   - The object store's 1 GiB memory limit was OOM-killed twice during hour-long runs. Trino reported it as "Unknown host rustfs", and once it slowed batches 20×. RustFS now gets 2 GiB. It is shared infrastructure, constant for every engine, so this does not tilt the comparison, but it would have quietly polluted a measured run.
   - The fact table's whole-table key test (190 M rows) also runs Trino out of memory on profile M. It now follows the silver pattern: a test on the latest window plus a year-by-year check.
+- **B6, second round: does a sort order make partitions unnecessary?** No. A sorted table without partitions is as small as the partitioned one (0.375 GB), but queries filtered by period got 60–80% slower, because Trino can no longer skip whole months from the manifest. Sorting by date first compresses worse (0.52 GB). The first version of the partition rule ("only above ~1 GB per partition") did not survive the numbers and was rewritten.
 - **Goal: billions of rows inside 10 GB.** At ~2.7 bytes per bronze row, the 6.5 GB reserved for one writer's lakehouse fits ~1.3 billion bronze rows with today's layout, and more if sorting before writing pays off as it did in phase 1. The benchmark runs first on the current 742 M rows; after the layout suite (B6), `r2` grows by years until it fills the budget, and the suites run again. The Cloudflare R2 run comes last, after every local phase.
 - **Scale `local`** will be the whole GHCN history, 1750–2025 (~14.4 GB to download, ~19 GB of lakehouse). At 5 M rows/s, ingestion would need far more data than GHCN has to reach 30 minutes, so the history's size is the limit.
 
@@ -193,8 +194,12 @@ Each variant is a full copy of `fct_weather_daily` (190.2 M rows); reads are B3 
 | **sorted (station_id, date)** | **0.383** | 192 | 66 | **506** | 407 | 303 | 197 | 207 | 107 |
 | z-order (Spark) | 0.667 | 192 | 49 | 976 | 523 | 391 | 218 | 197 | 117 |
 | year(date) partition | 0.758 | 64 | 110 | 197,537 | 736 | 404 | 227 | 381 | 176 |
+| *second round:* sorted, monthly (same as above, re-run) | 0.383 | 192 | 68 | 535 | 378 | 271 | 202 | 207 | 121 |
+| sorted (station_id, date), no partition | 0.375 | 100 | 94 | 504 | 679 | 375 | 236 | 285 | 149 |
+| sorted (date, station_id), no partition | 0.524 | 100 | 131 | 456 | 621 | 362 | 281 | 365 | 145 |
+| sorted (station_id, date), yearly partition | 0.370 | 64 | 136 | 492 | 635 | 361 | 202 | 269 | 142 |
 
-Takeaways: sorting is the one change that pays, and it becomes the default layout. File size targets cannot matter when a monthly partition holds 2–4 MB. Snappy costs 22% more storage for no read gain. The yearly partition made the yearly count ~250× slower (one run timed out): an anomaly to explain before publishing.
+Takeaways: sorting is the change that pays most (half the storage, faster reads), and monthly partitions plus sorting is the best overall layout: dropping the partition slows every period-filtered query by 60–80%. File size targets cannot matter when a monthly partition holds 2–4 MB. Snappy costs 22% more storage for no read gain. A coarse partition without a sort order is the worst case (yearly count: 197 s unsorted against 0.49 s sorted).
 
 ### 6.1 Scale `r2` load (GHCN 2010–2025, profile M, one run, before the harness)
 
@@ -222,7 +227,7 @@ Takeaways: sorting is the one change that pays, and it becomes the default layou
 
 ## 7. What surprised me
 
-- **Partitioning by month, the "obvious" choice, bought nothing.** Every gold table started partitioned by month, the textbook layout for time series. On the B6 measurements it did not pay: 190 M rows came to 0.38–0.73 GB, so each monthly partition held 2–4 MB. That is micro-partitioning. File size targets could not apply, and the engines spent their time opening small files and reading metadata. What made reads faster was sorting the data, a "cluster by" on (station_id, date): half the storage and a 37% faster yearly count. The partition rule we ended with: partition only when partitions are big (about 1 GB compressed each), or when the partition serves the writes (bronze by batch, silver by delete+insert window). Everywhere else, let the sort order prune. A second B6 round tests sort-only against partition + sort to close the question with numbers.
+- **Sorting beat partitioning, but partitions still earned their keep.** Every gold table started partitioned by month, the textbook layout for time series. The first B6 round made partitions look useless: 190 M rows came to 0.38–0.73 GB, so each month held 2–4 MB, and the file size knob did nothing. Sorting the data was the big win: half the storage, a 37% faster yearly count. So we tested sort-only tables expecting to drop partitions, and the numbers said no. Without the monthly partition, the same sorted table answered period-filtered questions 60–80% slower (Q2: 378 → 679 ms). Trino still prunes whole months from the manifest, even when they are tiny. The rule we ended with: sort first; keep a time partition when queries filter by period, or when it serves the writes; never partition without sorting. A yearly partition without a sort order made the yearly count take 197 s; sorted, it took 0.49 s.
 - **A sleeping laptop looks like a distributed-systems bug.** Trino's `ABANDONED_TASK` turned out to be macOS idle sleep freezing the Docker VM. The clue was query IDs lagging the log clock.
 - **Materialized views have to match the query's shape, not its intent.** StarRocks' wide join MV served none of the SQL Cube generates. A boring copy of each table served all of it.
 
