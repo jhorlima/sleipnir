@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help env up down ps logs init clean engine-up engine-down postgres-load trino-cli starrocks-init starrocks-mv-create starrocks-mv-refresh starrocks-mv-drop starrocks-cli ingest-build download ingest tpch tpch-check storage-report \
-	dbt-image dbt-debug dbt-build dbt-backfill dbt-check-unique dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
-	cube-up cube-down cube-query cube-sql b6 b6-all bench bench-image bench-check report
+	dbt-image dbt-debug dbt-build dbt-backfill dbt-maintain dbt-check-unique dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
+	cube-up cube-down b5-refresh cube-query cube-sql b2-campaign b6 b6-all bench bench-image bench-check report
 
 ENGINE ?= trino
 # tpch: integer TPC-H scale factor for D2 (SPEC §6).
@@ -12,10 +12,14 @@ DBT_TARGET ?= trino
 VARS ?=
 ARGS ?=
 RUN_ID ?=
+# SCHEMA_SUFFIX=_small writes <engine>_silver_small / <engine>_gold_small (the small scale, SPEC D-23); Postgres ignores it.
+SCHEMA_SUFFIX ?=
+# b2-campaign: r2 (full GHCN 2010-2025) or small (2025).
+DATA_SCALE ?= r2
 # dbt-backfill: months to build from scratch (default: the r2 scale, GHCN 2010-2025).
 BACKFILL_START ?= 2010-01-01
 BACKFILL_END ?= 2026-01-01
-# cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENGINE=trino|duckdb|starrocks picks the view; ENDPOINT=load (rows) or sql (generated SQL).
+# cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENGINE=trino|duckdb|starrocks picks the view (trinomv: B5b table, trinopa|starrockspa: B5c rollups); ENDPOINT=load (rows) or sql (generated SQL).
 Q ?=
 ENDPOINT ?= load
 # bench: SUITE=b1..b5; B1 always measures DuckDB. ARGS is passed to dbt (B2).
@@ -27,6 +31,7 @@ SCENARIO ?=
 QUERIES ?=
 # b6: VARIANT (see `make help`), MAINTAIN=trino|spark.
 VARIANT ?=
+RELATION ?=
 MAINTAIN ?=
 bench_engine = $(if $(filter b1,$(SUITE)),duckdb,$(ENGINE))
 harness = uv run --directory bench/harness
@@ -36,7 +41,7 @@ engine_service = $(if $(filter postgres,$(ENGINE)),postgres-bench,$(ENGINE))
 
 dbt_vars = $(if $(VARS),--vars '$(VARS)')
 dbt = docker compose --env-file .env --env-file env/$(PROFILE).env --profile dbt run --rm \
-	-e DBT_TARGET=$(DBT_TARGET) -e RUN_ID=$(RUN_ID) dbt
+	-e DBT_TARGET=$(DBT_TARGET) -e RUN_ID=$(RUN_ID) -e SCHEMA_SUFFIX=$(SCHEMA_SUFFIX) dbt
 
 help: ## List the available targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-17s %s\n", $$1, $$2}'
@@ -123,6 +128,9 @@ dbt-backfill: ## Build silver/gold from scratch one month at a time (BACKFILL_ST
 	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_gold.fct_weather_daily}'
 	$(dbt) run-operation maintain_table --args '{relation: $(DBT_TARGET)_gold.agg_weather_monthly_country}'
 
+dbt-maintain: ## Run maintain_table once on RELATION=<schema.table> (B2 measures it through the harness)
+	$(dbt) run-operation maintain_table --args '{relation: $(RELATION)}'
+
 dbt-check-unique: ## Check the silver and fact natural keys over the whole tables, one year per query (after a backfill; not measured)
 	$(dbt) run-operation assert_unique_by_year --args '{relation: $(DBT_TARGET)_silver.ghcn_daily, key_columns: [station_id, date, element]}'
 	$(dbt) run-operation assert_unique_by_year --args '{relation: $(DBT_TARGET)_gold.fct_weather_daily, key_columns: [station_id, date]}'
@@ -143,8 +151,11 @@ dbt-shell: ## Open a shell in the dbt container (project mounted at /app)
 drop-run: ## Drop the bench_RUN_ID_* namespaces via Trino and wait until their files are purged
 	scripts/drop-run-namespaces.sh $(RUN_ID)
 
-cube-up: ## Start Cube (API, refresh worker) and Cube Store; the engines are started on their own
-	docker compose --profile cube up -d --wait cube-api cube-refresh-worker cubestore-router cubestore-worker
+cube-up: ## Start the Cube API and Cube Store (no refresh worker: it would build rollups in the middle of a measured run); the engines are started on their own
+	docker compose --profile cube up -d --wait cube-api cubestore-router cubestore-worker
+
+b5-refresh: ## Measured B5 refresh as its own row in results/b5.parquet (SCENARIO=b5b: dbt run of mv_weather_wide; b5c: Cube Store rollup build of ENGINE=trino|starrocks)
+	ENGINE=$(ENGINE) PROFILE=$(PROFILE) scripts/cube-b5-refresh.sh $(SCENARIO)
 
 cube-down: ## Stop and remove the Cube and Cube Store containers (the Cube Store volume is kept)
 	docker compose --profile cube rm --stop --force cube-api cube-refresh-worker cubestore-router cubestore-worker
@@ -162,6 +173,9 @@ bench-image: ## Build the bench image (sleipnir-bench:BENCH_VERSION) used by the
 bench: ## Run one measured suite and append results/SUITE.parquet (SUITE=b1..b5 ENGINE=trino PROFILE=m DATASET=ghcn|tpch SCENARIO=b5a|b5b|b5c QUERIES=q1,q2 ARGS=...)
 	$(harness) python run.py $(SUITE) --engine $(bench_engine) --profile $(PROFILE) --args '$(ARGS)' \
 		--dataset $(DATASET) --scenario '$(SCENARIO)' --queries '$(QUERIES)'
+
+b2-campaign: ## B2 end to end on ENGINE=trino|spark|postgres PROFILE=m DATA_SCALE=r2|small: full build, maintenance, then each incremental strategy x3; resumable (finished steps are skipped)
+	$(harness) python b2.py --engine $(ENGINE) --profile $(PROFILE) --scale $(DATA_SCALE)
 
 b6: ## B6 layout variant on bench_* (VARIANT=baseline|file128|file256|file512|snappy|gzip|year|sorted|zorder; MAINTAIN=trino|spark adds the maintenance step)
 	$(harness) python b6.py $(VARIANT) --engine $(ENGINE) --profile $(PROFILE) --maintain '$(MAINTAIN)'

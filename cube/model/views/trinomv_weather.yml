@@ -1,0 +1,17 @@
+# B5b view: same members as trino_weather, served from the MV-equivalent table (cubes/trino_mv/).
+views:
+  - name: trinomv_weather
+    public: true
+    cubes:
+      - join_path: trinomv_weather_daily
+        includes: "*"
+        excludes:
+          - id
+          - total_prcp_all
+          - total_prcp_country
+          - total_prcp_prior_month
+      - join_path: trinomv_station_years
+        includes:
+          - median_station_annual_prcp
+          - name: year
+            alias: station_year

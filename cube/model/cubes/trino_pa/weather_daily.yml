@@ -1,0 +1,53 @@
+# B5c (SPEC §8.4, §10.3): Trino fact cube with the Cube Store rollups. Only the trinopa_weather view uses it, so
+# trino_weather (B4) can never be served from Cube Store. The rollups are the ones proved in V9.
+# Rollup measures are DOUBLE so Cube Store keeps them as Float (the percentile casts are restated here);
+# build range = the r2 scale; one partition per year; refresh_key is 365 days, so it never fires within a run (one build per run).
+cubes:
+  - name: trinopa_weather_daily
+    extends: trino_weather_daily
+
+    measures:
+      - name: median_tmax
+        sql: "approx_percentile(CAST({CUBE}.tmax AS DOUBLE), 0.5)"
+        type: number
+      - name: p95_tmax
+        sql: "approx_percentile(CAST({CUBE}.tmax AS DOUBLE), 0.95)"
+        type: number
+
+    pre_aggregations:
+      - name: monthly_country
+        measures: [observation_count, days_with_rain, total_prcp]
+        dimensions: [trino_stations.country]
+        time_dimension: date
+        granularity: month
+        partition_granularity: year
+        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
+        refresh_key: {every: 365 days}
+      - name: monthly_country_avg
+        measures: [avg_tmax, avg_tmin]
+        dimensions: [trino_stations.country]
+        time_dimension: date
+        granularity: month
+        partition_granularity: year
+        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
+        refresh_key: {every: 365 days}
+      - name: yearly_station
+        measures: [observation_count, total_prcp]
+        dimensions: [station_id]
+        time_dimension: date
+        granularity: year
+        partition_granularity: year
+        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
+        refresh_key: {every: 365 days}
+      - name: yearly_country_percentiles
+        measures: [median_tmax, p95_tmax]
+        dimensions: [trino_stations.country]
+        time_dimension: date
+        granularity: year
+        partition_granularity: year
+        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
+        refresh_key: {every: 365 days}

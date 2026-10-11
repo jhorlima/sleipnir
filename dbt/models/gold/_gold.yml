@@ -69,6 +69,14 @@ models:
               arguments:
                 min_value: 0
 
+  - name: mv_weather_wide
+    description: B5b only (trino target). The fact left-joined to dim_station and dim_date; Cube reads it as the MV equivalent.
+    columns:
+      - name: station_id
+        data_tests: [not_null]
+      - name: date
+        data_tests: [not_null]
+
   - name: agg_weather_monthly_country
     data_tests:
       - dbt_utils.unique_combination_of_columns:

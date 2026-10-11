@@ -1,0 +1,21 @@
+# B5c view: same members as starrocks_weather, over the cubes that carry the rollups (cubes/starrocks_pa/).
+views:
+  - name: starrockspa_weather
+    public: true
+    cubes:
+      - join_path: starrockspa_weather_daily
+        includes: "*"
+        excludes:
+          - id
+          - total_prcp_all
+          - total_prcp_country
+          - total_prcp_prior_month
+      - join_path: starrockspa_weather_daily.starrocks_stations
+        includes: [country, elevation, latitude, longitude]
+      - join_path: starrockspa_weather_daily.starrocks_dates
+        includes: [year, quarter, month]
+      - join_path: starrockspa_station_years
+        includes:
+          - median_station_annual_prcp
+          - name: year
+            alias: station_year

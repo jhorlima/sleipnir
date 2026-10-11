@@ -1,0 +1,53 @@
+# B5c (SPEC §8.4, §10.3): StarRocks fact cube with the Cube Store rollups. Only the starrockspa_weather view uses it, so
+# starrocks_weather (B4) can never be served from Cube Store. Same rollups as cubes/trino_pa/weather_daily.yml.
+cubes:
+  - name: starrockspa_weather_daily
+    extends: starrocks_weather_daily
+    # The MySQL driver rejects pre-aggregation table names over 64 characters.
+    sql_alias: srpa_weather
+
+    measures:
+      - name: median_tmax
+        sql: "PERCENTILE_CONT(CAST({CUBE}.tmax AS DOUBLE), 0.5)"
+        type: number
+      - name: p95_tmax
+        sql: "PERCENTILE_CONT(CAST({CUBE}.tmax AS DOUBLE), 0.95)"
+        type: number
+
+    pre_aggregations:
+      - name: monthly_country
+        measures: [observation_count, days_with_rain, total_prcp]
+        dimensions: [starrocks_stations.country]
+        time_dimension: date
+        granularity: month
+        partition_granularity: year
+        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
+        refresh_key: {every: 365 days}
+      - name: monthly_country_avg
+        measures: [avg_tmax, avg_tmin]
+        dimensions: [starrocks_stations.country]
+        time_dimension: date
+        granularity: month
+        partition_granularity: year
+        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
+        refresh_key: {every: 365 days}
+      - name: yearly_station
+        measures: [observation_count, total_prcp]
+        dimensions: [station_id]
+        time_dimension: date
+        granularity: year
+        partition_granularity: year
+        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
+        refresh_key: {every: 365 days}
+      - name: yearly_country_percentiles
+        measures: [median_tmax, p95_tmax]
+        dimensions: [starrocks_stations.country]
+        time_dimension: date
+        granularity: year
+        partition_granularity: year
+        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
+        refresh_key: {every: 365 days}

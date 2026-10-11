@@ -1,0 +1,38 @@
+# B5b (SPEC §10.3): the Trino fact cube pointed at the MV-equivalent table, which already holds the join of
+# fct_weather_daily, dim_station and dim_date. The dimensions that trino_weather gets through joins are columns here,
+# so the joins inherited from trino_weather_daily are never traversed. Queried through the trinomv_weather view.
+cubes:
+  - name: trinomv_weather_daily
+    extends: trino_weather_daily
+    sql_table: lakehouse.trino_gold.mv_weather_wide
+
+    dimensions:
+      - name: country
+        sql: "{CUBE}.country_code"
+        type: string
+      - name: elevation
+        sql: "{CUBE}.elevation"
+        type: number
+      - name: latitude
+        sql: "{CUBE}.latitude"
+        type: number
+      - name: longitude
+        sql: "{CUBE}.longitude"
+        type: number
+      - name: year
+        sql: "{CUBE}.year"
+        type: number
+      - name: quarter
+        sql: "{CUBE}.quarter"
+        type: number
+      - name: month
+        sql: "{CUBE}.month"
+        type: number
+
+    measures:
+      - name: total_prcp_country
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: sum
+        grain:
+          keep_only: [trinomv_weather_daily.country]

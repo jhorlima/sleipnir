@@ -134,6 +134,14 @@ class Setup:
         self.stats_service = ENGINE_SERVICE[self.engine]
         self.restart_services = self.services_to_restart()
 
+    def cube_view_prefix(self):
+        """Cube view of the scenario: <engine> (B4), trinomv (B5b: MV-equivalent table), <engine>pa (B5c: rollups)."""
+        if self.scenario == "b5b":
+            return "trinomv"
+        if self.scenario == "b5c":
+            return f"{self.engine}pa"
+        return self.engine
+
     def default_data_scale(self):
         if self.dataset == "tpch":
             return f"sf{os.environ.get('SF', '1')}"
@@ -214,8 +222,8 @@ def load_queries(setup):
             log(f"skip {query_id}: needs {query_path.name} and {reference_path.name}")
             continue
         if setup.via_cube:
-            # The query files name the trino view; the engine picks its own (as in scripts/cube-query.sh).
-            query = json.loads(query_path.read_text().replace("trino_weather", f"{setup.engine}_weather"))
+            # The query files name the trino view; the scenario picks its own (as in scripts/cube-query.sh).
+            query = json.loads(query_path.read_text().replace("trino_weather", f"{setup.cube_view_prefix()}_weather"))
         else:
             query = query_path.read_text().strip().rstrip(";")
         queries.append((query_id, query, reference_path.read_text().strip().rstrip(";")))
@@ -278,6 +286,12 @@ def judge(measurement, setup, query_id, reference, client):
         notes.append(gate_note)
         if not used:
             status = "invalid"
+    elif setup.via_cube:
+        # B4 and B5b read the engine; a rollup hit here would make the baseline faster than it is.
+        used, gate_note = pre_aggregations_gate(client.last_response)
+        if used:
+            notes.append(gate_note)
+            status = "invalid"
     return status, matches, "; ".join(notes), len(text_rows)
 
 
@@ -310,7 +324,7 @@ def run_query(setup, query_id, query, reference, base):
         if run_type == "cold":
             notes_parts.append(cold_note)
         if setup.scenario == "b5b":
-            notes_parts.append("label only: mv_weather_wide does not exist yet, reads the gold tables")
+            notes_parts.append("reads trino_gold.mv_weather_wide")
         if setup.via_cube:
             notes_parts.append("renewQuery=true, cache=no-cache")
         if setup.engine == "starrocks" and setup.via_cube:
@@ -354,6 +368,17 @@ def prepare_starrocks_for_cube():
     client.close()
 
 
+def record_step(setup, base, step):
+    """The B5b table refresh / B5c rollup build, measured by scripts/cube-b5-refresh.sh, as a row of its own (SPEC §9 step 6)."""
+    row = make_row(
+        **base,
+        step=step["step"], run_type="measured", latency_ms=step["seconds"] * 1000,
+        storage_bytes=step.get("storage_bytes"), status="ok", notes=step.get("notes", ""),
+    )
+    target = append_rows(setup.results_suite, [row])
+    log(f"recorded {step['step']}: {step['seconds']} s in {target}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--suite", choices=["b3", "b4", "b5"], required=True)
@@ -362,6 +387,10 @@ def main():
     parser.add_argument("--dataset", choices=["ghcn", "tpch"], default="ghcn")
     parser.add_argument("--scenario", choices=["", "b5a", "b5b", "b5c"], default="")
     parser.add_argument("--queries", default="", help="comma list, e.g. q1,q2 (default: all of the dataset)")
+    parser.add_argument(
+        "--record-step", default="",
+        help="instead of running queries, append one refresh/build row from a JSON object {step, seconds, storage_bytes, notes}",
+    )
     args = parser.parse_args()
     if args.suite == "b5" and not args.scenario:
         parser.error("b5 needs --scenario b5a|b5b|b5c")
@@ -369,18 +398,27 @@ def main():
         parser.error("b4 runs the Cube questions (ghcn only)")
     if args.scenario == "b5a" and args.engine != "starrocks":
         parser.error("b5a is the StarRocks MV scenario")
+    if args.scenario == "b5b" and args.engine != "trino":
+        parser.error("b5b is the Trino MV-equivalent table scenario")
+    if args.scenario == "b5c" and args.engine not in ("trino", "starrocks"):
+        parser.error("b5c runs the Cube Store rollups on trino or starrocks")
+    if args.record_step and not args.scenario:
+        parser.error("--record-step needs --scenario")
 
     setup = Setup(args)
-    queries = load_queries(setup)
     engine_version, engine_config = setup.engine_metadata()
-    if setup.engine == "starrocks" and setup.via_cube:
-        prepare_starrocks_for_cube()
-
     base = {
         "run_id": new_run_id(), "suite": setup.results_suite, "scenario": setup.scenario_label, "dataset": setup.dataset,
         "data_scale": setup.data_scale, "engine": setup.engine, "engine_version": engine_version,
         "engine_config": f"{engine_config}\n{os.environ.get('ENGINE_CONFIG_EXTRA', '')}".strip(), "profile": args.profile,
     }
+    if args.record_step:
+        record_step(setup, base, json.loads(args.record_step))
+        return
+
+    queries = load_queries(setup)
+    if setup.engine == "starrocks" and setup.via_cube:
+        prepare_starrocks_for_cube()
     counts = {}
     for query_id, query, reference_sql in queries:
         log(f"{setup.suite}/{setup.scenario} {setup.engine} {query_id}")
