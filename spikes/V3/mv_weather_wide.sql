@@ -1,5 +1,8 @@
--- B5a MV (SPEC §10.3). LEFT JOINs mirror what Cube emits (many_to_one joins from the fact cube).
--- Columns: every column the base cubes use (weather_daily, stations, dates).
+-- B5a (SPEC §10.3): the wide join Cube generates, as a StarRocks async MV over the Iceberg gold tables.
+-- LEFT JOINs mirror Cube's many_to_one joins from the fact cube; columns are every one the base cubes use.
+-- BUCKETS 16: the fact has 50-200M rows at scale r2. Refresh with:
+--   SET query_timeout = 3600;  -- the SYNC statement itself is killed at the default 300 s
+--   REFRESH MATERIALIZED VIEW sleipnir_mv.mv_weather_wide WITH SYNC MODE;
 CREATE DATABASE IF NOT EXISTS sleipnir_mv;
 DROP MATERIALIZED VIEW IF EXISTS sleipnir_mv.mv_weather_wide;
 
@@ -9,9 +12,10 @@ CREATE MATERIALIZED VIEW sleipnir_mv.mv_weather_wide (
     year, quarter, month
 )
 PARTITION BY date_trunc('month', date)
-DISTRIBUTED BY HASH(station_id) BUCKETS 4
+DISTRIBUTED BY HASH(station_id) BUCKETS 16
 ORDER BY (country_code, date, station_id)
-REFRESH MANUAL
+-- DEFERRED: without it StarRocks starts a refresh at creation, which would not be the measured one.
+REFRESH DEFERRED MANUAL
 PROPERTIES (
     "force_external_table_query_rewrite" = "true",
     "query_rewrite_consistency" = "checked"

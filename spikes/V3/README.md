@@ -1,6 +1,6 @@
 # V3: does StarRocks rewrite queries to an async MV defined as a join over Iceberg (REST catalog)?
 
-**Result: PARTIAL (documented as supported; not run locally).** Research only, nothing was started. Research date: 2026-10-10.
+**Result: PARTIAL.** The MV is created, refreshes and is used for queries whose join shape equals the MV's (fact + station + date). Queries that join fewer tables, which is every shape Cube generates, are not rewritten; View Delta Join did not work on Iceberg tables. Sections 1-8 are the research (2026-10-10); section 9 has the proof run on 4.1.6.
 
 Labels: **[doc]** official docs/release notes, **[issue]** GitHub issue, **[inf]** inferred, **[verify]** the proof in this folder must check it.
 
@@ -61,7 +61,7 @@ PROPERTIES (
 - `aws.s3.region`: documented on the Glue REST page; quick start sets the region through env. **[doc]**
 - Three-part names `lakehouse.trino_gold.fct_weather_daily` work as in cube-models.md. MVs live in an internal database (`sleipnir_mv`), not in the Iceberg catalog.
 
-## 4. MV DDL (SPEC §10.3), see `02_mv.sql`
+## 4. MV DDL (SPEC §10.3), see `mv_weather_wide.sql`
 
 - `PARTITION BY date_trunc('month', date)` is the supported form for Iceberg `month(date)` partitioning: hour/day/month/year transforms map to `date_trunc('<unit>', col)`; bucket/truncate are not supported. **[doc: CREATE MATERIALIZED VIEW]** `fct_weather_daily` is `month(date)` partitioned (`partitioned_by_month`), so MV partitions align 1:1 with base partitions. The partition column must come from the partitioned base table (`f.date`); the unpartitioned dims (`dim_station`, `dim_date`) join in unpartitioned, so a change in a dim marks all partitions stale. **[doc] [inf]**
 - `DISTRIBUTED BY HASH(station_id) BUCKETS n`, sort key `ORDER BY (country_code, date, station_id)`, `REFRESH MANUAL` (default). External-table MVs cannot refresh on base-table change anyway; only manual or fixed-interval. **[doc]**
@@ -73,7 +73,7 @@ PROPERTIES (
 
 ## 5. Compose and sizing
 
-Recommendation: **`starrocks/allin1-ubuntu`, one service** (`compose.starrocks.yaml`). One cgroup limit is exactly "FE+BE sum" from SPEC §10.1 with no extra split knob, and a single `memswap_limit`. Separate `fe-ubuntu` + `be-ubuntu` (as in the quick start compose, with `depends_on` the FE healthcheck) is the alternative if allin1's config paths cannot be overridden; then the profile limit must be split FE/BE and recorded. Single-node: the allin1 image runs one FE and one BE; no replication issue (replication_num=1). **[doc: quick start uses allin1 and requires >= 4 GB Docker RAM]**
+Recommendation: **`starrocks/allin1-ubuntu`, one service** (now `compose/engines.yaml`). One cgroup limit is exactly "FE+BE sum" from SPEC §10.1 with no extra split knob, and a single `memswap_limit`. Separate `fe-ubuntu` + `be-ubuntu` (as in the quick start compose, with `depends_on` the FE healthcheck) is the alternative if allin1's config paths cannot be overridden; then the profile limit must be split FE/BE and recorded. Single-node: the allin1 image runs one FE and one BE; no replication issue (replication_num=1). **[doc: quick start uses allin1 and requires >= 4 GB Docker RAM]**
 
 - Ports: 9030 (MySQL, Cube), 8030 (FE HTTP), 8040 (BE HTTP). Publish none (Cube reaches `starrocks:9030` on the compose network); optionally `127.0.0.1:9030`.
 - Healthcheck: `mysql -h 127.0.0.1 -P 9030 -u root -N -e 'SHOW BACKENDS' | grep -q true` (the quick start's own healthchecks run `SHOW FRONTENDS`/`SHOW BACKENDS` and check alive). **[doc]** The `mysql` client exists in the allin1 image (the quick start runs it via `docker exec`). **[doc]**
@@ -101,7 +101,53 @@ After the first run, with the stack still up: (1) EXPLAIN Q1_three_tables shows 
 
 ## 8. Files and how to run
 
-`compose.starrocks.yaml`, `01_catalog.sql`, `02_mv.sql`, `03_queries.sql`, `run.sh` (run from the repo root; needs the base stack and Trino gold tables; never during a benchmark, §benchmark-integrity 1). Cleanup: `docker compose -f compose.yaml -f spikes/V3/compose.starrocks.yaml --profile starrocks down -v`.
+`03_queries.sql` and `run.sh` (from the repo root, after `make engine-up ENGINE=starrocks PROFILE=m` and `make starrocks-init`; needs the Trino gold tables; never during a benchmark, §benchmark-integrity 1). Cleanup: `make engine-down ENGINE=starrocks` and `docker volume rm sleipnir_starrocks-meta sleipnir_starrocks-storage`.
+
+## 9. Proof run (StarRocks 4.1.6, profile M, scale r2, 190,214,772 fact rows)
+
+Service, catalog and Cube source are now part of the repo (`compose/engines.yaml`, `scripts/starrocks-init.sh`, `config/starrocks/entrypoint.sh`); the MV DDL of this proof is `mv_weather_wide.sql`. `03_queries.sql` has the hand-written shapes and the SQL Cube generates for Q1-Q3 (`Cube_Q1..3`); `run.sh` runs the proof. The first drafts (compose snippet, catalog and MV SQL) were replaced by those files.
+
+### Answers to the open questions
+| Question | Answer |
+|---|---|
+| FE heap default | `-Xmx8192m` (`start_fe.sh` default when `JAVA_OPTS` is unset; `fe.conf` of the image sets it to 8192m). It would not fit profile S, hence the entrypoint sets it to 25% of `ENGINE_MEMORY` (M: 2g). |
+| Does the BE respect the limit | The BE has no `mem_limit` in the image's `be.conf`; the entrypoint sets it to 62.5% of `ENGINE_MEMORY` (M: `5G`) and `SHOW BACKENDS` reports `MemLimit: 4.500GB` (90% of it is the BE process limit). A query over the limit fails with `Memory of process exceed limit ... Limit: 4831838208` instead of killing the container. Whether the BE would read the cgroup on its own was not tested. |
+| Config paths in allin1 | `/data/deploy/starrocks/{fe,be}/conf/{fe,be}.conf`; the image entrypoint appends `priority_networks` to them, so they are edited by a wrapper entrypoint (a read-only mount would break it), not mounted. |
+| Vended credentials | `iceberg.catalog.vended-credentials-enabled=false` plus static keys works against RustFS (path style, region set); direct counts match Trino (190,214,772 / 133,039 / 5,844). |
+| Catalog creation | `CREATE EXTERNAL CATALOG IF NOT EXISTS` is idempotent. |
+| `REFRESH MANUAL` | Populates the MV at creation unless `DEFERRED` is given; the DDL uses `REFRESH DEFERRED MANUAL` so the first refresh is the measured one. The property `force_external_table_query_rewrite = true` is stored as `CHECKED`. |
+| Metadata cache after the refresh | The first EXPLAIN after the refresh already used the MV (pass 1 = pass 2). |
+| v2 change detection | Not a problem for this flow: after a full refresh the MV is rewritable (`query_rewrite_status: VALID`, trace says `NO_COMPENSATE`). |
+
+### Refresh and storage
+- `REFRESH ... WITH SYNC MODE` needs `SET query_timeout = 3600` in the same session: the SYNC statement itself is killed at 300 s (the first attempt failed at 301-303 s; a refresh that continued in the background took 158 s once most partitions were loaded).
+- Clean refresh of 192 monthly partitions, 8 per task (`partition_refresh_number` default 8 in 4.1): **540 s and 589 s** in two runs (rows loaded: 190,214,772).
+- After the refresh the BE compacts for about 10 minutes at 2-3 cores and up to 6.9 GiB of the 8 GiB container; a query issued during that time failed with BE memory exceeded. `run.sh` waits for the container CPU to drop below 10% before reading.
+- MV size: 7.9 GB right after the refresh, **4.8 GB after compaction** (3072 tablets). Dropping an MV leaves its files in the BE trash for `catalog_trash_expire_second=3600`, so the volume peaked at 18 GB during the proof. The MV is the biggest storage item of one execution; it counts against the 10 GB budget (benchmark-integrity §6) together with bronze/silver/gold.
+
+### Rewrite per query (`EXPLAIN` shows `mv_weather_wide`; session `enable_materialized_view_rewrite=true`, `enable_materialized_view_union_rewrite=false`)
+| Query | Joined tables | Rewritten | Results equal with/without MV |
+|---|---|---|---|
+| Q1, hand-written, fact + `dim_date` | 2 | no | yes |
+| Q1, hand-written, all three tables | 3 | **yes** | yes |
+| Q2, hand-written (three tables) | 3 | **yes** | yes |
+| Q3, hand-written, fact + station | 2 | no | yes |
+| Q3, hand-written, fact only | 1 | no | yes |
+| Q4 control (inner join with bounding box) | 2 | no | yes |
+| **Cube Q1** (fact only, `DATE_FORMAT(CONVERT_TZ(...))` + `count(CONCAT(...))`) | 1 | **no** | not run (not rewritten) |
+| **Cube Q2** (fact + station) | 2 | **no** | not run |
+| **Cube Q3** (fact only) | 1 | **no** | not run |
+
+Equality is on sorted rows with a 1e-9 relative tolerance: double sums change in the last digits depending on the order (e.g. `5036.999999999999` vs `5037.000000000001`).
+
+Cube only joins the cubes a query touches, so its SQL never has the three tables of the MV: only an exact join shape is rewritten. Everything else needs View Delta Join. Tried on Iceberg: `ALTER TABLE lakehouse.trino_gold.dim_station SET ("unique_constraints" = "station_id")`, `dim_date` likewise, `foreign_key_constraints` on `fct_weather_daily` and on the MV. StarRocks accepts them on external tables and the MV trace changes from "no FK constraints" to "Rewrite ViewDelta failed: cannot compensate query by using PK/FK constraints", but no query is rewritten (the constraints were then cleared; the property stays on the table with an empty value). The unresolved part is whether outer-join elimination needs non-null FK columns, which Iceberg tables written by Trino cannot declare.
+
+Consequence for B5a: with one wide MV, the benchmark rewrite check (SPEC §10.3) marks Cube Q1-Q3 invalid. Options: one MV per join shape Cube emits (fact only, fact + station, fact + date, fact + station + date), or point the Cube starrocks cube at the MV (`sql_table: sleipnir_mv.mv_weather_wide`, the cost is that the base cube changes shape), or record B5a as not accelerated for those queries.
+
+### Cube on StarRocks (MySQL driver)
+- Cube Q1-Q4 and Q6-Q10 return rows on the `starrocks_weather` view (16, 1951, 20, 5, 30, 192, 16, 192, 2246 rows).
+- Q1-Q3 match a DuckDB reference over the same Iceberg tables (Q1 counts equal, Q2 1951 keys with 0 mismatches at 1e-9, Q3 20 stations with 0 mismatches).
+- **Q5 (rolling 7 days) fails**: Cube's rolling window SQL uses `WITH RECURSIVE` and `CAST(... AS DATETIME(6))`; StarRocks 4.1.6 answers "Recursive CTE is not supported" and a syntax error on `DATETIME(6)`.
 
 ## Sources
 

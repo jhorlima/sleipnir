@@ -1,0 +1,34 @@
+# StarRocks: fct_weather_daily. Everything else comes from base_weather_daily; only what differs is here.
+cubes:
+  - name: starrocks_weather_daily
+    extends: base_weather_daily
+    data_source: starrocks
+    # Reads the gold tables written by dbt-trino (schema trino_gold) through the lakehouse external catalog.
+    sql_table: lakehouse.trino_gold.fct_weather_daily
+
+    # Joins and the country grain reference cubes by name, so they are restated for this engine.
+    joins:
+      - name: starrocks_stations
+        relationship: many_to_one
+        sql: "{CUBE}.station_id = {starrocks_stations}.station_id"
+      - name: starrocks_dates
+        relationship: many_to_one
+        sql: "{CUBE}.date = {starrocks_dates}.date"
+
+    measures:
+      # Percentiles: StarRocks' PERCENTILE_CONT(expr, p), exact; not re-aggregated by Cube Store.
+      - name: median_tmax
+        sql: "PERCENTILE_CONT({CUBE}.tmax, 0.5)"
+        type: number
+      - name: p95_tmax
+        sql: "PERCENTILE_CONT({CUBE}.tmax, 0.95)"
+        type: number
+      - name: p95_prcp
+        sql: "PERCENTILE_CONT({CUBE}.prcp, 0.95)"
+        type: number
+      - name: total_prcp_country
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: sum
+        grain:
+          keep_only: [starrocks_stations.country]

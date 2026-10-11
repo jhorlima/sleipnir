@@ -83,3 +83,46 @@ services:
         condition: service_healthy
       rustfs:
         condition: service_healthy
+
+  # Read-only engine on the lake. One container = FE + BE, so the profile limit is their sum (SPEC §10.1).
+  # FE heap and BE mem_limit follow the profile (config/starrocks/entrypoint.sh); the catalog is created by scripts/starrocks-init.sh.
+  starrocks:
+    image: starrocks/allin1-ubuntu:${STARROCKS_VERSION:-4.1.6}
+    profiles: [starrocks]
+    entrypoint: ["/usr/bin/tini-static", "--", "/etc/sleipnir/entrypoint.sh"]
+    environment:
+      ENGINE_MEMORY: ${ENGINE_MEMORY:-8g}
+    volumes:
+      - ./config/starrocks/entrypoint.sh:/etc/sleipnir/entrypoint.sh:ro
+      # Catalog, MV definitions and MV data survive an engine restart.
+      - starrocks-meta:/data/deploy/starrocks/fe/meta
+      - starrocks-storage:/data/deploy/starrocks/be/storage
+    # The Alive column of SHOW BACKENDS: the BE has registered with the FE and answers.
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -P 9030 -u root -N -e 'SHOW BACKENDS' | grep -q true"]
+      start_period: 120s
+      start_interval: 3s
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "${ENGINE_CPUS:-4}"
+          memory: ${ENGINE_MEMORY:-8g}
+    # Equal to the memory limit: no swap, so an engine out of memory fails instead of slowing down unseen.
+    memswap_limit: ${ENGINE_MEMORY:-8g}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.starrocks.rule: Host(`starrocks.localhost`)
+      traefik.http.routers.starrocks.entrypoints: web
+      traefik.http.services.starrocks.loadbalancer.server.port: "8030"
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+
+volumes:
+  starrocks-meta:
+  starrocks-storage:

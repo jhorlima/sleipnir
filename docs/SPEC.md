@@ -295,14 +295,16 @@ Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+w
 ### 10.3 Cenários de aceleração (B5)
 | Cenário | Mecanismo | Como o Cube usa |
 |---|---|---|
-| **B5a** | **StarRocks async MV** `mv_weather_wide`: o SQL "cru" que o Cube gera — o tabelão `fct_weather_daily` × `dim_station` × `dim_date` com todas as colunas usadas pelos cubes. Propriedade `force_external_table_query_rewrite = true`; sessão com `enable_materialized_view_rewrite = true`. | O Cube continua lendo os marts; o otimizador do StarRocks reescreve a query para a MV. |
+| **B5a** | **StarRocks async MVs, uma por tabela do gold** (D-24): `mv_fct_weather_daily`, `mv_dim_station`, `mv_dim_date`, cada uma a cópia da tabela com todas as colunas, sem join e sem agregação. Propriedade `force_external_table_query_rewrite = true`; sessão com `enable_materialized_view_rewrite = true` e `enable_materialized_view_union_rewrite = false` (bug #79345). | O Cube continua lendo os marts; o otimizador do StarRocks reescreve a query para a MV. |
 | **B5b** | **Tabela equivalente à MV** no Trino: model dbt `table` `trino_gold.mv_weather_wide` com o mesmo SQL do B5a. O Trino 483 não cria MV no catálogo REST (V2). O "refresh" medido é `dbt run --select mv_weather_wide` | O Cube aponta para a tabela via `sql_table`, sem reescrita. |
 | **B5c** | **Cube Store** pre-aggregations (país × mês, estação × ano) sobre Trino e sobre StarRocks. | O Cube roteia para o Cube Store. |
 
-- DDL do B5a: `PARTITION BY date_trunc('month', date)`, `DISTRIBUTED BY HASH(station_id)` com buckets pelo volume (< 5M linhas → 4; 5–50M → 8; 50–200M → 16; > 200M → 32), `ORDER BY` pelas dimensões filtradas, `REFRESH MANUAL`. Não existe `CREATE OR REPLACE` para MV: recriar é `DROP` + `CREATE`.
-- Refresh **depois da transformação e antes da leitura** (passo 6 do §9), com `WITH SYNC MODE` (ou assíncrono + polling de `SHOW MATERIALIZED VIEWS` até estado final), e medido.
+- DDL do B5a: `PARTITION BY date_trunc('month', date)`, `DISTRIBUTED BY HASH(station_id)` com buckets pelo volume (< 5M linhas → 4; 5–50M → 8; 50–200M → 16; > 200M → 32), `ORDER BY` pelas dimensões filtradas, `REFRESH DEFERRED MANUAL` (sem `DEFERRED`, a criação já popula a MV e o primeiro refresh medido não faz nada). Não existe `CREATE OR REPLACE` para MV: recriar é `DROP` + `CREATE`. DDL em `bench/sql/`. Os arquivos de uma MV apagada ficam na lixeira do BE por 1 h (`catalog_trash_expire_second`).
+- Refresh **depois da transformação e antes da leitura** (passo 6 do §9), com `WITH SYNC MODE` e `SET query_timeout = 3600` na mesma sessão (o SYNC é morto em 300 s), e medido. Depois do refresh o BE compacta por ~10 min; a leitura só começa quando a CPU do container cai abaixo de 10%, senão as queries falham por memória. Na `r2`, a MV larga da prova do V3 levou 540–589 s de refresh e ocupou 4,8 GB depois da compactação (storage local do BE, fora do bucket).
+- Evolução possível: MVs com as agregações que o Cube usa (país × mês, estação × ano), se o StarRocks reescrever as queries do Cube para elas; avaliar depois do B5a com as MVs por tabela.
 - Sem a MV, o StarRocks cai silenciosamente na tabela base. Por isso o B4 do StarRocks (sem MV) é a linha de base do B5a, e o `EXPLAIN` confirma qual dos dois caminhos rodou.
-- **Validação obrigatória no B5a:** o `EXPLAIN` de cada query precisa mostrar `mv_weather_wide`; se a reescrita não ocorrer, a medição é marcada como inválida (⚠️ V3).
+- **Validação obrigatória no B5a:** o `EXPLAIN` de cada query precisa mostrar as MVs no lugar de cada tabela lida; se a reescrita não ocorrer, a medição é marcada como inválida.
+- A Q5 (janela móvel de 7 dias) não roda no StarRocks via Cube: o Cube gera `WITH RECURSIVE` e `CAST(... AS DATETIME(6))`, que o StarRocks 4.1.6 não aceita. Fica registrada como não suportada.
 - Q4–Q6 (§10.5) servem de controle; Q1–Q3 são as candidatas a ganho.
 
 ### 10.4 Manutenção (aplicada após cada carga; parâmetros do B6)
@@ -315,6 +317,7 @@ Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+w
 | `write.target-file-size-bytes` | 128 MB, 256 MB, 512 MB |
 | `write.parquet.compression-codec` | **zstd** (padrão do Iceberg), snappy, gzip |
 | Partição de `ghcn_daily` / `fct_weather_daily` | `month(date)`, `year(date)` |
+| Ordenação (*cluster by*) de `fct_weather_daily` | nenhuma; `sorted_by (station_id, date)` (Trino) / `WRITE ORDERED BY` (Spark); z-order `(station_id, date)` via `rewrite_data_files(strategy => 'sort')` no Spark |
 
 - Hipótese a validar: **zstd** é o melhor equilíbrio entre tamanho e velocidade de leitura; gzip comprime parecido, mas descomprime mais devagar; snappy é o maior em disco. Com ~1–2 GB por camada, partições pequenas (por mês) limitam o tamanho real dos arquivos — por isso partição entra na matriz junto com o tamanho de arquivo.
 - O resultado do B6 define os padrões usados nas demais suítes (registrado em §14).
@@ -444,6 +447,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-21 | Construção do zero em janelas mensais (`make dbt-backfill`: microbatch e manutenção uma vez por tabela) | Na `r2`, o dedup do silver numa query só (~740 M linhas) e o teste de unicidade da tabela inteira estouram o spill de 10 GB do perfil `M`. Por mês, cada lote leva 2–9 s. |
 | D-22 | Nas medições do DuckDB via Cube (B4/B5), o `cube-api` recebe os limites do perfil (`ENGINE_CPUS`/`ENGINE_MEMORY`), e o DuckDB recebe 75% dessa memória e `ENGINE_CPUS` threads; tudo registrado em `engine_config` | O DuckDB roda dentro do processo do Cube. Com os limites padrão do Cube (1 CPU / 1 GB, DuckDB 512 MB), a Q8 estoura a memória na `r2`. O overhead do Node fica dentro do mesmo orçamento, e isso é citado junto dos números. |
 | D-23 | Postgres (writer e reader) só na escala `small` (GHCN 2025), num container próprio com os limites do perfil; nessa escala todos os engines rodam B2/B3 para a comparação | Em linhas, o Postgres usa ~65 bytes/linha contra ~2,7 do Parquet: a `r2` daria ~90 GB e não cabe no disco do Docker. A escala `small` mantém o Postgres como baseline com os mesmos dados que os outros engines. |
+| D-24 | B5a com uma MV do StarRocks por tabela do gold (cópia de todas as colunas, sem join e sem agregação), em vez de uma MV larga com os joins | O StarRocks só reescreve para MV de join quando a query junta as mesmas tabelas, e o Cube junta só os cubes usados. Com uma MV por tabela, cada leitura de tabela é trocada pela sua MV, qualquer que seja o join; é o padrão usado em produção pelo autor. O Cube continua lendo os marts, e o storage extra fica no BE, fora do bucket. |
 
 ## 15. Validações pendentes (spikes)
 
@@ -451,7 +455,7 @@ docs/SPEC.en.md           # ao estabilizar
 |---|---|---|---|
 | V1 | ✅ Resolvido: DuckDB 1.5.6 escreve Iceberg v2 (CREATE, INSERT, particionado) via Lakekeeper com `ACCESS_DELEGATION_MODE 'none'` + secret S3 estático (detalhes em `spikes/V1/README.md`). Trino 483 lê as tabelas do DuckDB com poda de partição; Spark e StarRocks validados na fase 2 | Fase 1 | — |
 | V2 | ✅ Resolvido: **não suportado**. O Trino 483 responde `createMaterializedView is not supported for Iceberg REST catalog` (o `CREATE VIEW` lógico funciona); o código no master é igual. Fallback adotado no B5b (detalhes em `spikes/V2/README.md`). Revalidar a cada upgrade do Trino | Fase 2 | — |
-| V3 | Parcial (pesquisa, `spikes/V3/README.md`; prova pronta em `spikes/V3/run.sh`): StarRocks 4.1.6 (`allin1`) documenta MV assíncrona sobre catálogo Iceberg REST com reescrita de join/agregação. A confirmar na prova: (1) Q1/Q3 juntam menos tabelas que a MV e dependem de View Delta Join, que pede constraints talvez não declaráveis em tabelas Iceberg; (2) a detecção de mudança por partição é documentada só para Iceberg v1; (3) o cache de metadados pode fazer o primeiro `EXPLAIN` após o refresh perder a MV. Sessão do benchmark com `enable_materialized_view_union_rewrite=false` (bug aberto #79345: a compensação por union em partições Iceberg transformadas perde linhas) | Fase 2 | Uma MV por formato de join, ou registrar Q1/Q3 como não aceleradas |
+| V3 | ✅ Resolvido (StarRocks 4.1.6, `spikes/V3/README.md` §9): a MV de join é reescrita só quando a query tem **o mesmo formato de join** da MV. O SQL do Cube junta só os cubes usados, então nunca casa com a MV larga; View Delta Join não funcionou com constraints declaradas nas tabelas Iceberg. Resultados iguais com e sem MV (tolerância 1e-9). Adotado: uma MV por tabela, sem join (D-24), a provar com o SQL do Cube | Fase 2 | — |
 | V4 | ✅ Resolvido: dbt-trino suporta `microbatch` desde 1.9.0; `concurrent_batches` desde 1.10.2 (detalhes em `spikes/V4/README.md`). A validar na prática: `event_time` DATE comparado com literais TIMESTAMP e conflitos de commit com `concurrent_batches` | Fase 1 | — |
 | V5 | Limites atuais do free tier do R2 (storage, ops Class A/B) | Antes da fase 6 | Reduzir repetições/volume |
 | V6 | Iceberg v3: escrita no Trino, deletion vectors no StarRocks, suporte no Lakekeeper | Revisão periódica | Manter v2 |

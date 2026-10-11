@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help env up down ps logs init clean engine-up engine-down trino-cli ingest-build download ingest storage-report \
+.PHONY: help env up down ps logs init clean engine-up engine-down postgres-load trino-cli starrocks-init starrocks-cli ingest-build download ingest storage-report \
 	dbt-image dbt-debug dbt-build dbt-backfill dbt-check-unique dbt-run dbt-test dbt-full-refresh dbt-shell drop-run \
 	cube-up cube-down cube-query cube-sql bench report
 
@@ -13,13 +13,16 @@ RUN_ID ?=
 # dbt-backfill: months to build from scratch (default: the r2 scale, GHCN 2010-2025).
 BACKFILL_START ?= 2010-01-01
 BACKFILL_END ?= 2026-01-01
-# cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENGINE=trino|duckdb picks the view; ENDPOINT=load (rows) or sql (generated SQL).
+# cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENGINE=trino|duckdb|starrocks picks the view; ENDPOINT=load (rows) or sql (generated SQL).
 Q ?=
 ENDPOINT ?= load
 # bench: SUITE=b1|b2; B1 always measures DuckDB. ARGS is passed to dbt (B2).
 SUITE ?=
 bench_engine = $(if $(filter b1,$(SUITE)),duckdb,$(ENGINE))
 harness = uv run --directory bench/harness
+
+# The service name `postgres` is the catalog Postgres; the benchmark one is postgres-bench.
+engine_service = $(if $(filter postgres,$(ENGINE)),postgres-bench,$(ENGINE))
 
 dbt_vars = $(if $(VARS),--vars '$(VARS)')
 dbt = docker compose --env-file .env --env-file env/$(PROFILE).env --profile dbt run --rm \
@@ -48,13 +51,22 @@ init: ## Create the bucket and bootstrap Lakekeeper with the lakehouse warehouse
 	docker compose run --rm lakekeeper-bootstrap
 
 engine-up: ## Start one engine with a resource profile (ENGINE=trino PROFILE=s|m|l, default m)
-	docker compose --env-file .env --env-file env/$(PROFILE).env --profile $(ENGINE) up -d --wait $(ENGINE)
+	docker compose --env-file .env --env-file env/$(PROFILE).env --profile $(ENGINE) up -d --wait $(engine_service)
 
 engine-down: ## Stop and remove one engine container (ENGINE=trino)
-	docker compose --profile $(ENGINE) rm --stop --force $(ENGINE)
+	docker compose --profile $(ENGINE) rm --stop --force $(engine_service)
+
+postgres-load: ## Copy the small scale (2025 batches) of duckdb_bronze into postgres_bronze; replaces the tables (needs ENGINE=postgres up)
+	docker compose --env-file .env --env-file env/$(PROFILE).env --profile postgres-load run --rm postgres-load
 
 trino-cli: ## Open the Trino CLI inside the trino container, on the lakehouse catalog
 	docker compose exec trino trino --catalog lakehouse
+
+starrocks-init: ## Create the lakehouse external catalog and the MV database in the running StarRocks (idempotent)
+	scripts/starrocks-init.sh
+
+starrocks-cli: ## Open the mysql client inside the starrocks container
+	docker compose exec starrocks mysql -h 127.0.0.1 -P 9030 -u root
 
 ingest-build: ## Build the ingest image (sleipnir-ingest:INGEST_VERSION)
 	docker compose --profile ingest build ingest

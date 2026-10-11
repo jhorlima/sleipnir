@@ -10,7 +10,7 @@ x-cube-env-common: &cube-env-common
 
   # Cube refuses CUBEJS_DATASOURCES without `default`, which reads the un-prefixed CUBEJS_DB_* vars.
   # No cube uses it: it is an in-memory DuckDB, so it needs no running engine and never fails /readyz.
-  CUBEJS_DATASOURCES: default,trino,duckdb
+  CUBEJS_DATASOURCES: default,trino,duckdb,starrocks,postgres
   CUBEJS_DB_TYPE: duckdb
 
   CUBEJS_DS_TRINO_DB_TYPE: trino
@@ -19,6 +19,19 @@ x-cube-env-common: &cube-env-common
   CUBEJS_DS_TRINO_DB_USER: cube
   CUBEJS_DS_TRINO_DB_PRESTO_CATALOG: lakehouse
   CUBEJS_DS_TRINO_DB_SCHEMA: trino_gold
+
+  # StarRocks over its MySQL protocol (FE query port); tables are lakehouse.<namespace>.<table>.
+  CUBEJS_DS_STARROCKS_DB_TYPE: mysql
+  CUBEJS_DS_STARROCKS_DB_HOST: starrocks
+  CUBEJS_DS_STARROCKS_DB_PORT: "9030"
+  CUBEJS_DS_STARROCKS_DB_USER: root
+
+  # Benchmark Postgres (small scale only, SPEC D-23); trust auth on the compose network, so no password.
+  CUBEJS_DS_POSTGRES_DB_TYPE: postgres
+  CUBEJS_DS_POSTGRES_DB_HOST: postgres-bench
+  CUBEJS_DS_POSTGRES_DB_PORT: "5432"
+  CUBEJS_DS_POSTGRES_DB_NAME: sleipnir
+  CUBEJS_DS_POSTGRES_DB_USER: sleipnir
 
   # DuckDB runs inside the cube-api / cube-refresh-worker processes (limits below are inside their cgroups).
   # cube/cube.js adds the S3 secret and ATTACHes the Lakekeeper catalog from the variables below.
