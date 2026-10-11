@@ -165,6 +165,11 @@ Regras:
 - `fct_weather_daily` — 1 linha por estação/dia, pivot de `TMAX, TMIN, PRCP, SNOW`. Incremental.
 - `agg_weather_monthly_country` — agregado mensal por país. Incremental por mês.
 
+### Regra de particionamento (D-25)
+- **Particionar só quando a partição tem tamanho** (hoje: ≥ ~1 GB comprimido por partição, ou seja, alguns arquivos do tamanho-alvo) **e os filtros batem com ela**. Abaixo disso, a tabela fica sem partição ou com partição mais grossa, e a poda vem da ordenação (*cluster by*: `sorted_by` no Trino, `WRITE ORDERED BY` no Spark), pelos min/max de cada arquivo.
+- **Exceção: partição que serve a escrita.** Bronze por `_batch_id` (ingestão e leitura incremental por lote) e silver alinhada às janelas do `delete+insert` (apagar partições inteiras é barato). Aqui o ganho é medido no B1/B2, não na leitura.
+- O limite é medido por bytes, não por linhas: na `r2`, 190 M linhas da fato ocupam 0,38 GB, e a partição mensal dá 2–4 MB por partição. O valor final do limite sai da segunda rodada do B6 e da `r2` em bilhões.
+
 ### 7.1 Estratégias incrementais (matriz do B2)
 Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada é medida por engine; a vencedora vira o padrão daquele engine. Padrão atual: **`delete+insert`** no Trino e **`merge`** no Spark (que não tem delete+insert), escolhido pelo target na var `incremental_strategy` (janela derivada dos dados, substitui datas inteiras). O microbatch do dbt é guiado pelo relógio: em dados históricos precisa de `--event-time-start/--event-time-end` explícitos.
 
@@ -466,6 +471,7 @@ docs/SPEC.en.md           # ao estabilizar
 | D-22 | Nas medições do DuckDB via Cube (B4/B5), o `cube-api` recebe os limites do perfil (`ENGINE_CPUS`/`ENGINE_MEMORY`), e o DuckDB recebe 75% dessa memória e `ENGINE_CPUS` threads; tudo registrado em `engine_config` | O DuckDB roda dentro do processo do Cube. Com os limites padrão do Cube (1 CPU / 1 GB, DuckDB 512 MB), a Q8 estoura a memória na `r2`. O overhead do Node fica dentro do mesmo orçamento, e isso é citado junto dos números. |
 | D-23 | Postgres (writer e reader) só na escala `small` (GHCN 2025), num container próprio (`postgres-bench`, perfil `postgres`, auth `trust` só na rede do Compose) com os limites do perfil e `shared_buffers`/`effective_cache_size`/`work_mem` derivados dele (`config/postgres-bench/entrypoint.sh`); tabelas sem partição; o bronze é copiado do Iceberg pelo DuckDB (`make postgres-load`); nessa escala todos os engines rodam B2/B3 para a comparação | Em linhas, o Postgres usa ~65 bytes/linha contra ~2,7 do Parquet: a `r2` daria ~90 GB e não cabe no disco do Docker. A escala `small` mantém o Postgres como baseline com os mesmos dados que os outros engines. |
 | D-24 | B5a com uma MV do StarRocks por tabela do gold (cópia de todas as colunas, sem join e sem agregação), em vez de uma MV larga com os joins | O StarRocks só reescreve para MV de join quando a query junta as mesmas tabelas, e o Cube junta só os cubes usados. Com uma MV por tabela, cada leitura de tabela é trocada pela sua MV, qualquer que seja o join; é o padrão usado em produção pelo autor. O Cube continua lendo os marts, e o storage extra fica no BE, fora do bucket. |
+| D-25 | Partição só com ≥ ~1 GB comprimido por partição e filtros alinhados, ou quando serve a escrita (bronze por lote, janelas do `delete+insert` na silver); abaixo disso, ordenação (*cluster by*) | Micropartição gera arquivos pequenos (2–4 MB por mês na `r2`), e o custo de abrir arquivos e ler metadados supera a poda. O limite é provisório até a segunda rodada do B6. |
 
 ## 15. Validações pendentes (spikes)
 
