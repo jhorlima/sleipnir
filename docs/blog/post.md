@@ -246,6 +246,21 @@ DuckDB runs inside the benchmark container, with no coordinator or remote catalo
 
 Trino's Q7 is invalid on every run: `approx_percentile` was 19% off the exact median for one small group (EU), past the 5% tolerance. StarRocks cannot run Cube's rolling window (Q5, `WITH RECURSIVE`). DuckDB in Cube ran with the Cube container sized to profile M (D-22).
 
+### 6.5 B5 — acceleration (profile M, scale r2, `results/b5.parquet`)
+
+Warm p50 in ms; in parentheses the same question without acceleration (B3 for B5a, B4 for B5b/B5c).
+
+| | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | Q9 | Q10 | Refresh / build | Extra storage |
+|---|---|---|---|---|---|---|---|---|---|---|
+| B5a StarRocks, one MV per table (direct SQL) | 652 (546) | 131 (152) | 124 (137) | 117 (109) | 94 (249) | 38 (45) | — | — | 284 s fact + 2 s dims | BE local disk |
+| B5b Trino MV-equivalent table, via Cube | 6,036 (6,729) | 3,294 (4,076) | 3,272 (4,072) | 4,070 (4,078) | 3,298 (3,319) | 3,285 (3,292) | 3,293 (4,380) | 3,707 (6,168) | 279 s | 0.42 GB |
+| B5c Cube Store on Trino | — | 22 (4,076) | 18 (4,072) | — | — | — | 32 (4,380) | 33 (6,168) | 515 s | 20 MB |
+| B5c Cube Store on StarRocks | — | 19 (724) | 21 (155) | — | — | — | 29 (399) | 33 (1,438) | 165 s | 19 MB |
+
+- Every B5a query passed the `EXPLAIN` gate: StarRocks read the MVs, not Iceberg. Warm gains are small, because StarRocks already caches Iceberg data well; the MVs mostly help cold reads and heavier shapes like Q5.
+- B5b only helps the multi-stage questions (Q9, Q10) and Q2. Elsewhere Cube's own overhead (~3.3 s per question on Trino) hides any gain from the wide table.
+- B5c answers from Cube Store in 18–33 ms no matter which engine built the rollups. Building them costs 515 s on Trino against 165 s on StarRocks. Q7 needs the yearly variant (q7y) to hit a rollup, and on Trino it stays invalid: the rollup stores Trino's approximate percentile, still 19% off for one group.
+
 ### 6.4 Scale `small` — Postgres as the baseline (GHCN 2025, profile M)
 
 | B2 | From scratch | Best reprocess | Merge |
@@ -282,7 +297,7 @@ Trino's Q7 is invalid on every run: `approx_percentile` was 19% off the exact me
 | B2 Transformation (per model, per strategy) | From scratch by month: Trino 18 min, Spark 23 min. Reprocessing the latest batch: Spark insert_overwrite 12 s, Trino delete+insert 20 s; merge is the slowest on both (Trino 100 s, Spark 199 s). On 2025 alone, Postgres builds 4× slower than Trino | time per model and strategy |
 | B3 Direct reads | TPC-H SF8 warm geomean: DuckDB 304 ms, StarRocks 551 ms, Trino 1,874 ms; on the weather questions each engine wins some, and Postgres trails by 3–10× on the small scale | warm and cold p50 per query |
 | B4 Reads via Cube | Cube adds a ~3–4 s floor per question on Trino; StarRocks through Cube still answers simple questions in 73–155 ms. Trino's approximate percentile misses by 19% on a small group and fails the 5% gate | warm p50 per question and engine |
-| B5 Acceleration (StarRocks MV × Trino MV × Cube Store) | | |
+| B5 Acceleration (StarRocks MV × Trino MV × Cube Store) | Cube Store wins by far: rollup-served questions drop from seconds to 18–33 ms on both engines, with ~20 MB of rollups. StarRocks' per-table MVs barely move warm reads. Trino's MV-equivalent table changes nothing through Cube, whose ~3.3 s floor dominates | warm p50 per question, accelerated vs not |
 | B6 Maintenance and layout | Sorting the fact table by station and date halves it (0.73 → 0.38 GB) and speeds up the yearly count by 37%, with no read getting worse; file size targets do nothing with monthly partitions | storage and warm p50 per variant |
 
 ## 7. What surprised me
