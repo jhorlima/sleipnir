@@ -14,8 +14,8 @@ engine="${ENGINE:-trino}"
 profile="${PROFILE:-m}"
 build_timeout_seconds="${BUILD_TIMEOUT_SECONDS:-7200}"
 run_results=dbt/target/run_results.json
-# 4 rollups x one partition per year of the build range (2010-2025).
-expected_partitions=64
+# 4 rollups x one partition per year of the build range (1998-2025).
+expected_partitions=112
 model_dir=""
 
 record_step() {

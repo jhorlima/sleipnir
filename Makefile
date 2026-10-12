@@ -16,8 +16,8 @@ RUN_ID ?=
 SCHEMA_SUFFIX ?=
 # b2-campaign: r2 (full GHCN 2010-2025) or small (2025).
 DATA_SCALE ?= r2
-# dbt-backfill: months to build from scratch (default: the r2 scale, GHCN 2010-2025).
-BACKFILL_START ?= 2010-01-01
+# dbt-backfill: months to build from scratch (default: the r2 scale, GHCN 1998-2025).
+BACKFILL_START ?= 1998-01-01
 BACKFILL_END ?= 2026-01-01
 # cube-query: Q=<n> picks bench/queries/cube/q<n>.json; ENGINE=trino|duckdb|starrocks picks the view (trinomv: B5b table, trinopa|starrockspa: B5c rollups); ENDPOINT=load (rows) or sql (generated SQL).
 Q ?=

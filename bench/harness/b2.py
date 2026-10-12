@@ -37,7 +37,12 @@ STRATEGIES = {
 # B5b has its own measured refresh of this table; it is not part of the transformation.
 EXCLUDE_MV = "--exclude mv_weather_wide"
 # Full build window per scale: the microbatch begin and the exclusive end of the last batch.
-SCALE_WINDOW = {"r2": ("2010-01-01", "2026-01-01"), "small": ("2025-01-01", "2026-01-01")}
+# r2 was GHCN 2010-2025 for the first measurements; r2_1998 is the billion-row r2 (1998-2025).
+SCALE_WINDOW = {
+    "r2": ("2010-01-01", "2026-01-01"),
+    "r2_1998": ("1998-01-01", "2026-01-01"),
+    "small": ("2025-01-01", "2026-01-01"),
+}
 
 MAINTAIN_LINE = re.compile(r"maintain_table (\S+): (.+) in ([\d.]+) s")
 

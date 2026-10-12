@@ -21,7 +21,7 @@ cubes:
         time_dimension: date
         granularity: month
         partition_granularity: year
-        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_start: {sql: "SELECT DATE '1998-01-01'"}
         build_range_end: {sql: "SELECT DATE '2025-12-31'"}
         refresh_key: {every: 365 days}
       - name: monthly_country_avg
@@ -30,7 +30,7 @@ cubes:
         time_dimension: date
         granularity: month
         partition_granularity: year
-        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_start: {sql: "SELECT DATE '1998-01-01'"}
         build_range_end: {sql: "SELECT DATE '2025-12-31'"}
         refresh_key: {every: 365 days}
       - name: yearly_station
@@ -39,7 +39,7 @@ cubes:
         time_dimension: date
         granularity: year
         partition_granularity: year
-        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_start: {sql: "SELECT DATE '1998-01-01'"}
         build_range_end: {sql: "SELECT DATE '2025-12-31'"}
         refresh_key: {every: 365 days}
       - name: yearly_country_percentiles
@@ -48,6 +48,6 @@ cubes:
         time_dimension: date
         granularity: year
         partition_granularity: year
-        build_range_start: {sql: "SELECT DATE '2010-01-01'"}
+        build_range_start: {sql: "SELECT DATE '1998-01-01'"}
         build_range_end: {sql: "SELECT DATE '2025-12-31'"}
         refresh_key: {every: 365 days}
