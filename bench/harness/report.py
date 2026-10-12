@@ -45,7 +45,12 @@ def main():
         print(f"no results in {RESULTS_DIR}")
         return
     con = duckdb.connect()
-    con.execute(f"CREATE VIEW results AS SELECT * FROM read_parquet('{RESULTS_DIR}/*.parquet', union_by_name = true)")
+    all_rows = f"SELECT * FROM read_parquet('{RESULTS_DIR}/*.parquet', union_by_name = true)"
+    # Results are never edited (benchmark-integrity §4): a run found wrong afterwards is listed here and left out.
+    invalidated = RESULTS_DIR / "invalidated_runs.csv"
+    if invalidated.exists():
+        all_rows += f" WHERE run_id NOT IN (SELECT run_id FROM read_csv('{invalidated}'))"
+    con.execute(f"CREATE VIEW results AS {all_rows}")
 
     print("\nLatency percentiles per engine x profile x scenario (over steps)")
     con.sql(LATENCY_PERCENTILES).show(max_rows=200, max_width=200)
