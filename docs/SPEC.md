@@ -381,6 +381,8 @@ D2: 22 queries TPC-H com os parâmetros padrão (`bench/queries/tpch/`, um arqui
 
 ### 10.6 Protocolo
 - Nunca dois engines ao mesmo tempo. Nas leituras (B3–B5), uma query por vez.
+- **Infra no mesmo estado para cada engine:** o RustFS é reiniciado antes da campanha de cada engine. Depois de ~10 h de uso contínuo, ele chegou a 1,5 de 2 GiB e passou a responder devagar; os lotes do Spark subiram de 10 s para 100–500 s e terminaram em timeout de leitura no S3. Com o RustFS recém-iniciado, ele mede o engine, não o desgaste da infraestrutura.
+- O Mac fica com a tampa aberta e na tomada durante as medições: o `caffeinate -i` (e apps de "keep awake") só impedem o sono por inatividade; com a tampa fechada a VM congela e o Trino perde as tasks.
 - **Cold:** reiniciar o engine e limpar os caches → 1 execução.
 - **Warm:** 1 warm-up descartado + **5 execuções** medidas.
 - Timeout: 300 s por query (registra `timeout` e segue).
