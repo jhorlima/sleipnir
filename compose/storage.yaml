@@ -18,8 +18,8 @@ services:
       resources:
         limits:
           cpus: "${RUSTFS_CPUS:-1}"
-          # 1g was OOM-killed during hour-long dbt runs (seen as "Unknown host rustfs" in Trino).
-          memory: ${RUSTFS_MEMORY:-2g}
+          # 1g and 2g were OOM-killed (seen as "Unknown host rustfs"): long dbt runs and Spark's full sort rewrite of the fact.
+          memory: ${RUSTFS_MEMORY:-3g}
     labels:
       traefik.enable: "true"
       traefik.http.routers.rustfs.rule: Host(`rustfs.localhost`)
