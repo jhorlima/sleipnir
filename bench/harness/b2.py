@@ -52,6 +52,10 @@ def log(message):
     print(f"[b2] {message}", file=sys.stderr, flush=True)
 
 
+# The local scale switches from yearly to monthly batches here (see full_build_passes).
+LOCAL_MONTHLY_FROM = "1950-01-01"
+
+
 def schema_suffix(engine, scale):
     # Postgres is small-only and keeps postgres_silver / postgres_gold.
     if scale == "small" and engine != "postgres":
@@ -133,8 +137,8 @@ def set_run_environment(args, scenario, strategy, reprocess_batch=""):
     os.environ["STRATEGY"] = strategy
     os.environ["REPROCESS_FROM_BATCH"] = reprocess_batch
     os.environ["MICROBATCH_BEGIN"] = SCALE_WINDOW[args.scale][0] if scenario == "full" else ""
-    # 263 years of mostly tiny months: the local scale's full build runs one batch per year.
-    os.environ["MICROBATCH_BATCH_SIZE"] = "year" if scenario == "full" and args.scale == "local" else ""
+    # run_full sets the batch size per pass; every other scenario uses the model default (month).
+    os.environ["MICROBATCH_BATCH_SIZE"] = ""
 
 
 def tag_rows(rows, repeat):
@@ -142,15 +146,30 @@ def tag_rows(rows, repeat):
         row["notes"] = f"repeat={repeat}; {row['notes'] or ''}".strip()
 
 
+def full_build_passes(scale):
+    """(begin, end, batch_size, full_refresh) per pass. The local scale builds its small early years by year and
+    the years with ~28 M rows by month: a yearly batch of those runs Trino out of memory on profile M."""
+    begin, end = SCALE_WINDOW[scale]
+    if scale != "local":
+        return [(begin, end, "", True)]
+    return [(begin, LOCAL_MONTHLY_FROM, "year", True), (LOCAL_MONTHLY_FROM, end, "month", False)]
+
+
 def run_full(args):
-    begin, end = SCALE_WINDOW[args.scale]
     set_run_environment(args, "full", "microbatch")
-    dbt_args = f"--full-refresh --event-time-start {begin} --event-time-end {end} {EXCLUDE_MV}"
-    rows, returncode = run.run_b2(Namespace(engine=args.engine, profile=args.profile, args=dbt_args))
-    tag_rows(rows, 1)
-    append_rows("b2", rows)
-    if returncode != 0:
-        sys.exit("full build failed (rows recorded with status=error)")
+    passes = full_build_passes(args.scale)
+    for number, (begin, end, batch_size, full_refresh) in enumerate(passes, start=1):
+        os.environ["MICROBATCH_BATCH_SIZE"] = batch_size
+        refresh_flag = "--full-refresh " if full_refresh else ""
+        dbt_args = f"{refresh_flag}--event-time-start {begin} --event-time-end {end} {EXCLUDE_MV}"
+        rows, returncode = run.run_b2(Namespace(engine=args.engine, profile=args.profile, args=dbt_args))
+        tag_rows(rows, 1)
+        if len(passes) > 1:
+            for row in rows:
+                row["notes"] = f"{row['notes']}; pass={number} of {len(passes)} ({begin}..{end} by {batch_size})"
+        append_rows("b2", rows)
+        if returncode != 0:
+            sys.exit("full build failed (rows recorded with status=error)")
 
 
 def run_maintenance(args):
