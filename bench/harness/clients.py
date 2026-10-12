@@ -84,6 +84,8 @@ class DuckDBClient:
         self.connection = duckdb.connect()
         self.connection.execute(f"SET threads = {duckdb_threads()}")
         self.connection.execute(f"SET memory_limit = '{duckdb_memory_limit_gb()}GB'")
+        # The harness code is mounted read-only, so the default spill directory (./.tmp) cannot be created.
+        self.connection.execute("SET temp_directory = '/tmp/duckdb-spill'")
         if source == "lakehouse":
             self._attach_lakehouse()
         else:
