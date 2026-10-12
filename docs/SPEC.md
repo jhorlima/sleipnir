@@ -136,7 +136,7 @@ Regras:
 
 | Escala | D1 (GHCN) | Download | Lotes `.csv.gz` | Bronze | Lakehouse (bronze + 1 writer) | Status |
 |---|---|---|---|---|---|---|
-| `r2` (padrão) | hoje 2010–2025: 192 lotes mensais, 741,9 M linhas no bronze. **Meta: ≥ 1 bi linhas no bronze dentro do teto**; anos ampliados depois do B6 | 2,81 GB | 3,36 GB | 1,98 GB | **3,75 GB** (silver 1,02, gold 0,75) + D2 ≤ 2 GB | Medida pelo `make storage-report` |
+| `r2` (padrão) | **GHCN 1998–2025** (`data_scale = r2_1998`): 336 lotes mensais, **1,29 bi de linhas no bronze**. As primeiras medições usaram 2010–2025 (`data_scale = r2`, 742 M linhas) e continuam em `results/` com esse rótulo | 4,86 GB | ~5,9 GB | 3,41 GB | **6,0 GB** (silver 1,88, gold 0,71) + D2 1,88 GB = **7,9 GB** | Medida pelo `make storage-report` |
 | `small` | só 2025: 12 lotes mensais, ~44 M linhas no bronze | 0,17 GB | ~0,2 GB | ~0,12 GB | ~0,23 GB (no Postgres: 8,15 GB de dados + até 8 GB de WAL) | Medida; escala da comparação com o Postgres (D-23) |
 | `local` | histórico completo, 1750–2025 | ~14,4 GB | ~17 GB | ~10 GB | ~19 GB | Estimada; carga na etapa 10 de [`specs/phase-2.md`](specs/phase-2.md), com aviso de disco antes |
 
@@ -185,7 +185,7 @@ Regras:
 - **Partição por tempo continua valendo quando os filtros são por período**, mesmo com partições pequenas: na `r2`, tirar a partição mensal de uma fato já ordenada deixou as queries com filtro de período 60–80% mais lentas no Trino (Q2: 378 → 679 ms), com partições de 2–4 MB. Sem filtros alinhados à partição, ela não paga o custo de arquivos pequenos.
 - **Partição que serve a escrita** também fica: bronze por `_batch_id` (ingestão e leitura incremental por lote) e silver alinhada às janelas do `delete+insert`.
 - Partição grossa (ano) sem ordenação é a pior combinação: a Q1 levou 197 s, contra 0,5 s com a mesma partição ordenada.
-- A regra é revista quando a `r2` crescer para bilhões de linhas, porque as partições engordam.
+- Revista na `r2_1998` (1,29 bi de linhas): a conclusão se mantém, porque adicionar anos aumenta o número de partições, não o tamanho de cada uma (~1,9 MB por mês nas duas escalas). Partições só engordam com mais dados por período, como uma escala com mais estações ou mais variáveis.
 
 ### 7.1 Estratégias incrementais (matriz do B2)
 Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada é medida por engine; a vencedora vira o padrão daquele engine. Padrão atual: **`delete+insert`** no Trino e **`merge`** no Spark (que não tem delete+insert), escolhido pelo target na var `incremental_strategy` (janela derivada dos dados, substitui datas inteiras). O microbatch do dbt é guiado pelo relógio: em dados históricos precisa de `--event-time-start/--event-time-end` explícitos.

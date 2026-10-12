@@ -152,7 +152,7 @@ Both are listed as "revisit later"; the benchmark can be re-run when the ecosyst
 - **Gotcha: the object store gets tired.** After ~10 hours of benchmark traffic, RustFS sat at 1.5 of its 2 GiB and answered slowly. Spark's monthly batches went from 10 s to 100–500 s and then failed with S3 read timeouts. Trino had run on a freshly started RustFS. To keep the comparison fair, the object store now restarts before each engine's campaign.
 - **Gotcha: the laptop slept again, between runs.** Each measured command ran under `caffeinate -i`, but that only holds while the command runs. In a quiet gap between two runs the screen turned off and the Mac went into idle sleep. The next run was launched into a sleeping machine, kept alive only by brief Power Nap wake-ups. The Docker VM froze and Trino abandoned its queries. The fix is a keep-awake app with a timer covering the whole campaign, gaps included.
 - **Why the network is not in the numbers yet.** The scale is called `r2` because it fits Cloudflare R2's free tier, but every run so far used RustFS on the same machine, so no network sits in the path. The R2 phase will run the same suites against a remote bucket. To keep those numbers readable, each R2 campaign starts with a network baseline (upload/download of a known file, small-GET latency), and every suite counts its GET/PUT requests. The comparison then separates the network's cost from the engine's.
-- **Goal: billions of rows inside 10 GB.** At ~2.7 bytes per bronze row, the 6.5 GB reserved for one writer's lakehouse fits ~1.3 billion bronze rows with today's layout, and more if sorting before writing pays off as it did in phase 1. The benchmark runs first on the current 742 M rows; after the layout suite (B6), `r2` grows by years until it fills the budget, and the suites run again. The Cloudflare R2 run comes last, after every local phase.
+- **Goal reached: 1.29 billion rows inside 10 GB** (GHCN 1998–2025, 7.9 GB with TPC-H; see §6.6). Original plan: At ~2.7 bytes per bronze row, the 6.5 GB reserved for one writer's lakehouse fits ~1.3 billion bronze rows with today's layout, and more if sorting before writing pays off as it did in phase 1. The benchmark runs first on the current 742 M rows; after the layout suite (B6), `r2` grows by years until it fills the budget, and the suites run again. The Cloudflare R2 run comes last, after every local phase.
 - **Scale `local`** will be the whole GHCN history, 1750–2025 (~14.4 GB to download, ~19 GB of lakehouse). At 5 M rows/s, ingestion would need far more data than GHCN has to reach 30 minutes, so the history's size is the limit.
 
 ### Phase 3 — orchestration (Airflow 3 + Cosmos watcher mode)
@@ -261,6 +261,30 @@ Warm p50 in ms; in parentheses the same question without acceleration (B3 for B5
 - Every B5a query passed the `EXPLAIN` gate: StarRocks read the MVs, not Iceberg. Warm gains are small, because StarRocks already caches Iceberg data well; the MVs mostly help cold reads and heavier shapes like Q5.
 - B5b only helps the multi-stage questions (Q9, Q10) and Q2. Elsewhere Cube's own overhead (~3.3 s per question on Trino) hides any gain from the wide table.
 - B5c answers from Cube Store in 18–33 ms no matter which engine built the rollups. Building them costs 515 s on Trino against 165 s on StarRocks. Q7 needs the yearly variant (q7y) to hit a rollup, and on Trino it stays invalid: the rollup stores Trino's approximate percentile, still 19% off for one group.
+
+### 6.6 Billions of rows inside 10 GB — scale r2 grown to GHCN 1998–2025 (`data_scale = r2_1998`)
+
+The headline goal: 1,294,761,940 bronze rows, and one writer's lakehouse plus TPC-H SF8 takes 7.9 GB (bronze 3.41, silver 1.88, gold 0.71, TPC-H 1.88). It fits the 10 GB free-tier budget with ~2 GB to spare.
+
+| | 2010–2025 (742 M rows) | 1998–2025 (1.29 B rows, ×1.75) |
+|---|---|---|
+| B1 ingest | 146 s, 5.07 M rows/s | 260 s, 4.97 M rows/s |
+| B2 Trino from scratch | 1,089 s | 1,988 s |
+| B2 Spark from scratch | 1,405 s | 2,659 s |
+| B2 Trino reprocess, delete+insert / merge / microbatch | 20 / 100 / 32 s | 18 / 30 / 15 s |
+| B2 Spark reprocess, insert_overwrite / merge / microbatch | 12 / 199 / 17 s | 20 / 401 / 35 s |
+| B3 Q1 (yearly count, whole table), Trino / StarRocks / DuckDB | 431 / 546 / 1,040 ms | 708 / 902 / 1,690 ms |
+| B3 Q2–Q6 (filtered) | unchanged within noise | unchanged within noise |
+| B5a StarRocks MV refresh (fact) | 284 s | 550 s |
+| B5c Cube Store build, Trino / StarRocks | 515 / 165 s | 843 / 239 s |
+| B5c answers (Q2, Q3, Q9, Q10) | 18–33 ms | 16–34 ms |
+
+- Ingestion and full builds scale linearly with the data. Reprocessing one batch does not: it only touches that batch's window, which is the same size in both scales. Spark's merge is the exception, because it reads the whole silver table to match keys, so it doubled.
+- Only questions that read the whole fact (Q1, Q5, Q8 through Cube) grow with the data. Filtered questions stay flat, thanks to partition pruning and the sort order. Through Cube, StarRocks' Q8 now runs out of memory on profile M.
+- Cube Store answers stay at 16–34 ms regardless of size; only the build time grows.
+- The B5b table needed a change at this scale: a sorted CTAS across 28 yearly partitions ran out of Trino's writer memory, so the table is now unsorted.
+- B6 round 2 at 1.29 B rows: sorted + monthly partitions is still the best layout (Q2 435 ms; 593 without partitions). Adding years adds partitions, not bigger ones (~1.9 MB per month in both scales), so the partition rule does not change.
+- One run failed on a truncated object-store response ("Premature end of Content-Length") during Spark's merge, and was re-run after a fresh RustFS. Both rows stay in the results.
 
 ### 6.4 Scale `small` — Postgres as the baseline (GHCN 2025, profile M)
 
