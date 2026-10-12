@@ -8,7 +8,7 @@
     incremental_strategy=var('incremental_strategy'),
     unique_key=incremental_unique_key(['station_id', 'date', 'element'], 'date'),
     event_time='date',
-    batch_size='month',
+    batch_size=var('microbatch_batch_size'),
     begin=var('microbatch_begin'),
     concurrent_batches=false,
     on_schema_change='fail',

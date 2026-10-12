@@ -158,6 +158,8 @@ def dbt_vars():
         entries.append(f"reprocess_from_batch: {os.environ['REPROCESS_FROM_BATCH']}")
     if os.environ.get("MICROBATCH_BEGIN"):
         entries.append(f'microbatch_begin: "{os.environ["MICROBATCH_BEGIN"]}"')
+    if os.environ.get("MICROBATCH_BATCH_SIZE"):
+        entries.append(f"microbatch_batch_size: {os.environ['MICROBATCH_BATCH_SIZE']}")
     return "{" + ", ".join(entries) + "}"
 
 

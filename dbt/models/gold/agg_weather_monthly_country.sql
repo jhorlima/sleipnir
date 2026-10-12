@@ -5,7 +5,7 @@
     incremental_strategy=var('incremental_strategy'),
     unique_key=incremental_unique_key(['country_code', 'month'], 'month'),
     event_time='month',
-    batch_size='month',
+    batch_size=var('microbatch_batch_size'),
     begin=var('microbatch_begin'),
     concurrent_batches=false,
     on_schema_change='fail',

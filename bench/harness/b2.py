@@ -41,6 +41,7 @@ EXCLUDE_MV = "--exclude mv_weather_wide"
 SCALE_WINDOW = {
     "r2": ("2010-01-01", "2026-01-01"),
     "r2_1998": ("1998-01-01", "2026-01-01"),
+    "local": ("1763-01-01", "2026-01-01"),
     "small": ("2025-01-01", "2026-01-01"),
 }
 
@@ -132,6 +133,8 @@ def set_run_environment(args, scenario, strategy, reprocess_batch=""):
     os.environ["STRATEGY"] = strategy
     os.environ["REPROCESS_FROM_BATCH"] = reprocess_batch
     os.environ["MICROBATCH_BEGIN"] = SCALE_WINDOW[args.scale][0] if scenario == "full" else ""
+    # 263 years of mostly tiny months: the local scale's full build runs one batch per year.
+    os.environ["MICROBATCH_BATCH_SIZE"] = "year" if scenario == "full" and args.scale == "local" else ""
 
 
 def tag_rows(rows, repeat):
