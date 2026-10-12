@@ -204,6 +204,63 @@ Each variant is a full copy of `fct_weather_daily` (190.2 M rows); reads are B3 
 
 Takeaways: sorting is the change that pays most (half the storage, faster reads), and monthly partitions plus sorting is the best overall layout: dropping the partition slows every period-filtered query by 60–80%. File size targets cannot matter when a monthly partition holds 2–4 MB. Snappy costs 22% more storage for no read gain. A coarse partition without a sort order is the worst case (yearly count: 197 s unsorted against 0.49 s sorted).
 
+### 6.3 B1–B4 — the benchmark (profile M: 4 CPU / 8 GB per engine, scale r2, `results/b1…b4.parquet`)
+
+Every number is a median of 5 warm runs after 1 discarded warm-up, or a single cold run after an engine restart and a page cache drop. Every answer was checked against a DuckDB reference before its timing counted.
+
+**B1 — ingestion (DuckDB 1.5.6).** 192 monthly batches, 741.9 M rows, 3.36 GB of gzipped CSV: 146.4 s in total, 5.07 M rows/s, 730 ms per batch (p95 918 ms).
+
+**B2 — transformation (dbt, scale r2).**
+
+| | Trino 483 | Spark 4.1.3 |
+|---|---|---|
+| From scratch, by month (silver / fact / aggregate) | 1,089 s (544 / 308 / 236) | 1,405 s (765 / 379 / 261) |
+| Reprocess the latest batch, best strategy | delete+insert 20.2 s | insert_overwrite 11.6 s |
+| … microbatch | 31.7 s | 16.5 s |
+| … merge | 100.1 s (the fact dominates) | 198.9 s (the silver dominates) |
+| Maintenance (optimize, manifests, expire, orphans) | 6.2 s | 58.9 s (includes the 51 s sort rewrite of the fact) |
+
+**B3 — direct SQL.**
+
+| Weather questions, warm p50 (ms) | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 |
+|---|---|---|---|---|---|---|
+| Trino | 431 | 452 | 283 | 227 | 172 | 109 |
+| StarRocks 4.1.6 | 546 | 152 | 137 | 109 | 249 | 45 |
+| DuckDB (in-process) | 1,040 | 157 | 74 | 50 | 434 | 28 |
+
+| TPC-H SF8, 22 queries (derived from TPC-H, not comparable to published TPC-H results) | warm geomean | cold geomean |
+|---|---|---|
+| DuckDB | 304 ms | 711 ms |
+| StarRocks | 551 ms | 3,722 ms |
+| Trino | 1,874 ms | 5,335 ms |
+
+DuckDB runs inside the benchmark container, with no coordinator or remote catalog per query, and its "cold" is a new connection over a dropped page cache. A cold StarRocks pays for a fresh FE and its Iceberg metadata cache.
+
+**B4 — the same questions through Cube 1.7.50 (no Cube Store), warm p50 (ms).**
+
+| | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | Q7 | Q8 | Q9 | Q10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Trino | 6,729 | 4,076 | 4,072 | 4,078 | 3,319 | 3,292 | invalid | 11,332 | 4,380 | 6,168 |
+| StarRocks | 9,695 | 724 | 155 | 127 | not supported | 73 | 306 | 4,682 | 399 | 1,438 |
+| DuckDB in Cube | 8,823 | 705 | 128 | 550 | 464 | 444 | 234 | 11,073 | 248 | 2,096 |
+
+Trino's Q7 is invalid on every run: `approx_percentile` was 19% off the exact median for one small group (EU), past the 5% tolerance. StarRocks cannot run Cube's rolling window (Q5, `WITH RECURSIVE`). DuckDB in Cube ran with the Cube container sized to profile M (D-22).
+
+### 6.4 Scale `small` — Postgres as the baseline (GHCN 2025, profile M)
+
+| B2 | From scratch | Best reprocess | Merge |
+|---|---|---|---|
+| Trino | 66 s | microbatch 9.2 s | 12.3 s |
+| Spark | 90 s | microbatch 12.2 s | 34.2 s |
+| Postgres 18.6 | 279 s | delete+insert 21.1 s | 48.5 s |
+
+| B3 warm p50 (ms) | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 |
+|---|---|---|---|---|---|---|
+| StarRocks | 80 | 171 | 126 | 103 | 99 | 52 |
+| DuckDB | 101 | 160 | 82 | 49 | 62 | 32 |
+| Trino | 161 | 511 | 291 | 186 | 191 | 119 |
+| Postgres | 589 | 1,016 | 451 | 258 | 389 | 137 |
+
 ### 6.1 Scale `r2` load (GHCN 2010–2025, profile M, one run, before the harness)
 
 | Step | Engine | Number |
@@ -221,10 +278,10 @@ Takeaways: sorting is the change that pays most (half the storage, faster reads)
 
 | Suite | Headline | Chart |
 |---|---|---|
-| B1 Ingestion | | |
-| B2 Transformation (per model, per strategy) | | |
-| B3 Direct reads | | |
-| B4 Reads via Cube | | |
+| B1 Ingestion | DuckDB loads 741.9 M rows (192 monthly gzipped batches) into Iceberg in 146 s: 5.07 M rows/s, 730 ms per batch | per-batch latency |
+| B2 Transformation (per model, per strategy) | From scratch by month: Trino 18 min, Spark 23 min. Reprocessing the latest batch: Spark insert_overwrite 12 s, Trino delete+insert 20 s; merge is the slowest on both (Trino 100 s, Spark 199 s). On 2025 alone, Postgres builds 4× slower than Trino | time per model and strategy |
+| B3 Direct reads | TPC-H SF8 warm geomean: DuckDB 304 ms, StarRocks 551 ms, Trino 1,874 ms; on the weather questions each engine wins some, and Postgres trails by 3–10× on the small scale | warm and cold p50 per query |
+| B4 Reads via Cube | Cube adds a ~3–4 s floor per question on Trino; StarRocks through Cube still answers simple questions in 73–155 ms. Trino's approximate percentile misses by 19% on a small group and fails the 5% gate | warm p50 per question and engine |
 | B5 Acceleration (StarRocks MV × Trino MV × Cube Store) | | |
 | B6 Maintenance and layout | Sorting the fact table by station and date halves it (0.73 → 0.38 GB) and speeds up the yearly count by 37%, with no read getting worse; file size targets do nothing with monthly partitions | storage and warm p50 per variant |
 
