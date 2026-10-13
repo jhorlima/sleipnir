@@ -138,12 +138,13 @@ Regras:
 |---|---|---|---|---|---|---|
 | `r2` (padrão) | **GHCN 1998–2025** (`data_scale = r2_1998`): 336 lotes mensais, **1,29 bi de linhas no bronze**. As primeiras medições usaram 2010–2025 (`data_scale = r2`, 742 M linhas) e continuam em `results/` com esse rótulo | 4,86 GB | ~5,9 GB | 3,41 GB | **6,0 GB** (silver 1,88, gold 0,71) + D2 1,88 GB = **7,9 GB** | Medida pelo `make storage-report` |
 | `small` | só 2025: 12 lotes mensais, ~44 M linhas no bronze | 0,17 GB | ~0,2 GB | ~0,12 GB | ~0,23 GB (no Postgres: 8,15 GB de dados + até 8 GB de WAL) | Medida; escala da comparação com o Postgres (D-23) |
-| `local` | histórico completo, 1750–2025 | ~14,4 GB | ~17 GB | ~10 GB | ~19 GB | Estimada; carga na etapa 10 de [`specs/phase-2.md`](specs/phase-2.md), com aviso de disco antes |
+| `local` | histórico completo, **1763–2025** (1750–1762 não existem no NOAA): 3.156 lotes, **3,97 bi de linhas no bronze**. `landing/` num SSD externo (USB, exFAT) | 14,4 GB | ~17 GB | ~10 GB | ~18 GB (sem teto: só local) | B1, B2 Trino, B3 e B4 medidos; B2 Spark e B5 pendentes |
 
   - **Meta da `r2`: bilhões de linhas dentro de 10 GB.** Na `r2` atual o bronze ocupa ~2,7 bytes/linha e o lakehouse 3,75 GB, só ~38% do orçamento. O teto de 6,5 GB do D1 comporta ~1,3 bi linhas no bronze com o layout atual. Se o B6 confirmar o ganho de ordenar antes de gravar (o Parquet caiu à metade na fase 1), comporta mais. As medições começam na `r2` atual; depois do B6, a `r2` é ampliada em anos até encher o teto e as suítes são repetidas ([plano](specs/phase-2.md), etapa 10).
   - A escala `local` é limitada pelo tamanho do histórico, não pelo tempo: o B1 da `r2` levou 142 s de insert (5,2 M linhas/s), então ~30 min de B1 exigiriam muito mais dados do que o GHCN tem. O histórico completo chega a ~20 GB.
   - Os lotes de `landing/batches` são `.csv.gz` (3,4 GB em vez de ~25 GB). O DuckDB lê gzip na mesma vazão do CSV puro, e gerar os lotes (fora da medição) leva ~1 min por ano.
   - A partir da `r2`, silver e gold são construídos do zero mês a mês (`make dbt-backfill`, D-21).
+  - Na `local`, o build do zero é por ano até 1949 (anos pequenos; por mês o custo fixo de 2.244 lotes dominaria) e por mês a partir de 1950: um lote anual de ~28 M linhas estoura a memória do dedup do silver no Trino perfil `M`. O `batch_size` do microbatch é uma variável do dbt (`microbatch_batch_size`, padrão `month`).
 - Fora do bucket: `landing/` (CSV em disco local), baseline Postgres, MVs do StarRocks (storage local do BE) e Cube Store.
 - **D2 = TPC-H SF8: 1,875 GB** medidos (SF1 = 0,227 GB; SF9 passaria de 2 GB), em `lakehouse.duckdb_tpch`, gerado pelo DuckDB em ~65 s (`make tpch SF=8`). Na `r2`, bronze + um writer + D2 = 5,63 GB.
 - Manutenção após cada carga (§10.4): snapshots antigos contam no orçamento.

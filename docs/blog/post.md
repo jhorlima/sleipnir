@@ -286,6 +286,25 @@ The headline goal: 1,294,761,940 bronze rows, and one writer's lakehouse plus TP
 - B6 round 2 at 1.29 B rows: sorted + monthly partitions is still the best layout (Q2 435 ms; 593 without partitions). Adding years adds partitions, not bigger ones (~1.9 MB per month in both scales), so the partition rule does not change.
 - One run failed on a truncated object-store response ("Premature end of Content-Length") during Spark's merge, and was re-run after a fresh RustFS. Both rows stay in the results.
 
+### 6.7 Scale `local` — the whole GHCN history, 1763–2025 (`data_scale = local`)
+
+3,969,975,896 bronze rows (3.97 B), with the landing area on an external USB SSD. There is no storage cap at this scale: it only runs locally.
+
+| | r2 (742 M) | r2_1998 (1.29 B) | local (3.97 B) |
+|---|---|---|---|
+| B1 ingest | 146 s, 5.07 M rows/s | 260 s, 4.97 M rows/s | 1,292 s, 3.07 M rows/s (3,156 batches, many tiny; read from a USB SSD) |
+| B2 Trino from scratch | 1,089 s | 1,988 s | 6,320 s (by year to 1949, by month after) |
+| B2 Trino reprocess, delete+insert / merge / microbatch | 20 / 100 / 32 s | 18 / 30 / 15 s | 28 / 44 / 29 s |
+| B3 Q1 (whole table), Trino / StarRocks / DuckDB | 431 / 546 / 1,040 ms | 708 / 902 / 1,690 ms | 2,695 / 3,767 / 5,947 ms |
+| B3 Q2–Q6 (filtered), Trino | 109–452 ms | 111–474 ms | 121–466 ms |
+| B4 Q1 through Cube, Trino / StarRocks / DuckDB | 6.7 / 9.7 / 8.8 s | 9.7 / 17.3 / 15.5 s | 32.4 / 70.5 / 60.5 s |
+
+- At 4 billion rows the pattern holds: whole-table questions grow with the data, and filtered ones stay flat. Trino handles the whole-table count best (2.7 s against 3.8 s for StarRocks and 5.9 s for in-process DuckDB).
+- Ingestion slowed to 3.07 M rows/s. The early centuries are 2,000+ tiny monthly batches that pay a fixed cost each, and the files come from a USB SSD.
+- Gotcha: yearly microbatches of ~28 M rows ran Trino's dedup out of memory on profile M. The full build goes by year until 1949 and by month from 1950. The first attempt failed, so the gold tables were never rebuilt, and the B3/B4 runs that followed read the previous scale's gold under the `local` label. Their `run_id`s are listed in `results/invalidated_runs.csv` and left out of the report; the result files are never edited.
+- StarRocks hit its limits on profile M. The MV refresh of 3.97 B rows (3,156 monthly partitions) ran out of BE memory with the default 8 partitions per task. The B5a reads then failed the `EXPLAIN` gate, because StarRocks fell back to Iceberg, as designed. Q8 through Cube also ran out of query memory. Trino's approximate median missed by 12% on 1797 (very few stations) and fails the gate.
+- Not run at this scale yet: Spark's B2 (~5–6 h) and B5. The StarRocks MV refresh needs another attempt with one partition per task.
+
 ### 6.4 Scale `small` — Postgres as the baseline (GHCN 2025, profile M)
 
 | B2 | From scratch | Best reprocess | Merge |
