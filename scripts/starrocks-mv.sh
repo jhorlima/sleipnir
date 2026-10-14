@@ -28,7 +28,7 @@ refresh_mvs() {
     for mv_name in ${mv_names}; do
         start_seconds=$(date +%s)
         # The SYNC statement itself is killed at the default query_timeout of 300 s.
-        run_sql -e "SET query_timeout=3600; REFRESH MATERIALIZED VIEW ${mv_database}.${mv_name} WITH SYNC MODE" > /dev/null
+        run_sql -e "SET query_timeout=${MV_REFRESH_TIMEOUT_SECONDS:-3600}; REFRESH MATERIALIZED VIEW ${mv_database}.${mv_name} WITH SYNC MODE" > /dev/null
         seconds=$(( $(date +%s) - start_seconds ))
         echo "{\"step\": \"refresh_${mv_name}\", \"seconds\": ${seconds}}"
     done
