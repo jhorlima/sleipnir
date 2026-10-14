@@ -303,7 +303,11 @@ The headline goal: 1,294,761,940 bronze rows, and one writer's lakehouse plus TP
 - Ingestion slowed to 3.07 M rows/s. The early centuries are 2,000+ tiny monthly batches that pay a fixed cost each, and the files come from a USB SSD.
 - Gotcha: yearly microbatches of ~28 M rows ran Trino's dedup out of memory on profile M. The full build goes by year until 1949 and by month from 1950. The first attempt failed, so the gold tables were never rebuilt, and the B3/B4 runs that followed read the previous scale's gold under the `local` label. Their `run_id`s are listed in `results/invalidated_runs.csv` and left out of the report; the result files are never edited.
 - StarRocks hit its limits on profile M. The MV refresh of 3.97 B rows (3,156 monthly partitions) ran out of BE memory with the default 8 partitions per task. The B5a reads then failed the `EXPLAIN` gate, because StarRocks fell back to Iceberg, as designed. Q8 through Cube also ran out of query memory. Trino's approximate median missed by 12% on 1797 (very few stations) and fails the gate.
-- Not run at this scale yet: Spark's B2 (~5–6 h) and B5. The StarRocks MV refresh needs another attempt with one partition per task.
+- **Where profile M runs out, at ~4 billion rows.** Two engines hit the limit of 4 CPU / 8 GB here, and both failures stay in the results:
+  - **StarRocks MV refresh (B5a):** it ran out of BE memory in 3 minutes, with the default 8 partitions per task and again with 1. Building a 3.97 B-row MV does not fit a 4.5 GB BE. The B5a reads failed the `EXPLAIN` gate (StarRocks fell back to Iceberg) and are recorded invalid.
+  - **Spark's full build (B2):** after 3.5 hours the Thrift Server connection dropped at July 1997 (batch 571 of 912), with the container at 7.4 of 8 GB. Monthly batches had slowed from 12 s to ~25 s while the object store neared its own memory limit. That limit was raised live from 3 to 5 GiB to keep it alive, and both details are recorded with the run.
+  - Trino finished every step of B2 at this scale on the same profile.
+  - Measuring StarRocks' MVs and Spark at this size fairly takes a campaign with every engine on profile L. Raising the limit for just the engines that failed would break the same-resources rule.
 
 ### 6.4 Scale `small` — Postgres as the baseline (GHCN 2025, profile M)
 
