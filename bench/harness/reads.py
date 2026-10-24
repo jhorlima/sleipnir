@@ -380,7 +380,7 @@ def record_step(setup, base, step):
     row = make_row(
         **base,
         step=step["step"], run_type="measured", latency_ms=step["seconds"] * 1000,
-        storage_bytes=step.get("storage_bytes"), status="ok", notes=step.get("notes", ""),
+        storage_bytes=step.get("storage_bytes"), status=step.get("status", "ok"), notes=step.get("notes", ""),
     )
     target = append_rows(setup.results_suite, [row])
     log(f"recorded {step['step']}: {step['seconds']} s in {target}")
@@ -396,7 +396,7 @@ def main():
     parser.add_argument("--queries", default="", help="comma list, e.g. q1,q2 (default: all of the dataset)")
     parser.add_argument(
         "--record-step", default="",
-        help="instead of running queries, append one refresh/build row from a JSON object {step, seconds, storage_bytes, notes}",
+        help="instead of running queries, append one refresh/build row from a JSON object {step, seconds, storage_bytes, status, notes}",
     )
     args = parser.parse_args()
     if args.suite == "b5" and not args.scenario:
