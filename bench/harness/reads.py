@@ -38,7 +38,7 @@ from clients import (
     duckdb_threads,
 )
 from results import REPO_ROOT, append_rows, make_row, new_run_id
-from run import read_engine_config, read_engine_image
+from run import read_docker_vm, read_engine_config, read_engine_image
 from sampling import StatsSampler, container_ids
 
 QUERIES_DIR = REPO_ROOT / "bench" / "queries"
@@ -180,7 +180,7 @@ class Setup:
         """engine_version and engine_config, recorded like B2 (benchmark-integrity §3); D-22 for DuckDB via Cube."""
         if self.engine == "duckdb" and not self.via_cube:
             limits, _ = container_limits("bench")
-            config = f"threads={duckdb_threads()}; memory_limit={duckdb_memory_limit_gb()}GB; {limits}"
+            config = f"{read_docker_vm()}\nthreads={duckdb_threads()}; memory_limit={duckdb_memory_limit_gb()}GB; {limits}"
             return f"duckdb {duckdb.__version__}", config
         service = ENGINE_SERVICE[self.engine]
         if not self.via_cube:
@@ -192,7 +192,7 @@ class Setup:
         if self.engine == "duckdb":
             memory = cube_environment.get("CUBEJS_DS_DUCKDB_DB_DUCKDB_MEMORY_LIMIT")
             threads = cube_environment.get("CUBE_DUCKDB_THREADS")
-            config = f"duckdb embedded in {CUBE_SERVICE}: threads={threads}; memory_limit={memory}; {cube_limits}"
+            config = f"{read_docker_vm()}\nduckdb embedded in {CUBE_SERVICE}: threads={threads}; memory_limit={memory}; {cube_limits}"
             return f"{cube_image} (embedded duckdb)", config
         engine_limits, _ = container_limits(service)
         engine_config = f"{read_engine_config(service) or ''}\n{engine_limits}".strip()
