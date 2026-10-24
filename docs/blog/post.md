@@ -309,6 +309,21 @@ The headline goal: 1,294,761,940 bronze rows, and one writer's lakehouse plus TP
   - Trino finished every step of B2 at this scale on the same profile.
   - Measuring StarRocks' MVs and Spark at this size fairly takes a campaign with every engine on profile L. Raising the limit for just the engines that failed would break the same-resources rule.
 
+### 6.8 Profile L at scale `local` (8 CPU / 12 GB per engine)
+
+Profile L does not fit the Docker VM that every profile-M number came from (8 CPU / 16 GB). The engine's 12 GB, plus ~2 GB of infrastructure and ~3 GB of Cube and Cube Store, is about 17 GB. The VM was raised to 10 CPU / 20 GB, with swap unchanged at 2 GB. Container limits still come from the profile, so the engine itself gets nothing extra. What does change is the room around it: more page cache in the VM for the object store's files, and more CPU for the object store and Cube. From this campaign on, the VM size is written into every result's `engine_config`.
+
+- **Control: does the bigger VM move the numbers?** B3 on Trino at profile M, scale `local`, rerun on the new VM (42 queries, all checksums match):
+
+| B3 Trino, profile M | VM 8 CPU / 16 GB | VM 10 CPU / 20 GB |
+|---|---|---|
+| warm p50 / p95 | 276 / 2,779 ms | 252 / 2,700 ms |
+| cold p50 / p95 | 2,220 / 6,857 ms | 2,127 / 6,330 ms |
+| Q1 (whole table) warm p50 | 2,695 ms | 2,653 ms |
+
+  - The bigger VM is slightly faster: 2% on the whole-table Q1 and up to 13% on the small filtered queries (Q4/Q5 warm), whose few hundred milliseconds are the most sensitive to the room around the engine. A profile-L number that beats profile M by less than ~10% is within the VM effect, not the profile.
+  - Gotcha: the first comparison mixed in an older run that is listed in `results/invalidated_runs.csv` (it read the previous scale's gold), and it made the bigger VM look 40% slower on Q1. Any comparison across campaigns filters out the invalidated runs first.
+
 ### 6.4 Scale `small` — Postgres as the baseline (GHCN 2025, profile M)
 
 | B2 | From scratch | Best reprocess | Merge |
