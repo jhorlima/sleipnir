@@ -324,6 +324,19 @@ Profile L does not fit the Docker VM that every profile-M number came from (8 CP
   - The bigger VM is slightly faster: 2% on the whole-table Q1 and up to 13% on the small filtered queries (Q4/Q5 warm), whose few hundred milliseconds are the most sensitive to the room around the engine. A profile-L number that beats profile M by less than ~10% is within the VM effect, not the profile.
   - Gotcha: the first comparison mixed in an older run that is listed in `results/invalidated_runs.csv` (it read the previous scale's gold), and it made the bigger VM look 40% slower on Q1. Any comparison across campaigns filters out the invalidated runs first.
 
+- **Trino, M → L (warm p50):**
+
+| | profile M | profile L |
+|---|---|---|
+| B3 Q1 (whole table) | 2,695 ms | 3,097 ms |
+| B3 Q2–Q6 (filtered) | 121–466 ms | 116–344 ms |
+| B4 Q1 through Cube (whole table) | 32.4 s | 65.3 s |
+| B4 Q2–Q6, Q9, Q10 through Cube | 3.3–16.3 s | 3.3–14.2 s |
+| B4 Q8 (median per year, approximate) | 141 s, invalid | 115 s, invalid |
+
+  - Twice the CPU and 50% more memory did not make the whole-table scans faster: B3 Q1 went up 15% and Q1 through Cube doubled, while the filtered queries stayed flat or improved a little. The object store is the suspect: RustFS runs with 1 CPU in every profile (shared infrastructure is held constant), so an engine with 8 CPUs mostly waits on it with more requests in flight.
+  - Q7 and Q8 fail the correctness gate on profile L exactly as on M, with the same wrong values (Q7 'EU' 30.40 against 25.55; Q8 1797 582.4 against 518.5): the error is in the query or the approximation, not in the resources.
+
 ### 6.4 Scale `small` — Postgres as the baseline (GHCN 2025, profile M)
 
 | B2 | From scratch | Best reprocess | Merge |
