@@ -58,12 +58,21 @@ def run_measured(command, service):
     return output_lines, returncode, wall_seconds, sampler
 
 
+def read_docker_vm():
+    """CPUs and memory of the Docker VM: the page cache and headroom around the engine depend on it."""
+    info = subprocess.run(
+        ["docker", "info", "--format", "{{.NCPU}} {{.MemTotal}}"], capture_output=True, text=True, check=True
+    )
+    cpus, memory_bytes = info.stdout.split()
+    return f"docker_vm: cpus={cpus} memory_gib={int(memory_bytes) / 2**30:.1f}"
+
+
 def read_engine_config(engine):
-    """Non-comment lines of the files directly under config/<engine>/ (benchmark-integrity §3)."""
+    """Docker VM size plus the non-comment lines of the files directly under config/<engine>/ (benchmark-integrity §3)."""
+    settings = [read_docker_vm()]
     config_dir = REPO_ROOT / "config" / engine
     if not config_dir.is_dir():
-        return None
-    settings = []
+        return "\n".join(settings)
     for path in sorted(config_dir.iterdir()):
         if not path.is_file():
             continue

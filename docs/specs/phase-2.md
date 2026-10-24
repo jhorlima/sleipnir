@@ -4,7 +4,7 @@ Detalha a fase 2 do §13 do [SPEC](../SPEC.md). Regras de medição em `.claude/
 
 ## Restrição que define a ordem
 
-A VM do Docker tem 8 CPUs, 16 GB e 2 GB de swap. O perfil `M` dá 8 GB ao engine sob teste e o `L` dá 12 GB. A infra (RustFS, Lakekeeper, Postgres, Traefik) usa cerca de 2 GB, e o Cube com o Cube Store mais uns 3 GB. Por isso:
+A VM do Docker tem 8 CPUs, 16 GB e 2 GB de swap nas campanhas do perfil `M`, e 10 CPUs, 20 GB e 2 GB de swap na campanha do perfil `L` (SPEC §2). O perfil `M` dá 8 GB ao engine sob teste e o `L` dá 12 GB. A infra (RustFS, Lakekeeper, Postgres, Traefik) usa cerca de 2 GB, e o Cube com o Cube Store mais uns 3 GB. Por isso:
 
 - **Só um engine fica de pé por vez**, inclusive nas validações dos workers, e não apenas nas medições. Workers escrevem código em paralelo, mas sobem engines em fila, um de cada vez. Engine + Cube cabem juntos no perfil `M`.
 - Os containers dos engines têm `memswap_limit` igual ao limite de memória: sem swap, um engine sem memória falha em vez de ficar lento sem que ninguém perceba.
