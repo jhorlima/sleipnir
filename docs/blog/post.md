@@ -335,6 +335,7 @@ Profile L does not fit the Docker VM that every profile-M number came from (8 CP
 | B4 Q8 (median per year, approximate) | 141 s, invalid | 115 s, invalid |
 
   - Twice the CPU and 50% more memory did not make the whole-table scans faster: B3 Q1 went up 15% and Q1 through Cube doubled, while the filtered queries stayed flat or improved a little. The object store is the suspect: RustFS runs with 1 CPU in every profile (shared infrastructure is held constant), so an engine with 8 CPUs mostly waits on it with more requests in flight.
+  - Decision: profile L runs twice. This first campaign keeps the object store at 1 CPU, like every other profile, so the profiles are compared on the same infrastructure. A second profile-L campaign gives RustFS more CPU, to show how much each engine gains when the object store is no longer the bottleneck.
   - Q7 and Q8 fail the correctness gate on profile L exactly as on M, with the same wrong values (Q7 'EU' 30.40 against 25.55; Q8 1797 582.4 against 518.5): the error is in the query or the approximation, not in the resources.
 
 ### 6.4 Scale `small` — Postgres as the baseline (GHCN 2025, profile M)
