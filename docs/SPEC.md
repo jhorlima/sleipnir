@@ -97,6 +97,7 @@ Versões pinadas em `.env`; nenhuma tag `latest`.
   - `spark.sql.shuffle.partitions` = 2–3 × N; AQE ligado (`spark.sql.adaptive.enabled`, `coalescePartitions`, `skewJoin`);
   - `spark.sql.iceberg.vectorization.enabled=true` (padrão) e `spark.serializer=KryoSerializer`;
   - `write.distribution-mode=hash` nas tabelas particionadas, para evitar arquivos pequenos.
+- **Caches do catálogo desligados** (`cache-enabled=false`, `rest-table-cache.max-entries=0`, V14): o Thrift Server mantém vivas as sessões JDBC fechadas, cada uma com o seu `SparkCatalog`, e o dbt-spark abre uma sessão por microbatch; com os caches ligados, cada catálogo retido segura uma `TableMetadata` inteira, o heap cresce com commits × sessões e o B2 na escala `local` termina em GC thrash (perfis `M` e `L`). Desligados, cada comando recarrega a tabela no Lakekeeper; resta uma fuga linear de ~1 MB por sessão. As medições do Spark anteriores a esta mudança têm os caches ligados no `engine_config`.
 - Os parâmetros finais são registrados em `config/spark/` e em `results` (`engine_config`).
 
 ## 5. Datasets
@@ -512,6 +513,7 @@ docs/SPEC.en.md           # ao estabilizar
 | V10 | STS do RustFS (AssumeRole) com a session policy do Lakekeeper → vended credentials para todos os engines | Fase 4 | Manter chaves estáticas |
 | V11 | Cosmos: `ExecutionMode.WATCHER` (dbt instalado na imagem do Airflow/worker) × `ExecutionMode.DOCKER` (dbt numa imagem própria, uma task por model) — overhead e isolamento | Fase 3 | `DockerOperator` chamando `dbt build` |
 | V12 | "Modo seguro": IdP OIDC leve (Dex ou Zitadel) + Lakekeeper com autenticação OIDC (sem OpenFGA) + vended credentials via STS do RustFS (depende do V10); engines com OAuth2 client credentials (DuckDB `CLIENT_ID`/`CLIENT_SECRET`/`OAUTH2_SERVER_URI`). Medido como cenário à parte; o cenário sem auth e com chaves estáticas segue como linha de base | Fase 4 | Manter chaves estáticas sem auth |
+| V14 | ✅ Resolvido em parte: o crescimento do heap do Spark Thrift Server no B2 da escala `local` (4,4 M `BaseSnapshot` vivos, GC thrash) vem das sessões JDBC fechadas que ficam retidas, cada uma com um `SparkCatalog` cujo `CachingCatalog` e `RESTTableCache` (Iceberg 1.12) seguram a `TableMetadata`. Prova no perfil `S` (30 sessões): com os dois caches desligados, nenhuma `TableMetadata`/`BaseSnapshot` retida (antes ~18 mil snapshots), heap 109 MB contra 166 MB. Limites da UI e `spark.ui.enabled=false` não resolvem. Em aberto: qual objeto segura a `SessionState` (fuga linear de ~1 MB por sessão; parecido com SPARK-34689) |
 | V13 | ✅ Resolvido: o Cube v1.7.50 embute DuckDB 1.5.5 e lê os marts Iceberg via Lakekeeper. Extensões por env; `CREATE SECRET` + `ATTACH` (`ACCESS_DELEGATION_MODE 'none'`) via `driverFactory` em `cube/cube.js`. Q1–Q10 respondem e Q1–Q3 batem com a referência DuckDB direta (detalhes em `spikes/V13/README.md`). Pegadinhas: erro no init SQL é engolido e fica em cache até reiniciar o Cube; `INSTALL` baixa extensões a cada start | Fase 2 | — |
 
 ## 16. Publicação
