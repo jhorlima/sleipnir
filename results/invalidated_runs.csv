@@ -3,3 +3,6 @@ run_id,suite,reason
 20261012T211901-0bcadd,b3,"labelled local but read the r2_1998 gold: the local B2 full build had failed (Trino memory), so trino_gold was never rebuilt"
 20261012T212234-f63c19,b3,"labelled local but read the r2_1998 gold: the local B2 full build had failed (Trino memory), so trino_gold was never rebuilt"
 20261012T212426-8b2f6c,b4,"labelled local but read the r2_1998 gold: the local B2 full build had failed (Trino memory), so trino_gold was never rebuilt"
+20261024T211843-ed453e,b5,"two B5a read runs started at the same time by mistake (benchmark-integrity §1); killed after ~90 s"
+20261024T211852-cd4104,b5,"two B5a read runs started at the same time by mistake (benchmark-integrity §1); killed after ~90 s"
+20261024T221636-845858,b2,"RustFS OOM-killed at its 3 GiB limit during the Trino profile-L full build (infrastructure, not the engine)"
