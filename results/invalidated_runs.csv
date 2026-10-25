@@ -6,3 +6,4 @@ run_id,suite,reason
 20261024T211843-ed453e,b5,"two B5a read runs started at the same time by mistake (benchmark-integrity §1); killed after ~90 s"
 20261024T211852-cd4104,b5,"two B5a read runs started at the same time by mistake (benchmark-integrity §1); killed after ~90 s"
 20261024T221636-845858,b2,"RustFS OOM-killed at its 3 GiB limit during the Trino profile-L full build (infrastructure, not the engine)"
+20261025T014000-996184,b2,"RustFS OOM-killed at its 3 GiB limit during the Trino profile-L microbatch run (infrastructure, not the engine)"
