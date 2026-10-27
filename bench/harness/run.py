@@ -67,15 +67,18 @@ def read_docker_vm():
     vm = f"docker_vm: cpus={cpus} memory_gib={int(memory_bytes) / 2**30:.1f}"
     # The object store is shared infrastructure, but its limits move the numbers (D-26), so they are recorded too.
     rustfs = subprocess.run(
-        ["docker", "inspect", "--format", "{{.Config.Image}} {{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}",
+        ["docker", "inspect", "--format",
+         "{{.Config.Image}} {{.HostConfig.NanoCpus}} {{.HostConfig.Memory}} "
+         "{{range .Config.Env}}{{if eq (index (split . \"=\") 0) \"RUSTFS_SCANNER_ENABLED\"}}{{.}}{{end}}{{end}}",
          "sleipnir-rustfs-1"],
         capture_output=True, text=True,
     )
     if rustfs.returncode != 0:
         return vm
-    rustfs_image, nano_cpus, rustfs_memory_bytes = rustfs.stdout.split()
+    rustfs_image, nano_cpus, rustfs_memory_bytes, *scanner = rustfs.stdout.split()
+    scanner_setting = scanner[0].split("=")[1] if scanner else "default"
     return (f"{vm} rustfs={rustfs_image} rustfs_cpus={int(nano_cpus) / 1e9:g} "
-            f"rustfs_memory_gib={int(rustfs_memory_bytes) / 2**30:g}")
+            f"rustfs_memory_gib={int(rustfs_memory_bytes) / 2**30:g} rustfs_scanner={scanner_setting}")
 
 
 def read_engine_config(engine):

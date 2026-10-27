@@ -7,6 +7,8 @@ services:
       RUSTFS_ADDRESS: ":9000"
       RUSTFS_CONSOLE_ENABLE: "true"
       RUSTFS_CONSOLE_ADDRESS: ":9001"
+      # The data-usage scanner holds metadata in memory under hours of small-object writes (V15).
+      RUSTFS_SCANNER_ENABLED: ${RUSTFS_SCANNER_ENABLED:-true}
     volumes:
       - rustfs-data:/data
     healthcheck:
