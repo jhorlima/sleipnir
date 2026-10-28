@@ -10,3 +10,4 @@ run_id,suite,reason
 20261027T222215-62f7cb,b2,"l2 Trino full build (pass 1) while macOS swapped 15.7 of 16 GB: host memory pressure"
 20261027T224747-f4c77a,b2,"l2 Trino full build (pass 2) while macOS swapped 15.7 of 16 GB: host memory pressure"
 20261028T012524-3f9284,b2,"l2 Trino maintenance while macOS swapped 15.7 of 16 GB: host memory pressure"
+20261028T133405-fcd6c5,b2,"l2 Spark incremental_merge failed with No space left on device: Docker disk full (infrastructure)"
