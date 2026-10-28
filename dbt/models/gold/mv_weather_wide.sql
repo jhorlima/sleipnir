@@ -1,12 +1,18 @@
 {#- B5b (SPEC §10.3): the table that stands in for the StarRocks MV on Trino, which cannot create MVs on the REST catalog (V2).
     Same wide join as the B5a MV and as the one Cube generates. Only the trino target builds it: on the other
     targets it is disabled, so their `dbt run` is unchanged. Cube reads it through cube/model/cubes/trino_mv/.
-    The measured refresh is `dbt run --select mv_weather_wide`.
-    Layout: partitioned by year and not sorted. One CTAS writes every partition at once, and the table writer of
-    profile M (1.8 GB per query) runs out of memory with monthly partitions, or with a sort order on 28 yearly
-    partitions at scale r2_1998 (the fact avoids this by writing one month per microbatch). -#}
+    The measured refresh is `dbt run --select mv_weather_wide --full-refresh` (scripts/cube-b5-refresh.sh).
+    Layout: partitioned by year and not sorted, written one year per microbatch. A single CTAS writes every
+    partition at once, and its table writer ran out of Trino's default per-query memory per node at scale local
+    (2.7 GB on profile L) and with monthly partitions on profile M; the fact avoids this the same way. -#}
 {{ config(
     enabled=(target.name == 'trino'),
+    materialized='incremental',
+    incremental_strategy='microbatch',
+    event_time='date',
+    batch_size='year',
+    begin=var('microbatch_begin'),
+    concurrent_batches=false,
     properties={
         'partitioning': "ARRAY['year(date)']",
     },

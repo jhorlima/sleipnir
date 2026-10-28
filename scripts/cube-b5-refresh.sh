@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Measured refresh step of B5b and B5c (SPEC §9 step 6, §10.3); appends it to results/b5.parquet as its own row.
 # Usage: ENGINE=trino|starrocks PROFILE=m scripts/cube-b5-refresh.sh b5b|b5c
-#   b5b  `dbt run --select mv_weather_wide` on Trino; seconds = dbt's own execution time of the model
+#   b5b  `dbt run --select mv_weather_wide --full-refresh` on Trino (one year per microbatch); seconds = dbt's own execution time of the model
 #   b5c  builds the Cube Store rollups of ENGINE with a one-off refresh worker; seconds = worker start until every
 #        partition of the engine's rollups is ready in Cube Store
 # Needs the engine under test and Cube (cube-api, Cube Store) up, without the stock refresh worker. Run after the
@@ -24,14 +24,25 @@ record_step() {
     --engine "$engine" --profile "$profile" --record-step "$step_json"
 }
 
+# First year of the yearly microbatches of mv_weather_wide: the scale's first bronze date (bench/harness/b2.py SCALE_WINDOW).
+microbatch_begin() {
+  case "${DATA_SCALE:-r2}" in
+    local) echo "1763-01-01" ;;
+    r2_1998) echo "1998-01-01" ;;
+    small) echo "2025-01-01" ;;
+    *) echo "2010-01-01" ;;
+  esac
+}
+
 refresh_table() {
   rm -f "$run_results"
-  make dbt-run PROFILE="$profile" DBT_TARGET=trino VARS='{maintenance: false}' ARGS='--select mv_weather_wide'
+  make dbt-run PROFILE="$profile" DBT_TARGET=trino \
+    VARS="{maintenance: false, microbatch_begin: '$(microbatch_begin)'}" ARGS='--select mv_weather_wide --full-refresh'
   local seconds storage_bytes
   seconds=$(jq '.results[0].execution_time' "$run_results")
   storage_bytes=$(docker compose exec -T trino trino --catalog lakehouse --schema trino_gold --output-format CSV_UNQUOTED \
     --execute 'SELECT sum(file_size_in_bytes) FROM "mv_weather_wide$files"')
-  record_step "{\"step\": \"refresh_mv_weather_wide\", \"seconds\": ${seconds}, \"storage_bytes\": ${storage_bytes}, \"notes\": \"dbt run --select mv_weather_wide; storage = Iceberg data files\"}"
+  record_step "{\"step\": \"refresh_mv_weather_wide\", \"seconds\": ${seconds}, \"storage_bytes\": ${storage_bytes}, \"notes\": \"dbt run --select mv_weather_wide --full-refresh, one year per microbatch; storage = Iceberg data files\"}"
 }
 
 # A refresh worker that sees only ENGINE's rollups: the stock worker builds every engine's rollups and its scheduler
