@@ -37,7 +37,7 @@ microbatch_begin() {
 refresh_table() {
   rm -f "$run_results"
   make dbt-run PROFILE="$profile" DBT_TARGET=trino \
-    VARS="{maintenance: false, microbatch_begin: '$(microbatch_begin)'}" ARGS='--select mv_weather_wide --full-refresh'
+    VARS="{maintenance: false, microbatch_begin: \"$(microbatch_begin)T00:00:00\"}" ARGS='--select mv_weather_wide --full-refresh'
   local seconds storage_bytes
   seconds=$(jq '.results[0].execution_time' "$run_results")
   storage_bytes=$(docker compose exec -T trino trino --catalog lakehouse --schema trino_gold --output-format CSV_UNQUOTED \
@@ -67,7 +67,7 @@ stop_builder() {
   fi
 }
 
-# Partitions that Cube Store marks ready (the volume holds only this build's rollups). Cube Store speaks the MySQL
+# Partitions that Cube Store marks ready (after reset_cube_store the volume holds only this build's rollups). Cube Store speaks the MySQL
 # protocol; the Cube API image has the client library, and a failed query (Cube Store still starting) counts as 0.
 ready_partitions() {
   docker compose exec -T cube-api node -e "
@@ -82,8 +82,17 @@ ready_partitions() {
   "
 }
 
+# An empty Cube Store before each build (SPEC §8.4): ready_partitions counts every ready table, so rollups left by
+# another engine or an earlier scale would end the build early and leave this engine's reads unserved.
+reset_cube_store() {
+  docker compose --profile cube rm --stop --force cube-api cubestore-router cubestore-worker
+  docker volume rm sleipnir_cubestore-data
+  docker compose --profile cube up -d --wait cube-api cubestore-router cubestore-worker
+}
+
 build_rollups() {
   trap stop_builder EXIT
+  reset_cube_store
   local started ready
   started=$(date +%s)
   start_builder
