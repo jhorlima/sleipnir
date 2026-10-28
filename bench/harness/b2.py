@@ -123,9 +123,13 @@ def is_done(args, scenario, strategy, repeat):
     if not target.exists():
         return False
     # A multi-pass full build is done only when its last pass is; an ok first pass alone is not.
+    # An invalidated run (results/invalidated_runs.csv) does not count either, so a resume repeats it.
     last_pass = len(full_build_passes(args.scale))
+    invalidated = RESULTS_DIR / "invalidated_runs.csv"
+    not_invalidated = f"and run_id not in (select run_id from read_csv('{invalidated}')) " if invalidated.exists() else ""
     count = duckdb.connect().execute(
         f"select count(*) from read_parquet('{target}') where suite = 'b2' and step = 'total' and status = 'ok' "
+        f"{not_invalidated}"
         "and engine = ? and data_scale = ? and profile = ? and scenario = ? and strategy = ? and notes like ? "
         "and (notes not like '%pass=%' or notes like ?)",
         [args.engine, args.scale, args.profile, scenario, strategy, f"repeat={repeat};%",
