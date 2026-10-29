@@ -1,15 +1,10 @@
-# Sleipnir: racing query engines on the same lakehouse
+# Sleipnir lab notebook
 
-> Draft. Working title. This file is the article skeleton and the lab notebook at the same time:
-> every decision, test and result is logged here as it happens, then edited into the final story.
-
-**Assets to produce at the end:** cover image · result cards (numbers rendered as images) · architecture diagram · screenshots of Cube/StarRocks/Trino UIs · short explainer video.
+> A chronological record of the project's decisions, failures and measurements, written as they happened.
+> It is the trail behind every number in `results/`: why a run was invalidated, what changed after it, and
+> which numbers can be compared. The published articles are in `docs/blog/`.
 
 ---
-
-## 0. Motivation
-
-<!-- Author: why I wanted to build this; what question I could not answer with vendor benchmarks. -->
 
 ## 1. The question
 

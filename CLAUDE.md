@@ -19,9 +19,9 @@ This repo will be published. Never reference private projects, companies, client
 - Specs describe the **current** state only. When something changes, rewrite the affected text; never leave superseded options, strike-throughs or "previously" notes. History lives in git.
 - `docs/SPEC.md` is the project overview; detailed specs per phase/feature go to `docs/specs/<topic>.md` and are linked from it.
 
-## Article notebook
+## Lab notebook and articles
 
-`docs/blog/post.md` is the article draft and the project's lab notebook. Whenever a decision is made, a spike is resolved, a gotcha is found or a suite produces numbers, add it to the matching section in the same change (story tone, no internal references). The author writes the motivation section.
+`docs/lab-notebook.md` is the project's lab notebook and the trail behind every published number. Whenever a decision is made, a spike is resolved, a gotcha is found or a suite produces numbers, add it to the matching section in the same change (no internal references). Published articles and their LinkedIn posts live in `docs/blog/` (`NN-<topic>.md`); the author writes their motivation sections.
 
 ## Rules
 

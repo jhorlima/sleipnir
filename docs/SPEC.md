@@ -525,7 +525,8 @@ docs/SPEC.en.md           # ao estabilizar
 | Repositório público | Código em inglês, `README.md` (arquitetura, como reproduzir, resultados), licença Apache-2.0, `SPEC.en.md`. |
 | Resultados | `results/*.parquet` + relatório gerado (tabelas e gráficos) versionados, com versões e `engine_config` de cada execução. |
 | Artigo | Blog (versão completa) + post no LinkedIn (resumo com 2–3 gráficos e link). |
-| Rascunho | `docs/blog/post.md` — esqueleto do artigo e diário do projeto, atualizado a cada decisão, spike e resultado. Escrito em inglês; tradução para PT-BR quando estiver pronto. |
+| Diário do projeto | `docs/lab-notebook.md` — registro cronológico de cada decisão, spike, falha e resultado, em inglês; é o rastro por trás de cada número publicado. |
+| Artigos | `docs/blog/NN-<tema>.md` — um arquivo por artigo publicado (Medium, em inglês) e o post do LinkedIn (EN e PT) com o prompt da capa. |
 | Assets | Capa; cards com os números (resultados renderizados como imagem); diagrama da arquitetura; screenshots das UIs; vídeo explicativo da ferramenta e dos benchmarks (skill `/brag`). |
 
 Estrutura do artigo:
