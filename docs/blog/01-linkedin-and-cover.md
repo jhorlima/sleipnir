@@ -13,6 +13,7 @@ A few results (for this setup only, so test your own case):
 - Pre-aggregations in Cube Store answered in 16–34 ms at every scale. You pay at build time instead.
 - Doubling the CPU made one Trino query 2× slower... because the object store was the bottleneck. With 2 CPUs on the object store, that query went from 65 s to 25 s.
 - A materialized view that only copies a table didn't beat reading Iceberg directly.
+- Postgres handled tens of millions of rows fine, but stored them 35× bigger than Parquet: the disk decides before the queries do. DuckDB loaded 742 M rows in 146 s.
 
 Most of the work went into things that looked like engine problems and weren't: the laptop going to sleep mid-run, macOS swapping, a Spark session leak holding 4.4 million snapshot objects, the object store running out of memory, a full disk.
 
@@ -35,6 +36,7 @@ Alguns resultados (valem para este cenário, então teste o seu caso):
 - As pré-agregações no Cube Store responderam em 16–34 ms em todas as escalas. O custo vai para o build.
 - Dobrar a CPU deixou uma query do Trino 2× mais lenta... porque o gargalo era o object store. Com 2 CPUs no object store, essa query caiu de 65 s para 25 s.
 - Uma materialized view que só copia a tabela não ganhou de ler o Iceberg direto.
+- O Postgres deu conta de dezenas de milhões de linhas, mas ocupou 35× mais espaço que o Parquet: o disco decide antes das queries. O DuckDB carregou 742 milhões de linhas em 146 s.
 
 A maior parte do trabalho foi em coisas que pareciam problema de engine e não eram: o notebook dormindo no meio da execução, o swap do macOS, um vazamento de sessões no Spark segurando 4,4 milhões de objetos de snapshot, o object store sem memória, o disco cheio.
 

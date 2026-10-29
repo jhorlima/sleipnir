@@ -2,15 +2,23 @@
 
 *What I learned racing Trino, Spark, StarRocks and DuckDB on the same Iceberg lakehouse, and everything that broke along the way.*
 
-<!-- Author: motivation. Why I wanted to build this, and what I could not answer from vendor benchmarks. -->
+## Why I built this
 
----
+It started small. I was looking for a public dataset to build a fact layer on and push Cube's pre-aggregations to their limits. Once I found one, I thought: why stop there?
+
+I've worked with these tools for years: Trino, Spark, dbt, partitioning, cluster by, incremental models, delete+insert, table maintenance. I know how they behave in the projects I've worked on. What I wanted was to look at them from a different angle: new compression and partitioning choices, a bigger dataset than I'd usually throw at DuckDB, and every engine with exactly the same limits. And I wanted to see how far AI could take me on the scaffolding, so I could spend my time on the tests instead of the plumbing.
+
+The benchmarks I found that tested things the way I wanted were on older engine versions and different data volumes. Spark 4 was out, Trino and StarRocks had moved a lot, and I had three questions I couldn't answer from what was already published:
+
+- **How far does Postgres go** before you actually need a lakehouse stack?
+- **Do the new versions of Spark and Trino** change the picture?
+- **Is DuckDB a good option for ingestion and compression** at billions of rows?
 
 ## What I wanted to find out
 
-The question was simple: if every engine gets the same machine, the same tables and the same semantic layer, how fast does each one load, transform and serve the data? And what do the usual acceleration tricks (materialized views, pre-aggregations, compaction) actually buy you?
+Put simply: if every engine gets the same machine, the same tables and the same semantic layer, how fast does each one load, transform and serve the data? And what do the usual acceleration tricks (materialized views, pre-aggregations, compaction) actually buy you?
 
-Vendor benchmarks don't answer that for my case. They run on their best hardware, with their best tuning, on their favourite dataset. I wanted the boring version: the same files, the same limits, the same questions, and every answer checked before its time counts.
+I wanted the boring version: the same files, the same limits, the same questions, and every answer checked before its time counts. And I wanted it on a **single worker** first, on purpose. Before adding replicas, I want a baseline to compare against: what one node can do, so that the multi-worker version (in the cloud, with network and throughput in the picture) has something to be measured against.
 
 So I built a small lakehouse on a laptop and called it Sleipnir (Odin's eight-legged horse... several engines, one body).
 
@@ -139,6 +147,14 @@ Most of the time on this project went here. Each of these looked like an engine 
 - **Approximate functions fail correctness checks.** Trino's `approx_percentile` was 19% off the exact median for one small group. Fine for a chart; not fine if you compare engines on "the same answer".
 - **A row store pays for it in disk.** The 2025 data takes 0.23 GB as Iceberg/Parquet and 8.15 GB inside Postgres, about 35× more. That's why Postgres only runs at the smallest scale.
 - **A bigger VM is not free either.** Moving the Docker VM from 16 to 20 GB made the same queries 2–13% faster, with the same container limits. Small, but enough to always write down the VM size next to the numbers.
+
+## Back to my three questions
+
+**How far does Postgres go?** Further than people usually assume, for queries. With one year of data (44 M rows) the same dbt project built from scratch in 279 s on Postgres against 66 s on Trino, and Postgres answered the weather questions in 137 ms–1 s, against 32–511 ms for the columnar engines. That's slower, but fine for a lot of real use. What stopped it was **storage**: that year takes 8.15 GB in Postgres and 0.23 GB as Parquet, so 742 M rows would need ~90 GB, more than the whole Docker disk. If your data is in the tens of millions of rows, Postgres is probably enough. In the hundreds of millions and up, the disk makes the decision before the queries do.
+
+**Do the new versions of Spark and Trino change the picture?** I can only half answer this one, because I didn't run the old versions side by side (that's a fair next test). What I can say: Spark 4.1 with Iceberg 1.12 ran the same dbt project as Trino 483 with no model changes, and at 3.97 B rows it needed two fixes that had nothing to do with its query engine (a session leak and the object store). Trino 483 was the steadiest writer of the whole project: when it failed, it was its per-query memory limit on a write that was too big at once (a yearly batch of ~28 M rows, a single `CREATE TABLE AS` of 1.1 B rows), and writing in smaller batches fixed it every time.
+
+**Is DuckDB good for ingestion and compression?** Yes, for this shape of data. It loaded 742 M rows in 146 s (5 M rows/s) and wrote the bronze layer at 1.98 GB from 3.36 GB of gzipped CSV. As a reader it surprised me too: the fastest on three of the five filtered questions and on TPC-H at SF8, while running inside the benchmark process. Where it wouldn't fit: many concurrent users, or several services reading the same tables, which is exactly where a server engine earns its place.
 
 ## What these numbers can and can't tell you
 
