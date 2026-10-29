@@ -11,3 +11,5 @@ run_id,suite,reason
 20261027T224747-f4c77a,b2,"l2 Trino full build (pass 2) while macOS swapped 15.7 of 16 GB: host memory pressure"
 20261028T012524-3f9284,b2,"l2 Trino maintenance while macOS swapped 15.7 of 16 GB: host memory pressure"
 20261028T133405-fcd6c5,b2,"l2 Spark incremental_merge failed with No space left on device: Docker disk full (infrastructure)"
+20261028T203330-88caab,b5,"l2 StarRocks B5c build counted Trino rollups left in Cube Store (harness bug, fixed): ended after 10 s"
+20261028T203332-2be83a,b5,"l2 StarRocks B5c reads after the bogus build: no partitions to serve them"
