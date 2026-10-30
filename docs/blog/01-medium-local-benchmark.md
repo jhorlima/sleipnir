@@ -38,14 +38,14 @@ A few things I didn't know before starting:
 - The early centuries are tiny compared with recent years, which reach ~28 M rows each. That difference ends up mattering (more on that later).
 - In 1797 so few stations reported that an *approximate* median came out 12% off the exact one. Fine for a dashboard, but it fails a correctness check.
 
-I loaded it at four scales:
+I loaded it at four scales. The names are a bit cryptic, so here's what they mean (and yes, `r2` *is* about Cloudflare R2):
 
-| Scale | Years | Bronze rows |
-|---|---|---|
-| `small` | 2025 | 44 M (used for the Postgres baseline) |
-| `r2` | 2010–2025 | 742 M |
-| `r2_1998` | 1998–2025 | 1.29 B |
-| `local` | 1763–2025 | **3.97 B** |
+| Scale | Years | Bronze rows | What the name means |
+|---|---|---|---|
+| `small` | 2025 | 44 M | One year, small enough for the Postgres baseline. |
+| `r2` | 2010–2025 | 742 M | Sized to fit **Cloudflare R2's free tier (10 GB)**, so the same run can later be repeated with the data in R2. |
+| `r2_1998` | 1998–2025 | 1.29 B | `r2` grown back to 1998: more than a billion rows, and one engine's whole lakehouse plus TPC-H still fits in 10 GB (7.9 GB). |
+| `local` | 1763–2025 | **3.97 B** | The full history. It only runs locally: it's well past the 10 GB of the free tier. |
 
 To give the incremental strategies real work, the ingestion creates duplicates on purpose: each batch repeats the last 7 days of the previous one, and ~1% of the rows come back with a revised value.
 
@@ -227,7 +227,51 @@ Derived from TPC-H, not comparable to published TPC-H results.
 At `local`, the StarRocks MV refreshed in 909 s on M and ~600 s on L, and the Cube Store rollups built in 846 s on Trino.
 
 - **Cube Store** answered in **16–34 ms** at every scale, whichever engine built the rollups. What takes time is building them: from 165 s (StarRocks, 742 M rows) to 846 s (Trino, 3.97 B rows).
+- A note on those build times: the rollups were already **partitioned by year** (28 yearly partitions each, 1998–2025), but every measured build rebuilt **all** of them at once, from a refresh worker with half a CPU and no tuning for parallel builds. That's the worst case on purpose, the cost of building from zero, but it isn't how you'd run it day to day. With an incremental refresh only the partitions whose data changed get rebuilt (usually the latest year), and independent partitions can be built in parallel. The next round measures that too: pre-aggregations refreshed per time partition, instead of everything in one go. Cube makes this possible with a custom SQL in the `refresh_key` that is evaluated **per partition**: with `FILTER_PARAMS` on the partition's time dimension, each year gets its own "signature" of the data (for example `MAX(_batch_id)` plus `COUNT(*)` for that year, or the partition stats from Iceberg's metadata tables, which don't scan any data). If a year's signature didn't change, that partition isn't rebuilt. I've used this pattern before on a smaller model, and it should cut the daily rebuild here to the one year that actually received data.
 - **StarRocks materialized views** (one plain copy per gold table) did not beat StarRocks reading Iceberg directly (at `local`, Q1: 2.5 s with the MV, 1.8 s without). A copy saves no work. An MV pays off when it pre-joins or pre-aggregates something, which is a different test.
+
+### Table layout and maintenance (B6, Trino, `r2`, profile M)
+
+Each variant is a full copy of the 190 M-row fact table, written by Trino (z-order by Spark), read with the same direct-SQL questions (warm, ms):
+
+| Variant | Size | Q1 (full scan) | Q2 (2025, by month) | Q6 (one station, one month) |
+|---|---|---|---|---|
+| Baseline: monthly partition, zstd, unsorted | 0.73 GB | 806 | 455 | 120 |
+| **Sorted by (station, date), monthly partition** | **0.38 GB** | **506** | 407 | 107 |
+| Sorted, no partition | 0.38 GB | 504 | 679 | 149 |
+| Sorted, yearly partition | 0.37 GB | 492 | 635 | 142 |
+| Yearly partition, unsorted | 0.76 GB | 197,537 | 736 | 176 |
+| Z-order (Spark) | 0.67 GB | 976 | 523 | 117 |
+| Snappy instead of zstd | 0.89 GB | 918 | 415 | 119 |
+
+- **Sorting is what paid the most**: half the storage (sorted Parquet compresses much better) and a faster full scan, with no read getting worse.
+- **Partitioning by year didn't pay off.** Without a sort order it was the worst case by far (197 s for the yearly count, against 0.5 s sorted). Even sorted, dropping the monthly partition or using yearly ones made the period-filtered questions 60–80% slower: Trino still skips whole months from the metadata, even when each month is only 2–4 MB.
+- Z-order lost to a plain sort for these questions.
+- The rule I ended with: **sort first; partition by time when queries filter by time; never partition without sorting.**
+
+**Compression and file size.** Same table, same monthly partition, unsorted, only one knob changed at a time:
+
+| Variant | Size | Write | Q1 | Q2 | Q3 |
+|---|---|---|---|---|---|
+| zstd (Iceberg's default) | 0.73 GB | 57 s | 806 | 455 | 385 |
+| gzip | 0.71 GB | 54 s | 786 | 414 | 317 |
+| snappy | 0.89 GB | 41 s | 918 | 415 | 296 |
+| zstd, target file 128 MB | 0.73 GB | 45 s | 874 | 439 | 308 |
+| zstd, target file 256 MB | 0.73 GB | 51 s | 991 | 412 | 326 |
+| zstd, target file 512 MB | 0.73 GB | 48 s | 761 | 440 | 340 |
+
+- **Compression:** zstd and gzip came out practically tied (gzip 3% smaller, reads within run-to-run noise). Snappy wrote faster but took 22% more space with no read gain. I kept **zstd** because it's the default for Iceberg tables (Iceberg 1.4+ and Trino) and the usual choice: no reason here to move away from it.
+- **File size:** the target size didn't matter at all, and for a simple reason: at 742 M rows a monthly partition holds only 2–4 MB, so every partition is a single file whatever the target. I kept Iceberg's default (512 MB). The usual "files of a few hundred MB" advice matters when partitions are large; with small monthly partitions, sorting is what moved the numbers.
+- **For this test**, the winner was: **zstd + Iceberg's default target size + sorted by (station, date) + monthly partition**. With bigger partitions (another dataset, or yearly partitions on much more data) the file size knob would be worth testing again.
+- These layouts were only read through Trino. Whether StarRocks and DuckDB react the same way is a fair next test.
+
+Table maintenance (compaction, manifests, expiring snapshots, orphan files) ran as its own measured step on the writers:
+
+| Maintenance, `r2` | Time | Note |
+|---|---|---|
+| Trino | 6 s | `optimize` and friends, sorted on write already |
+| Spark | 59 s | 51 s of it is the sort rewrite: Spark only sorts the fact through `rewrite_data_files` |
+| Postgres | — | `VACUUM`, at `small` only |
 
 ## The M → L surprise
 
@@ -269,6 +313,8 @@ About three weeks from the first commit to the last measurement. The spec and th
 
 A lot of that ran **overnight**. The long builds (Trino and Spark at 3.97 B rows take 2.5 to 4 hours each) only made sense with the Mac left alone, lid open, plugged in, kept awake: one night Spark ran from 22:50 until it was stopped in the morning, another the whole second profile-L campaign ran from 22:50 to 10:40. The days in between went mostly into reading logs and heap dumps to understand why something failed... which is where the next section comes from.
 
+All those writes, spills and swaps came with a small bill too: the benchmark took almost **1% of my MacBook's SSD health** xD
+
 ## What went wrong (the fun part)
 
 Most of the time on this project went here. Each of these looked like an engine problem at first.
@@ -287,11 +333,24 @@ Most of the time on this project went here. Each of these looked like an engine 
 
 **7. My own bugs.** A result table showed the *median* of the two build passes instead of their sum (6,320 s instead of 12,639 s). A pre-aggregation build check counted rollups that another engine had left behind and declared victory after 10 seconds. Both were caught because the numbers looked too good... which is a pretty good rule of thumb.
 
+### Smaller gotchas worth knowing
+
+None of these broke a run for long, but each one cost me an evening:
+
+- **Trino's dedup couldn't spill.** `ROW_NUMBER() ... = 1` ran out of memory even with spill-to-disk on: Trino rewrites it into a TopNRanking operator, and that operator doesn't spill. `optimizer.optimize-top-n-ranking=false` fixed it (and it's recorded with the results, like every non-default setting).
+- **dbt runs a model's post-hook after every microbatch.** With table maintenance as a post-hook, a 192-month backfill would have compacted and expired snapshots 192 times. Maintenance now runs once per table, as its own measured step.
+- **Iceberg has no `CLUSTER BY`.** You get a table sort order instead, and each engine spells it differently: Trino's `sorted_by`, Spark's `WRITE ORDERED BY` (only on an existing table) or `rewrite_data_files`. And Spark's rewrite silently skips a partition that has a single file, so z-ordering needs `rewrite-all`.
+- **Spark won't remove orphan files younger than 24 h**, so its maintenance can't be identical to Trino's (which cleans immediately). The difference is written down next to the numbers.
+- **A StarRocks MV has to match the query's shape, not its intent.** A wide MV with all the joins served none of the SQL that Cube generates, because Cube only joins the tables a question uses. A boring copy of each table, with no joins, matched everything.
+- **Cube sends DECIMAL columns to Cube Store as `Decimal(18,5)`.** Sums lose everything past 5 decimals and tiny values become 0. Casting every measure that feeds a pre-aggregation to `DOUBLE` avoids it (a lesson from earlier Cube work that went straight into the rules).
+- **The newest isn't always usable.** dbt Core v2 had no Trino or Postgres adapter yet, and Iceberg v3 tables weren't fully supported by Trino and StarRocks, so the whole project stayed on dbt Core 1.x and Iceberg v2.
+
 ## Things that surprised me
 
-- **Sorting beat partitioning, but partitions still earned their keep.** Sorting the fact table halved the storage and made the yearly count 37% faster. Dropping the monthly partitions made period filters 60–80% slower, even with partitions of 2–4 MB. The rule I ended with: sort first, partition by time when queries filter by time.
+- **Sorting beat partitioning, but partitions still earned their keep.** Sorting the fact table halved the storage and made the yearly count 37% faster. Dropping the monthly partitions made period filters 60–80% slower, even with partitions of 2–4 MB (see the layout table above).
 - **Approximate functions fail correctness checks.** Trino's `approx_percentile` was 19% off the exact median for one small group. Fine for a chart; not fine if you compare engines on "the same answer".
 - **A row store pays for it in disk.** The 2025 data takes 0.23 GB as Iceberg/Parquet and 8.15 GB inside Postgres, about 35× more. That's why Postgres only runs at the smallest scale.
+
 ## Back to my three questions
 
 **How far does Postgres go?** Further than people usually assume, for queries. With one year of data (44 M rows) the same dbt project built from scratch in 279 s on Postgres against 66 s on Trino, and Postgres answered the weather questions in 137 ms–1 s, against 32–511 ms for the columnar engines. That's slower, but fine for a lot of real use. What stopped it was **storage**: that year takes 8.15 GB in Postgres and 0.23 GB as Parquet, so 742 M rows would need ~90 GB, more than the whole Docker disk. If your data is in the tens of millions of rows, Postgres is probably enough. In the hundreds of millions and up, the disk makes the decision before the queries do.
@@ -316,7 +375,7 @@ They can't tell you how the engines behave on a cluster, on a different data sha
 
 The next step is to run the same benchmark in the cloud, with managed object storage and more workers, to see whether the results change when the laptop is out of the picture: does Trino scale differently with more workers, does Spark's merge still need that much local disk, does the object store stop being the bottleneck? I'm testing that now, and when I have results I'll write a new post.
 
-Before or along with it: DuckDB 1.5 against 2.0 on the same data, which is the closest I'll get to answering "do new versions change the picture?" for at least one engine, and Postgres with a columnar extension, to see how far that pushes the "how far does Postgres go" line.
+Before or along with it: DuckDB 1.5 against 2.0 on the same data, which is the closest I'll get to answering "do new versions change the picture?" for at least one engine, and Postgres with a columnar extension, to see how far that pushes the "how far does Postgres go" line. And Cube's pre-aggregations refreshed per year partition (only what changed, in parallel) instead of rebuilt in one go.
 
 After that comes orchestration (Airflow) on top of the same stack.
 

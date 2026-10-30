@@ -208,6 +208,8 @@ Each variant is a full copy of `fct_weather_daily` (190.2 M rows); reads are B3 
 
 Takeaways: sorting is the change that pays most (half the storage, faster reads), and monthly partitions plus sorting is the best overall layout: dropping the partition slows every period-filtered query by 60–80%. File size targets cannot matter when a monthly partition holds 2–4 MB. Snappy costs 22% more storage for no read gain. A coarse partition without a sort order is the worst case (yearly count: 197 s unsorted against 0.49 s sorted).
 
+Chosen for this benchmark: **zstd** (Iceberg 1.4+ and Trino's default; tied with gzip, which was 3% smaller with reads within noise, so there was no reason to leave the default), **Iceberg's default target file size (512 MB)** (the target cannot matter while a monthly partition is a single 2–4 MB file; worth re-testing with larger partitions), **sorted by (station_id, date)** and **monthly partitions**.
+
 ### 6.3 B1–B4 — the benchmark (profile M: 4 CPU / 8 GB per engine, scale r2, `results/b1…b4.parquet`)
 
 Every number is a median of 5 warm runs after 1 discarded warm-up, or a single cold run after an engine restart and a page cache drop. Every answer was checked against a DuckDB reference before its timing counted.
@@ -409,6 +411,7 @@ Profile L does not fit the Docker VM that every profile-M number came from (8 CP
 - A laptop is not a clean lab: macOS swap and background processes (indexing, backups, updates) can steal time in the middle of a measured step. Free memory and swap are logged around every step and caught runs are invalidated, but not every interference leaves a trace. The cloud round is meant to be the fairer comparison.
 - The local object store has none of S3's limits: almost no latency per request and no request-rate cap (AWS documents ~3,500 writes and ~5,500 reads per second per prefix). Throttling it (latency, request rate) would make local numbers a better preview of the cloud ones; not done in phase 2.
 - Spark is a writer only; it is not measured as a query engine.
+- B5c measures the worst case of Cube Store: the rollups are partitioned by year (`partition_granularity: year`, 28 partitions per rollup), but `refresh_key` is 365 days with no incremental refresh, so every measured build rebuilds all 112 partitions, from a refresh worker with 0.5 CPU and default concurrency. The build range is fixed at 1998–2025 (the `r2` window), also at scale `local`; every measured B5c question reads 2025, so the results are unaffected. Next round: incremental refresh per year partition (`incremental: true` with an `update_window`), parallel partition builds, and a build range that follows the scale. The `refresh_key` can be a custom SQL evaluated per partition: with `FILTER_PARAMS` on the partition's time dimension, each year returns a signature of its data (`MAX(_batch_id)` and `COUNT(*)` for that year, or the partition stats from Iceberg's metadata tables, without scanning data), and only years whose signature changed are rebuilt.
 
 ## 9. Reproduce it
 
