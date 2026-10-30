@@ -168,6 +168,6 @@ The next step is to run the same benchmark in the cloud, with managed object sto
 
 After that comes orchestration (Airflow) on top of the same stack.
 
-The code, the spec, every result file and the list of invalidated runs are in the repo: <!-- repo link -->
+The code, the spec, every result file and the list of invalidated runs are in the repo: [github.com/jhorlima/sleipnir](https://github.com/jhorlima/sleipnir)
 
 If you've run something similar and got different numbers, I'd really like to hear about it :D

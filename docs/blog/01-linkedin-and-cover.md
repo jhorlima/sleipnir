@@ -21,7 +21,8 @@ The stack was built with an AI coding assistant, which made it possible in days.
 
 Next: the same benchmark in the cloud, with more workers. New post when I have results.
 
-The full story, with the numbers and what broke: <!-- Medium link -->
+The full story, with the numbers and what broke: https://medium.com/@jhorlima
+Code and results: https://github.com/jhorlima/sleipnir
 
 ## LinkedIn (Português)
 
@@ -44,7 +45,8 @@ A stack foi construída com um assistente de código com IA, o que permitiu faze
 
 Próximo passo: o mesmo benchmark na nuvem, com mais workers. Novo post quando tiver resultados.
 
-A história completa, com os números e o que quebrou: <!-- link do Medium -->
+A história completa, com os números e o que quebrou: https://medium.com/@jhorlima
+Código e resultados: https://github.com/jhorlima/sleipnir
 
 ## Cover image prompt
 
