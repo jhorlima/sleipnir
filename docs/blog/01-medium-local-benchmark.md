@@ -246,8 +246,23 @@ Each variant is a full copy of the 190 M-row fact table, written by Trino (z-ord
 
 - **Sorting is what paid the most**: half the storage (sorted Parquet compresses much better) and a faster full scan, with no read getting worse.
 - **Partitioning by year didn't pay off.** Without a sort order it was the worst case by far (197 s for the yearly count, against 0.5 s sorted). Even sorted, dropping the monthly partition or using yearly ones made the period-filtered questions 60–80% slower: Trino still skips whole months from the metadata, even when each month is only 2–4 MB.
-- File size targets did nothing (a monthly partition is a single small file anyway), and z-order lost to a plain sort for these questions.
+- Z-order lost to a plain sort for these questions.
 - The rule I ended with: **sort first; partition by time when queries filter by time; never partition without sorting.**
+
+**Compression and file size.** Same table, same monthly partition, unsorted, only one knob changed at a time:
+
+| Variant | Size | Write | Q1 | Q2 | Q3 |
+|---|---|---|---|---|---|
+| zstd (Iceberg's default) | 0.73 GB | 57 s | 806 | 455 | 385 |
+| gzip | 0.71 GB | 54 s | 786 | 414 | 317 |
+| snappy | 0.89 GB | 41 s | 918 | 415 | 296 |
+| zstd, target file 128 MB | 0.73 GB | 45 s | 874 | 439 | 308 |
+| zstd, target file 256 MB | 0.73 GB | 51 s | 991 | 412 | 326 |
+| zstd, target file 512 MB | 0.73 GB | 48 s | 761 | 440 | 340 |
+
+- **Compression:** zstd and gzip came out practically tied (gzip 3% smaller, reads within run-to-run noise). Snappy wrote faster but took 22% more space with no read gain. I kept **zstd** because it's the default for Iceberg tables (Iceberg 1.4+ and Trino) and the usual choice: no reason here to move away from it.
+- **File size:** the target size didn't matter at all, and for a simple reason: at 742 M rows a monthly partition holds only 2–4 MB, so every partition is a single file whatever the target. I kept Iceberg's default (512 MB). The usual "files of a few hundred MB" advice matters when partitions are large; with small monthly partitions, sorting is what moved the numbers.
+- **For this test**, the winner was: **zstd + Iceberg's default target size + sorted by (station, date) + monthly partition**. With bigger partitions (another dataset, or yearly partitions on much more data) the file size knob would be worth testing again.
 - These layouts were only read through Trino. Whether StarRocks and DuckDB react the same way is a fair next test.
 
 Table maintenance (compaction, manifests, expiring snapshots, orphan files) ran as its own measured step on the writers:

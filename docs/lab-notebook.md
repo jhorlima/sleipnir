@@ -208,6 +208,8 @@ Each variant is a full copy of `fct_weather_daily` (190.2 M rows); reads are B3 
 
 Takeaways: sorting is the change that pays most (half the storage, faster reads), and monthly partitions plus sorting is the best overall layout: dropping the partition slows every period-filtered query by 60–80%. File size targets cannot matter when a monthly partition holds 2–4 MB. Snappy costs 22% more storage for no read gain. A coarse partition without a sort order is the worst case (yearly count: 197 s unsorted against 0.49 s sorted).
 
+Chosen for this benchmark: **zstd** (Iceberg 1.4+ and Trino's default; tied with gzip, which was 3% smaller with reads within noise, so there was no reason to leave the default), **Iceberg's default target file size (512 MB)** (the target cannot matter while a monthly partition is a single 2–4 MB file; worth re-testing with larger partitions), **sorted by (station_id, date)** and **monthly partitions**.
+
 ### 6.3 B1–B4 — the benchmark (profile M: 4 CPU / 8 GB per engine, scale r2, `results/b1…b4.parquet`)
 
 Every number is a median of 5 warm runs after 1 discarded warm-up, or a single cold run after an engine restart and a page cache drop. Every answer was checked against a DuckDB reference before its timing counted.
