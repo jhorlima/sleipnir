@@ -37,6 +37,8 @@ DuckDB was pinned at **1.5.6** in phase 1 (spike V1, early October 2026), the ne
 
 2.0 is worth a run of its own: asynchronous I/O for Parquet and CSV (the release preview shows a scan going from 4.90 s on 1.5.4 to 0.12 s), a client-server mode, and a new default storage format. Before it replaces 1.5, spike V16 checks the Iceberg extension against Lakekeeper, then B1 and B3 run with 1.5 and 2.0 side by side on the same scale (D-27).
 
+The same round adds a test that was missing from phase 2: **Postgres with columnar storage**. Postgres stayed at scale `small` because it stores ~65 bytes per row against Parquet's ~2.7 (D-23), so `r2` would need ~90 GB. A columnar extension (TimescaleDB/TigerData's columnstore, `pg_duckdb`, Citus columnar) attacks exactly that. Spike V17 picks one and checks it runs the same dbt project (incremental strategies included), then storage and B2/B3 are compared against row-store Postgres at `small` before trying `r2`.
+
 ## 3. Designing a fair benchmark
 
 - One engine under test at a time; never two transformations in parallel.
