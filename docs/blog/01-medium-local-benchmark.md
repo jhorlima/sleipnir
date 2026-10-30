@@ -62,6 +62,23 @@ One writer, many readers on the same files. Every engine reads the same Iceberg 
 
 A note on how this got built: most of the stack was written with an AI coding assistant. I wrote a spec first (architecture, suites, rules, open questions), then worked through it with the assistant, with small agents doing scoped tasks and spikes in parallel. That made it possible to stand up a stack with seven moving parts in days instead of weeks. It did **not** make it right by default: a good part of this post is about bugs that only showed up when the numbers looked weird. AI makes building fast; checking is still on you :)
 
+## The machine
+
+Everything ran on one laptop:
+
+| | |
+|---|---|
+| Laptop | MacBook Pro, Apple M4 Pro |
+| CPU | 12 cores (8 performance + 4 efficiency) |
+| Memory | 24 GB |
+| Internal disk | 512 GB SSD |
+| Source CSVs | external USB SSD |
+| Software (at the end of the runs) | macOS 27, Docker Desktop 4.97 (engine 29.9) |
+| Docker VM, profile M campaigns | 8 CPU, 16 GB, 2 GB swap, 103 GB disk limit |
+| Docker VM, profile L campaigns | 10 CPU, 20 GB, 2 GB swap, 103 GB disk limit |
+
+Two things worth knowing before reading the numbers. The engines run inside a Linux VM, not on macOS directly, and the VM's CPUs are scheduled by macOS on whatever core is free: there's no way to pin them to the performance cores, so a run can land partly on the slower ones. And the VM size itself moves the numbers a little: going from 16 to 20 GB made the same queries 2–13% faster with the same engine limits, so every result records the VM size next to it.
+
 ## Keeping it fair
 
 These rules made the numbers worth publishing, and they also caused most of the extra work:
@@ -146,8 +163,6 @@ Most of the time on this project went here. Each of these looked like an engine 
 - **Sorting beat partitioning, but partitions still earned their keep.** Sorting the fact table halved the storage and made the yearly count 37% faster. Dropping the monthly partitions made period filters 60–80% slower, even with partitions of 2–4 MB. The rule I ended with: sort first, partition by time when queries filter by time.
 - **Approximate functions fail correctness checks.** Trino's `approx_percentile` was 19% off the exact median for one small group. Fine for a chart; not fine if you compare engines on "the same answer".
 - **A row store pays for it in disk.** The 2025 data takes 0.23 GB as Iceberg/Parquet and 8.15 GB inside Postgres, about 35× more. That's why Postgres only runs at the smallest scale.
-- **A bigger VM is not free either.** Moving the Docker VM from 16 to 20 GB made the same queries 2–13% faster, with the same container limits. Small, but enough to always write down the VM size next to the numbers.
-
 ## Back to my three questions
 
 **How far does Postgres go?** Further than people usually assume, for queries. With one year of data (44 M rows) the same dbt project built from scratch in 279 s on Postgres against 66 s on Trino, and Postgres answered the weather questions in 137 ms–1 s, against 32–511 ms for the columnar engines. That's slower, but fine for a lot of real use. What stopped it was **storage**: that year takes 8.15 GB in Postgres and 0.23 GB as Parquet, so 742 M rows would need ~90 GB, more than the whole Docker disk. If your data is in the tens of millions of rows, Postgres is probably enough. In the hundreds of millions and up, the disk makes the decision before the queries do.
@@ -155,6 +170,8 @@ Most of the time on this project went here. Each of these looked like an engine 
 **Do the new versions of Spark and Trino change the picture?** I can only half answer this one, because I didn't run the old versions side by side (that's a fair next test). What I can say: Spark 4.1 with Iceberg 1.12 ran the same dbt project as Trino 483 with no model changes, and at 3.97 B rows it needed two fixes that had nothing to do with its query engine (a session leak and the object store). Trino 483 was the steadiest writer of the whole project: when it failed, it was its per-query memory limit on a write that was too big at once (a yearly batch of ~28 M rows, a single `CREATE TABLE AS` of 1.1 B rows), and writing in smaller batches fixed it every time.
 
 **Is DuckDB good for ingestion and compression?** Yes, for this shape of data. It loaded 742 M rows in 146 s (5 M rows/s) and wrote the bronze layer at 1.98 GB from 3.36 GB of gzipped CSV. As a reader it surprised me too: the fastest on three of the five filtered questions and on TPC-H at SF8, while running inside the benchmark process. Where it wouldn't fit: many concurrent users, or several services reading the same tables, which is exactly where a server engine earns its place.
+
+All of this is DuckDB 1.5. DuckDB 2.0 came out on October 21, with these runs already going, so it isn't here: not for compatibility reasons, it just didn't exist yet when I pinned the versions. It brings async I/O for Parquet and a client-server mode, which touches both answers above, so it gets its own side-by-side run.
 
 ## What these numbers can and can't tell you
 
@@ -165,6 +182,8 @@ They can't tell you how the engines behave on a cluster, on a different data sha
 ## What's next
 
 The next step is to run the same benchmark in the cloud, with managed object storage and more workers, to see whether the results change when the laptop is out of the picture: does Trino scale differently with more workers, does Spark's merge still need that much local disk, does the object store stop being the bottleneck? I'm testing that now, and when I have results I'll write a new post.
+
+Before or along with it, DuckDB 1.5 against 2.0 on the same data, which is the closest I'll get to answering "do new versions change the picture?" for at least one engine.
 
 After that comes orchestration (Airflow) on top of the same stack.
 

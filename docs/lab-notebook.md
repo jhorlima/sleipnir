@@ -31,6 +31,12 @@ Both "newest" options were on the table and both lost to engine compatibility (O
 
 Both are listed as "revisit later"; the benchmark can be re-run when the ecosystem catches up.
 
+### 2.2 DuckDB 1.5, because 2.0 did not exist yet
+
+DuckDB was pinned at **1.5.6** in phase 1 (spike V1, early October 2026), the newest release at the time; Cube 1.7.50 embeds 1.5.5. **DuckDB 2.0.0 LTS came out on 2026-10-21**, with the phase-2 campaigns already running. It was not a compatibility decision: 2.0 had simply not been released. It was not adopted mid-campaign either, because switching versions halfway would have made one scale's numbers incomparable with the next, and Cube decides the DuckDB version inside B4 anyway.
+
+2.0 is worth a run of its own: asynchronous I/O for Parquet and CSV (the release preview shows a scan going from 4.90 s on 1.5.4 to 0.12 s), a client-server mode, and a new default storage format. Before it replaces 1.5, spike V16 checks the Iceberg extension against Lakekeeper, then B1 and B3 run with 1.5 and 2.0 side by side on the same scale (D-27).
+
 ## 3. Designing a fair benchmark
 
 - One engine under test at a time; never two transformations in parallel.
