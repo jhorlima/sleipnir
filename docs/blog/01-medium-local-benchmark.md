@@ -227,6 +227,7 @@ Derived from TPC-H, not comparable to published TPC-H results.
 At `local`, the StarRocks MV refreshed in 909 s on M and ~600 s on L, and the Cube Store rollups built in 846 s on Trino.
 
 - **Cube Store** answered in **16–34 ms** at every scale, whichever engine built the rollups. What takes time is building them: from 165 s (StarRocks, 742 M rows) to 846 s (Trino, 3.97 B rows).
+- A note on those build times: the rollups were already **partitioned by year** (28 yearly partitions each, 1998–2025), but every measured build rebuilt **all** of them at once, from a refresh worker with half a CPU and no tuning for parallel builds. That's the worst case on purpose, the cost of building from zero, but it isn't how you'd run it day to day. With an incremental refresh only the partitions whose data changed get rebuilt (usually the latest year), and independent partitions can be built in parallel. The next round measures that too: pre-aggregations refreshed per time partition, instead of everything in one go.
 - **StarRocks materialized views** (one plain copy per gold table) did not beat StarRocks reading Iceberg directly (at `local`, Q1: 2.5 s with the MV, 1.8 s without). A copy saves no work. An MV pays off when it pre-joins or pre-aggregates something, which is a different test.
 
 ## The M → L surprise
@@ -316,7 +317,7 @@ They can't tell you how the engines behave on a cluster, on a different data sha
 
 The next step is to run the same benchmark in the cloud, with managed object storage and more workers, to see whether the results change when the laptop is out of the picture: does Trino scale differently with more workers, does Spark's merge still need that much local disk, does the object store stop being the bottleneck? I'm testing that now, and when I have results I'll write a new post.
 
-Before or along with it: DuckDB 1.5 against 2.0 on the same data, which is the closest I'll get to answering "do new versions change the picture?" for at least one engine, and Postgres with a columnar extension, to see how far that pushes the "how far does Postgres go" line.
+Before or along with it: DuckDB 1.5 against 2.0 on the same data, which is the closest I'll get to answering "do new versions change the picture?" for at least one engine, and Postgres with a columnar extension, to see how far that pushes the "how far does Postgres go" line. And Cube's pre-aggregations refreshed per year partition (only what changed, in parallel) instead of rebuilt in one go.
 
 After that comes orchestration (Airflow) on top of the same stack.
 

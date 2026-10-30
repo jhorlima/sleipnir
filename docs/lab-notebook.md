@@ -409,6 +409,7 @@ Profile L does not fit the Docker VM that every profile-M number came from (8 CP
 - A laptop is not a clean lab: macOS swap and background processes (indexing, backups, updates) can steal time in the middle of a measured step. Free memory and swap are logged around every step and caught runs are invalidated, but not every interference leaves a trace. The cloud round is meant to be the fairer comparison.
 - The local object store has none of S3's limits: almost no latency per request and no request-rate cap (AWS documents ~3,500 writes and ~5,500 reads per second per prefix). Throttling it (latency, request rate) would make local numbers a better preview of the cloud ones; not done in phase 2.
 - Spark is a writer only; it is not measured as a query engine.
+- B5c measures the worst case of Cube Store: the rollups are partitioned by year (`partition_granularity: year`, 28 partitions per rollup), but `refresh_key` is 365 days with no incremental refresh, so every measured build rebuilds all 112 partitions, from a refresh worker with 0.5 CPU and default concurrency. The build range is fixed at 1998–2025 (the `r2` window), also at scale `local`; every measured B5c question reads 2025, so the results are unaffected. Next round: incremental refresh per year partition (`incremental: true` with an `update_window`), parallel partition builds, and a build range that follows the scale.
 
 ## 9. Reproduce it
 
