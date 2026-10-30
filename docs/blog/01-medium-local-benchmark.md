@@ -2,6 +2,8 @@
 
 *What I learned racing Trino, Spark, StarRocks and DuckDB on the same Iceberg lakehouse, and everything that broke along the way.*
 
+**TL;DR** The engine that surprised me most was **DuckDB**. Running inside a single process, with no server at all, it loaded 742 M rows in 146 s, had the best TPC-H time, won three of the five filtered questions, and nearly halved its whole-table scan when I doubled the CPU. But the more interesting stuff is in the rest of the post: doubling the CPU made one Trino query **2× slower** (the bottleneck was the object store), a Spark session leak held **4.4 million** Iceberg snapshot objects in memory, pre-aggregations answered in **16–34 ms** at any scale, and Postgres needed **35×** the disk of Parquet. All of this on one laptop, so read it as "this setup", not as a ranking :)
+
 ## Why I built this
 
 It started small. I was looking for a public dataset to build a fact layer on and push Cube's pre-aggregations to their limits. Once I found one, I thought: why stop there?
@@ -93,26 +95,143 @@ These rules made the numbers worth publishing, and they also caused most of the 
 
 > All of this is **for this setup**: one node inside a Docker VM on a Mac, this dataset (append-heavy time series), these queries. If your workload is different, test it. The point of the repo is that you can.
 
-### Loading
+> And to be upfront: **this was not a perfectly fair test, and I know it.** A laptop is not a lab. macOS swapped during some runs, and the system can start a background process (indexing, a backup, an update) in the middle of a measurement without leaving a trace. I logged free memory and swap around every measured step and invalidated every run I could catch, but not everything leaves a trace. That's the main reason for the next round in the cloud: a dedicated machine with nothing else running on it.
 
-DuckDB loaded the 3.97 B rows (3,156 batches) in 1,292 s, about 3 M rows/s, reading gzipped CSVs from a USB SSD. At the 742 M scale it was 5 M rows/s; the early centuries are thousands of tiny batches that each pay a fixed cost.
+Unless a table says otherwise, times are the median of 5 warm runs, and profile M is 4 CPU / 8 GB per engine.
 
-### Transforming (dbt, build from scratch at 3.97 B rows)
+### Loading (DuckDB)
 
-| | Profile M | Profile L |
+| Scale | Bronze rows | Batches | Time | Rows/s |
+|---|---|---|---|---|
+| `r2` (2010–2025) | 742 M | 192 | 146 s | 5.1 M |
+| `r2_1998` (1998–2025) | 1.29 B | 336 | 260 s | 5.0 M |
+| `local` (1763–2025) | 3.97 B | 3,156 | 1,292 s | 3.1 M |
+
+The full history is slower per row: the early centuries are thousands of tiny batches that each pay a fixed cost, and the CSVs came from a USB SSD.
+
+### Transforming: build from scratch (dbt)
+
+| Scale | Trino 483 | Spark 4.1 | Postgres 18 |
+|---|---|---|---|
+| `small` (44 M rows), M | 66 s | 90 s | 279 s |
+| `r2` (742 M), M | 1,089 s | 1,405 s | n/a ¹ |
+| `r2_1998` (1.29 B), M | 1,988 s | 2,659 s | n/a ¹ |
+| `local` (3.97 B), M | 12,639 s | failed ² | n/a ¹ |
+| `local` (3.97 B), L | 9,351 s | 13,803 s ³ | n/a ¹ |
+
+¹ Postgres only runs at `small`: as a row store it takes ~35× the space of Parquet, so `r2` would need ~90 GB, more than the whole Docker disk.
+² Spark's batches slowed down until the Thrift connection dropped after 3.5 h, the same pattern I later traced on profile L to the Thrift Server keeping every closed session's copy of the Iceberg metadata (see "What went wrong", #3). After the fix it hasn't been re-run on M.
+³ With the metadata fix and the object store upgraded (#3 and #4 below). It's the only full build Spark completed at this scale.
+
+### Transforming: reprocess the latest batch
+
+| Scale | Trino: delete+insert / merge / microbatch | Spark: insert_overwrite / merge / microbatch |
 |---|---|---|
-| Trino | 12,639 s | 9,351 s |
-| Spark | failed | 13,803 s |
+| `r2`, M | 20 / 100 / 32 s | 12 / 199 / 17 s |
+| `r2_1998`, M | 18 / 30 / 15 s | 20 / 401 / 35 s |
+| `local`, M | 28 / 44 / 29 s | — ⁴ |
+| `local`, L | 27 / 41 / 34 s | — ⁴ |
 
-Spark's failures turned out to be a session leak and then the object store running out of memory, not the size of the profile (see "What went wrong"). With both fixed it finished on L; it hasn't been re-run on M yet.
+Reprocessing only touches one window, so it barely grows with the table. Spark's merge is the exception: it reads the whole silver table to match keys, so it doubled from `r2` to `r2_1998`.
+⁴ Not measured. At `local` on profile L, Spark's merge spilled ~33 GB of shuffle data and filled the Docker disk (#6 below); on M the full build never finished.
 
-Reprocessing one batch (delete+insert, merge, microbatch) took 27–44 s on Trino at both profiles. It only touches one window, so more CPU doesn't help much.
+### Reading: the questions
 
-### Reading: direct SQL and through Cube
+| | Question |
+|---|---|
+| Q1 | Observations per year, whole history (full scan) |
+| Q2 | Monthly average max temperature per country, 2025 |
+| Q3 | Top 20 stations by rainfall, 2025 |
+| Q4 | Countries inside a lat/long box (Iberia), 2025 |
+| Q5 | 7-day rolling average for 4 stations, Q1 2025 |
+| Q6 | One station, one month |
+| Q7 | Median and p95 max temperature per country, 2025 (Cube only) |
+| Q8 | Median of each station's annual rainfall, whole history (Cube only) |
+| Q9 | Each country's share of total rainfall, 2025 (Cube only) |
+| Q10 | Monthly max temperature per country vs the year before (Cube only) |
 
-Yearly count over the whole fact table (Q1), warm median:
+Spark doesn't appear in the read tables: in this benchmark it only writes. The readers are the engines that are built to serve queries; Spark's Thrift Server as a query engine would be a different test.
 
-| 3.97 B rows | M | L | L, object store with 2 CPUs |
+### Reading: direct SQL (warm, ms)
+
+| `r2` (742 M rows), profile M | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 |
+|---|---|---|---|---|---|---|
+| Trino | 431 | 452 | 283 | 227 | 172 | 109 |
+| StarRocks 4.1 | 546 | 152 | 137 | 109 | 249 | 45 |
+| DuckDB 1.5 (in-process) | 1,040 | 157 | 74 | 50 | 434 | 28 |
+
+| `local` (3.97 B rows), profile L | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 |
+|---|---|---|---|---|---|---|
+| Trino | 3,097 | 344 | 205 | 207 | 203 | 116 |
+| StarRocks | 1,840 | 140 | 107 | 103 | 648 | 53 |
+| DuckDB | 3,077 | 145 | 96 | 75 | 1,189 | 61 |
+
+Only Q1 (and the rolling window in Q5) grows with the data. The filtered questions barely notice the table growing 5×: partition pruning plus a sort order.
+
+### Reading: through Cube (warm, ms)
+
+| `r2` (742 M rows), profile M | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | Q7 | Q8 | Q9 | Q10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Trino | 6,729 | 4,076 | 4,072 | 4,078 | 3,319 | 3,292 | invalid ⁵ | 11,332 | 4,380 | 6,168 |
+| StarRocks | 9,695 | 724 | 155 | 127 | failed ⁶ | 73 | 306 | 4,682 | 399 | 1,438 |
+| DuckDB inside Cube | 8,823 | 705 | 128 | 550 | 464 | 444 | 234 | 11,073 | 248 | 2,096 |
+
+| `local` (3.97 B rows), profile L | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | Q7 | Q8 | Q9 | Q10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Trino | 65,310 | 3,303 | 4,094 | 3,289 | 6,416 | 4,076 | invalid ⁵ | invalid ⁵ | 4,096 | 14,196 |
+| StarRocks | 44,488 | 432 | 129 | 128 | failed ⁶ | 82 | 204 | failed ⁷ | 351 | 1,384 |
+| DuckDB inside Cube | 37,369 | 559 | 241 | 1,955 | 1,387 | 1,585 | 332 | 225,093 | 439 | 1,425 |
+
+Through Cube, Trino pays a floor of ~3–4 s per question on this setup, which hides most differences on small questions.
+⁵ Trino's `approx_percentile` came out 19% off the exact median for one small group (and 12% off for 1797 in Q8): past the 5% tolerance, so recorded as invalid.
+⁶ Cube generates `WITH RECURSIVE` for the rolling window, which StarRocks can't parse.
+⁷ Out of memory in the BE.
+
+### TPC-H SF8, 22 queries (`r2` scale, profile M)
+
+| | Warm geomean | Cold geomean |
+|---|---|---|
+| DuckDB | 304 ms | 711 ms |
+| StarRocks | 551 ms | 3,722 ms |
+| Trino | 1,874 ms | 5,335 ms |
+
+Derived from TPC-H, not comparable to published TPC-H results.
+
+### One year of data, with Postgres (`small`, 44 M rows, profile M)
+
+| Direct SQL, warm (ms) | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 |
+|---|---|---|---|---|---|---|
+| StarRocks | 80 | 171 | 126 | 103 | 99 | 52 |
+| DuckDB | 101 | 160 | 82 | 49 | 62 | 32 |
+| Trino | 161 | 511 | 291 | 186 | 191 | 119 |
+| Postgres 18 | 589 | 1,016 | 451 | 258 | 389 | 137 |
+
+| Storage of that year | Size |
+|---|---|
+| Iceberg / Parquet | 0.23 GB |
+| Postgres (row store) | 8.15 GB |
+
+### Acceleration (`r2`, profile M, warm ms; in parentheses the same question without it)
+
+| | Q2 | Q3 | Q9 | Q10 | Refresh / build |
+|---|---|---|---|---|---|
+| Cube Store on Trino | 22 (4,076) | 18 (4,072) | 32 (4,380) | 33 (6,168) | 515 s |
+| Cube Store on StarRocks | 19 (724) | 21 (155) | 29 (399) | 33 (1,438) | 165 s |
+| Trino wide table (B5b), via Cube | 3,294 (4,076) | 3,272 (4,072) | 3,293 (4,380) | 3,707 (6,168) | 279 s |
+| StarRocks MVs (B5a), direct SQL | 131 (152) | 124 (137) | — | — | 284 s |
+
+At `local`, the StarRocks MV refreshed in 909 s on M and ~600 s on L, and the Cube Store rollups built in 846 s on Trino.
+
+- **Cube Store** answered in **16–34 ms** at every scale, whichever engine built the rollups. The cost moves to the build.
+- **StarRocks materialized views** (one plain copy per gold table) did not beat StarRocks reading Iceberg directly (at `local`, Q1: 2.5 s with the MV, 1.8 s without). A copy saves no work. An MV pays off when it pre-joins or pre-aggregates something, which is a different test.
+
+## The M → L surprise
+
+I expected profile L (twice the CPU) to be faster everywhere. For DuckDB and StarRocks it mostly was. For Trino, the whole-table query through Cube got **2× slower**: 32 s → 65 s.
+
+Q1 (whole-table yearly count) at 3.97 B rows, warm:
+
+| | M | L | L, object store with 2 CPUs |
 |---|---|---|---|
 | Trino, direct | 2.7 s | 3.1 s | 3.5 s |
 | StarRocks, direct | 3.8 s | 1.8 s | 2.2 s |
@@ -121,24 +240,17 @@ Yearly count over the whole fact table (Q1), warm median:
 | StarRocks, through Cube | 70.5 s | 44.5 s | 40.8 s |
 | DuckDB inside Cube | 60.5 s | 37.4 s | 30.6 s |
 
-Filtered questions (a station, a country, a period) stayed in the tens to hundreds of milliseconds. On Trino they took 109–452 ms at 742 M rows and 121–466 ms at 3.97 B: partition pruning plus a sort order means they barely notice the table growing 5×.
-
-On TPC-H SF8 (742 M scale, profile M), the warm geometric mean was 304 ms for DuckDB, 551 ms for StarRocks and 1,874 ms for Trino.
-
-### Acceleration
-
-- **Cube Store pre-aggregations** answered in **16–34 ms** at every scale, whichever engine built them. The cost moves to the build: 846 s on Trino at 3.97 B rows.
-- **StarRocks materialized views** (one plain copy per gold table) refreshed in 909 s on M and ~600 s on L... and did not make the reads faster than StarRocks reading Iceberg directly (Q1: 2.5 s with the MV, 1.8 s without). A copy saves no work. An MV pays off when it pre-joins or pre-aggregates something, which is a different test.
-
-## The M → L surprise
-
-I expected profile L (twice the CPU) to be faster everywhere. For DuckDB and StarRocks it mostly was. For Trino, the whole-table query through Cube got **2× slower**: 32 s → 65 s.
+| Trino, build from scratch at 3.97 B rows | M | L | L, object store with 2 CPUs |
+|---|---|---|---|
+| Time | 12,639 s | 9,351 s | 9,125 s |
 
 The filtered queries didn't move, and the object store sat at 1 CPU in every profile (shared infrastructure held constant, as the rules say). An engine with 8 CPUs was just sending more requests to an object store that couldn't keep up.
 
 So I ran profile L again with the object store at 2 CPUs. Same Trino query: **24.6 s**. Faster than M, finally.
 
 Where this matters: if you benchmark (or size) an engine against a self-hosted object store, the object store can be the thing you're measuring. Where it doesn't: managed object storage scales on its own, so in the cloud this specific bottleneck should mostly go away. That is one of the things the next round will check.
+
+Looking back, I could have explored the object store's limits on purpose instead of just bumping into them. My local S3 sat on the same machine, with almost no latency per request and only a CPU and memory cap. Real S3 behaves differently: AWS documents around 3,500 writes and 5,500 reads per second per prefix, and every request pays tens of milliseconds, which adds up fast when a table is thousands of small Parquet files. Throttling the local object store to something closer to that (latency, request rate) would have made the local numbers a better preview of the cloud ones. That goes on the list too.
 
 ## What went wrong (the fun part)
 
@@ -178,6 +290,8 @@ All of this is DuckDB 1.5. DuckDB 2.0 came out on October 21, with these runs al
 ## What these numbers can and can't tell you
 
 They can tell you how these engines behave relative to each other, on one node, with the same limits, on an append-heavy time series, and which tricks moved which questions.
+
+They also carry the noise of a laptop: swap, background processes, an object store with none of S3's latency or request limits. I removed what I could see; the cloud run is where I expect a fairer comparison.
 
 They can't tell you how the engines behave on a cluster, on a different data shape (heavy updates, wide joins, high concurrency), or with each engine tuned by someone who knows it well. Some results here (the object store bottleneck, the Spark session leak, the disk filling up) are about this setup as much as about the engines.
 
