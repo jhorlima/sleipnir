@@ -13,8 +13,8 @@ It took ~40 hours of transformations alone, over 8 days, and more than one night
 My bet going in: DuckDB would win almost everything. It did "surprise" me, in the good way: no server, a single process, it loaded 742 M rows in 146 s and had the best TPC-H time. But it didn't win everything, and some of the best surprises came from elsewhere:
 - Doubling the CPU made one Trino query 2× slower. The "bottleneck" wasn't the engine, it was the object store.
 - Spark "couldn't forget": its server piled up 4.4 million Iceberg snapshot objects in memory, one batch at a time.
-- Pre-aggregations answered in 16–34 ms at every scale. You only pay at build time.
-- Postgres handled tens of millions of rows fine, but used 35× the disk of Parquet.
+- Cube's pre-aggregations answered in 16–34 ms at every scale. What took time was building them: ~3 to ~14 minutes.
+- Postgres handled 44 million rows fine, but used 35× the disk of Parquet.
 
 And a few things looked like engine problems and weren't: the laptop "sleeping on the job", macOS swapping, a full disk xD
 
@@ -38,8 +38,8 @@ Foram ~40 horas só de transformações, em 8 dias, e mais de uma noite com o Ma
 Minha aposta no começo: o DuckDB ia ganhar quase tudo. Ele me "surpreendeu", no bom sentido: sem servidor, um processo só, carregou 742 milhões de linhas em 146 s e teve o melhor tempo no TPC-H. Mas não ganhou tudo, e algumas das melhores surpresas vieram de outros lugares:
 - Dobrar a CPU deixou uma query do Trino 2× mais lenta. O "gargalo" não era a engine, era o object store.
 - O Spark "não conseguia esquecer": o servidor dele foi acumulando 4,4 milhões de objetos de snapshot do Iceberg na memória, um lote de cada vez.
-- As pré-agregações responderam em 16–34 ms em todas as escalas. Você só paga no build.
-- O Postgres deu conta de dezenas de milhões de linhas, mas usou 35× mais disco que o Parquet.
+- As pré-agregações do Cube responderam em 16–34 ms em todas as escalas. O que levou tempo foi construí-las: de ~3 a ~14 minutos.
+- O Postgres deu conta de 44 milhões de linhas, mas usou 35× mais disco que o Parquet.
 
 E algumas coisas pareciam problema de engine e não eram: o notebook "dormindo no trabalho", o swap do macOS, o disco cheio xD
 

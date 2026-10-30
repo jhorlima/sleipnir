@@ -226,7 +226,7 @@ Derived from TPC-H, not comparable to published TPC-H results.
 
 At `local`, the StarRocks MV refreshed in 909 s on M and ~600 s on L, and the Cube Store rollups built in 846 s on Trino.
 
-- **Cube Store** answered in **16–34 ms** at every scale, whichever engine built the rollups. The cost moves to the build.
+- **Cube Store** answered in **16–34 ms** at every scale, whichever engine built the rollups. What takes time is building them: from 165 s (StarRocks, 742 M rows) to 846 s (Trino, 3.97 B rows).
 - **StarRocks materialized views** (one plain copy per gold table) did not beat StarRocks reading Iceberg directly (at `local`, Q1: 2.5 s with the MV, 1.8 s without). A copy saves no work. An MV pays off when it pre-joins or pre-aggregates something, which is a different test.
 
 ## The M → L surprise
