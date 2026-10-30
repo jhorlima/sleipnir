@@ -167,6 +167,8 @@ Most of the time on this project went here. Each of these looked like an engine 
 
 **How far does Postgres go?** Further than people usually assume, for queries. With one year of data (44 M rows) the same dbt project built from scratch in 279 s on Postgres against 66 s on Trino, and Postgres answered the weather questions in 137 ms–1 s, against 32–511 ms for the columnar engines. That's slower, but fine for a lot of real use. What stopped it was **storage**: that year takes 8.15 GB in Postgres and 0.23 GB as Parquet, so 742 M rows would need ~90 GB, more than the whole Docker disk. If your data is in the tens of millions of rows, Postgres is probably enough. In the hundreds of millions and up, the disk makes the decision before the queries do.
 
+One thing I didn't test, and should have: Postgres with **columnar storage**. Extensions like TigerData's columnstore (TimescaleDB), `pg_duckdb` or Citus columnar go straight at the storage problem, and could move the line where Postgres stops being enough. That goes into the next round.
+
 **Do the new versions of Spark and Trino change the picture?** I can only half answer this one, because I didn't run the old versions side by side (that's a fair next test). What I can say: Spark 4.1 with Iceberg 1.12 ran the same dbt project as Trino 483 with no model changes, and at 3.97 B rows it needed two fixes that had nothing to do with its query engine (a session leak and the object store). Trino 483 was the steadiest writer of the whole project: when it failed, it was its per-query memory limit on a write that was too big at once (a yearly batch of ~28 M rows, a single `CREATE TABLE AS` of 1.1 B rows), and writing in smaller batches fixed it every time.
 
 **Is DuckDB good for ingestion and compression?** Yes, for this shape of data. It loaded 742 M rows in 146 s (5 M rows/s) and wrote the bronze layer at 1.98 GB from 3.36 GB of gzipped CSV. As a reader it surprised me too: the fastest on three of the five filtered questions and on TPC-H at SF8, while running inside the benchmark process. Where it wouldn't fit: many concurrent users, or several services reading the same tables, which is exactly where a server engine earns its place.
@@ -183,7 +185,7 @@ They can't tell you how the engines behave on a cluster, on a different data sha
 
 The next step is to run the same benchmark in the cloud, with managed object storage and more workers, to see whether the results change when the laptop is out of the picture: does Trino scale differently with more workers, does Spark's merge still need that much local disk, does the object store stop being the bottleneck? I'm testing that now, and when I have results I'll write a new post.
 
-Before or along with it, DuckDB 1.5 against 2.0 on the same data, which is the closest I'll get to answering "do new versions change the picture?" for at least one engine.
+Before or along with it: DuckDB 1.5 against 2.0 on the same data, which is the closest I'll get to answering "do new versions change the picture?" for at least one engine, and Postgres with a columnar extension, to see how far that pushes the "how far does Postgres go" line.
 
 After that comes orchestration (Airflow) on top of the same stack.
 
