@@ -156,6 +156,8 @@ Most of the time on this project went here. Each of these looked like an engine 
 
 **Is DuckDB good for ingestion and compression?** Yes, for this shape of data. It loaded 742 M rows in 146 s (5 M rows/s) and wrote the bronze layer at 1.98 GB from 3.36 GB of gzipped CSV. As a reader it surprised me too: the fastest on three of the five filtered questions and on TPC-H at SF8, while running inside the benchmark process. Where it wouldn't fit: many concurrent users, or several services reading the same tables, which is exactly where a server engine earns its place.
 
+All of this is DuckDB 1.5. DuckDB 2.0 came out on October 21, with these runs already going, so it isn't here: not for compatibility reasons, it just didn't exist yet when I pinned the versions. It brings async I/O for Parquet and a client-server mode, which touches both answers above, so it gets its own side-by-side run.
+
 ## What these numbers can and can't tell you
 
 They can tell you how these engines behave relative to each other, on one node, with the same limits, on an append-heavy time series, and which tricks moved which questions.
@@ -165,6 +167,8 @@ They can't tell you how the engines behave on a cluster, on a different data sha
 ## What's next
 
 The next step is to run the same benchmark in the cloud, with managed object storage and more workers, to see whether the results change when the laptop is out of the picture: does Trino scale differently with more workers, does Spark's merge still need that much local disk, does the object store stop being the bottleneck? I'm testing that now, and when I have results I'll write a new post.
+
+Before or along with it, DuckDB 1.5 against 2.0 on the same data, which is the closest I'll get to answering "do new versions change the picture?" for at least one engine.
 
 After that comes orchestration (Airflow) on top of the same stack.
 
