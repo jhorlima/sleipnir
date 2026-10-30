@@ -406,6 +406,9 @@ Profile L does not fit the Docker VM that every profile-M number came from (8 CP
 
 - A single node inside a VM on macOS: compare engines with each other, not with absolute numbers elsewhere.
 - One dataset shape (append-heavy time series).
+- A laptop is not a clean lab: macOS swap and background processes (indexing, backups, updates) can steal time in the middle of a measured step. Free memory and swap are logged around every step and caught runs are invalidated, but not every interference leaves a trace. The cloud round is meant to be the fairer comparison.
+- The local object store has none of S3's limits: almost no latency per request and no request-rate cap (AWS documents ~3,500 writes and ~5,500 reads per second per prefix). Throttling it (latency, request rate) would make local numbers a better preview of the cloud ones; not done in phase 2.
+- Spark is a writer only; it is not measured as a query engine.
 
 ## 9. Reproduce it
 

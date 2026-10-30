@@ -2,50 +2,52 @@
 
 ## LinkedIn (English)
 
-I spent the last few weeks racing four query engines on the same lakehouse, on a laptop.
+A few weeks ago I wanted a public dataset big enough to push Cube.dev's pre-aggregations to their limit.
 
-Same Iceberg tables, same CPU and memory limits, same questions, and every answer checked against a reference before its time counted. The data is NOAA's daily weather history, 1763 to 2025: 3.97 billion rows.
+I found one. Over 260 years of daily weather records from stations all over the world, published by the US weather and climate agency (NOAA). From 1763 to 2025: 3.97 billion rows.
 
-Trino, Spark, StarRocks and DuckDB, with dbt for the transformations and Cube on top.
+Then I thought... why stop at Cube when I had Claude to help me test more tools?! So I built a small lakehouse on my laptop and put four query engines in the same race: Trino, Spark, StarRocks and DuckDB. Same Iceberg tables, same CPU and memory limits, same questions, and every answer checked before its time counted.
 
-A few results (for this setup only, so test your own case):
-- Filtered queries barely noticed the data growing 5×. Sorting + time partitions did most of the work.
-- Pre-aggregations in Cube Store answered in 16–34 ms at every scale. You pay at build time instead.
-- Doubling the CPU made one Trino query 2× slower... because the object store was the bottleneck. With 2 CPUs on the object store, that query went from 65 s to 25 s.
-- A materialized view that only copies a table didn't beat reading Iceberg directly.
-- Postgres handled tens of millions of rows fine, but stored them 35× bigger than Parquet: the disk decides before the queries do. DuckDB loaded 742 M rows in 146 s.
+It took ~40 hours of transformations alone, over 8 days, and more than one night with the Mac working the "night shift" while I slept.
 
-Most of the work went into things that looked like engine problems and weren't: the laptop going to sleep mid-run, macOS swapping, a Spark session leak holding 4.4 million snapshot objects, the object store running out of memory, a full disk.
+My bet going in: DuckDB would win almost everything. It did "surprise" me, in the good way: no server, a single process, it loaded 742 M rows in 146 s and had the best TPC-H time. But it didn't win everything, and some of the best surprises came from elsewhere:
+- Doubling the CPU made one Trino query 2× slower. The "bottleneck" wasn't the engine, it was the object store.
+- Spark "couldn't forget": its server piled up 4.4 million Iceberg snapshot objects in memory, one batch at a time.
+- Cube's pre-aggregations answered in 16–34 ms at every scale. What took time was building them: ~3 to ~14 minutes.
+- Postgres handled 44 million rows fine, but used 35× the disk of Parquet.
 
-The stack was built with an AI coding assistant, which made it possible in days. Catching the wrong numbers was still a human job :)
+And a few things looked like engine problems and weren't: the laptop "sleeping on the job", macOS swapping, a full disk xD
 
-Next: the same benchmark in the cloud, with more workers. New post when I have results.
+To be honest, a laptop isn't the fairest lab, so the next round goes to the cloud, with more workers. I'll write a new post when I have the numbers (fingers crossed for a free VPS on Oracle haha).
 
-The full story, with the numbers and what broke: https://medium.com/@jhorlima
+Claude built the stack with me in days. Catching the wrong numbers was still on me :)
+
+The whole story, with the tables and everything that broke: https://medium.com/@jhorlima
 Code and results: https://github.com/jhorlima/sleipnir
 
 ## LinkedIn (Português)
 
-Passei as últimas semanas colocando quatro query engines para competir no mesmo lakehouse, num notebook.
+Há algumas semanas eu queria um dataset público grande o bastante para levar as pré-agregações do Cube.dev ao limite.
 
-Mesmas tabelas Iceberg, mesmos limites de CPU e memória, mesmas perguntas, e cada resposta conferida com uma referência antes de o tempo valer. Os dados são o histórico diário de clima da NOAA, de 1763 a 2025: 3,97 bilhões de linhas.
+Achei. Mais de 260 anos de registros diários de clima de estações do mundo todo, publicados pela agência de clima e meteorologia dos EUA (NOAA). De 1763 a 2025: 3,97 bilhões de linhas.
 
-Trino, Spark, StarRocks e DuckDB, com dbt nas transformações e Cube por cima.
+Aí pensei... por que parar no Cube se eu tinha o Claude para me ajudar a testar mais ferramentas?! Montei um pequeno lakehouse no meu notebook e coloquei quatro query engines na mesma corrida: Trino, Spark, StarRocks e DuckDB. Mesmas tabelas Iceberg, mesmos limites de CPU e memória, mesmas perguntas, e cada resposta conferida antes de o tempo valer.
 
-Alguns resultados (valem para este cenário, então teste o seu caso):
-- As queries com filtro quase não sentiram os dados crescerem 5×. Ordenação + partição por tempo fizeram a maior parte do trabalho.
-- As pré-agregações no Cube Store responderam em 16–34 ms em todas as escalas. O custo vai para o build.
-- Dobrar a CPU deixou uma query do Trino 2× mais lenta... porque o gargalo era o object store. Com 2 CPUs no object store, essa query caiu de 65 s para 25 s.
-- Uma materialized view que só copia a tabela não ganhou de ler o Iceberg direto.
-- O Postgres deu conta de dezenas de milhões de linhas, mas ocupou 35× mais espaço que o Parquet: o disco decide antes das queries. O DuckDB carregou 742 milhões de linhas em 146 s.
+Foram ~40 horas só de transformações, em 8 dias, e mais de uma noite com o Mac fazendo "plantão" enquanto eu dormia.
 
-A maior parte do trabalho foi em coisas que pareciam problema de engine e não eram: o notebook dormindo no meio da execução, o swap do macOS, um vazamento de sessões no Spark segurando 4,4 milhões de objetos de snapshot, o object store sem memória, o disco cheio.
+Minha aposta no começo: o DuckDB ia ganhar quase tudo. Ele me "surpreendeu", no bom sentido: sem servidor, um processo só, carregou 742 milhões de linhas em 146 s e teve o melhor tempo no TPC-H. Mas não ganhou tudo, e algumas das melhores surpresas vieram de outros lugares:
+- Dobrar a CPU deixou uma query do Trino 2× mais lenta. O "gargalo" não era a engine, era o object store.
+- O Spark "não conseguia esquecer": o servidor dele foi acumulando 4,4 milhões de objetos de snapshot do Iceberg na memória, um lote de cada vez.
+- As pré-agregações do Cube responderam em 16–34 ms em todas as escalas. O que levou tempo foi construí-las: de ~3 a ~14 minutos.
+- O Postgres deu conta de 44 milhões de linhas, mas usou 35× mais disco que o Parquet.
 
-A stack foi construída com um assistente de código com IA, o que permitiu fazer em dias. Pegar os números errados continuou sendo trabalho humano :)
+E algumas coisas pareciam problema de engine e não eram: o notebook "dormindo no trabalho", o swap do macOS, o disco cheio xD
 
-Próximo passo: o mesmo benchmark na nuvem, com mais workers. Novo post quando tiver resultados.
+Sendo honesto, um notebook não é o laboratório mais justo, então a próxima rodada vai para a nuvem, com mais workers. Faço um novo post quando tiver os números (torcendo para encontrar uma VPS gratuita na Oracle haha).
 
-A história completa, com os números e o que quebrou: https://medium.com/@jhorlima
+O Claude montou a stack comigo em dias. Pegar os números errados continuou sendo comigo :)
+
+A história completa, com as tabelas e tudo que quebrou: https://medium.com/@jhorlima
 Código e resultados: https://github.com/jhorlima/sleipnir
 
 ## Cover image prompt
