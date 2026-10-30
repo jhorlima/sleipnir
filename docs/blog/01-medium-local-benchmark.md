@@ -252,6 +252,19 @@ Where this matters: if you benchmark (or size) an engine against a self-hosted o
 
 Looking back, I could have explored the object store's limits on purpose instead of just bumping into them. My local S3 sat on the same machine, with almost no latency per request and only a CPU and memory cap. Real S3 behaves differently: AWS documents around 3,500 writes and 5,500 reads per second per prefix, and every request pays tens of milliseconds, which adds up fast when a table is thousands of small Parquet files. Throttling the local object store to something closer to that (latency, request rate) would have made the local numbers a better preview of the cloud ones. That goes on the list too.
 
+## How long it took
+
+About three weeks from the first commit to the last measurement. The spec and the first working lakehouse took two days (October 9–10), with the AI assistant doing most of the scaffolding. The benchmark itself ran from **October 11 to October 28**:
+
+| | |
+|---|---|
+| Days with measurements | 8 (out of 18) |
+| Measured runs | 261 |
+| Time spent only in dbt transformations (B2), failed runs included | ~40 h |
+| Longest single run | Spark's build at 3.97 B rows, stopped after 5.9 h |
+
+A lot of that ran **overnight**. The long builds (Trino and Spark at 3.97 B rows take 2.5 to 4 hours each) only made sense with the Mac left alone, lid open, plugged in, kept awake: one night Spark ran from 22:50 until it was stopped in the morning, another the whole second profile-L campaign ran from 22:50 to 10:40. The days in between went mostly into reading logs and heap dumps to understand why something failed... which is where the next section comes from.
+
 ## What went wrong (the fun part)
 
 Most of the time on this project went here. Each of these looked like an engine problem at first.
