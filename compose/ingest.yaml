@@ -20,6 +20,8 @@ services:
         limits:
           cpus: "${ENGINE_CPUS:-4}"
           memory: ${ENGINE_MEMORY:-8g}
+    # Equal to the memory limit: no swap, so an engine out of memory fails instead of slowing down unseen.
+    memswap_limit: ${ENGINE_MEMORY:-8g}
     depends_on:
       lakekeeper:
         condition: service_healthy

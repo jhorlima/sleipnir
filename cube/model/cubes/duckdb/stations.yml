@@ -1,0 +1,6 @@
+# DuckDB: dim_station. Everything else comes from base_stations.
+cubes:
+  - name: duckdb_stations
+    extends: base_stations
+    data_source: duckdb
+    sql_table: lakehouse.trino_gold.dim_station

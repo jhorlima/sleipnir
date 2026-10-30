@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs inside the aws-cli container (bash, curl, jq; see compose/ingest.yaml).
-# Sums the object-store bytes of every table in duckdb_bronze and the <ENGINE>_* namespaces
+# Sums the object-store bytes of every table in duckdb_bronze, duckdb_tpch (D2) and the <ENGINE>_* namespaces
 # and fails when they exceed STORAGE_BUDGET_GB (SPEC §6).
 # Lakekeeper stores tables under UUID paths, so the catalog maps each table to its location.
 set -euo pipefail
@@ -44,7 +44,7 @@ namespaces=$(curl -fsS "$catalog_url/$prefix/namespaces" | jq -r '.namespaces[] 
 printf "%-24s %16s %10s\n" "namespace" "bytes" "GB"
 budget_bytes_used=0
 for namespace in $namespaces; do
-  if [ "$namespace" != "duckdb_bronze" ] && [[ "$namespace" != "${ENGINE}_"* ]]; then
+  if [ "$namespace" != "duckdb_bronze" ] && [ "$namespace" != "duckdb_tpch" ] && [[ "$namespace" != "${ENGINE}_"* ]]; then
     continue
   fi
   bytes=$(namespace_bytes "$namespace")
@@ -53,11 +53,11 @@ for namespace in $namespaces; do
 done
 
 budget_bytes=$(awk -v gb="$STORAGE_BUDGET_GB" 'BEGIN {printf "%.0f", gb * 1e9}')
-printf "%-24s %16s %10s\n" "duckdb_bronze+${ENGINE}_*" "$budget_bytes_used" "$(to_gb "$budget_bytes_used")"
+printf "%-24s %16s %10s\n" "bronze+tpch+${ENGINE}_*" "$budget_bytes_used" "$(to_gb "$budget_bytes_used")"
 printf "%-24s %16s %10s\n" "budget" "$budget_bytes" "$(to_gb "$budget_bytes")"
 
 if [ "$budget_bytes_used" -gt "$budget_bytes" ]; then
-  echo "FAIL: duckdb_bronze + ${ENGINE}_* exceeds ${STORAGE_BUDGET_GB} GB" >&2
+  echo "FAIL: duckdb_bronze + duckdb_tpch + ${ENGINE}_* exceeds ${STORAGE_BUDGET_GB} GB" >&2
   exit 1
 fi
 echo "OK: within ${STORAGE_BUDGET_GB} GB"

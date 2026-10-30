@@ -119,6 +119,5 @@ cubes:
         sql: "{total_prcp} / NULLIF({total_prcp_prior_month}, 0)"
         type: number
 
-    # Cube Store rollups (monthly_country, yearly_station) are added here in B5c (SPEC §8.4).
-    pre_aggregations: []
+    # Rollups (B5c, SPEC §8.4) live only in the <engine>_pa cubes, so B4 and B5b can never be served from Cube Store.
 

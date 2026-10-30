@@ -1,0 +1,13 @@
+# B5b: the nested-aggregate cube over trinomv_weather_daily (the join and the sub_query name the weather cube).
+cubes:
+  - name: trinomv_station_years
+    extends: trino_station_years
+    joins:
+      - name: trinomv_weather_daily
+        relationship: one_to_many
+        sql: "{CUBE}.station_id = {trinomv_weather_daily}.station_id AND {CUBE}.year = EXTRACT(YEAR FROM {trinomv_weather_daily}.date)"
+    dimensions:
+      - name: annual_prcp
+        sql: "{trinomv_weather_daily.total_prcp}"
+        type: number
+        sub_query: true

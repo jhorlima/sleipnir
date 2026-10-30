@@ -1,0 +1,7 @@
+{
+  "measures": ["trino_weather.total_prcp", "trino_weather.prcp_share_of_total"],
+  "dimensions": ["trino_weather.country"],
+  "timeDimensions": [{"dimension": "trino_weather.date", "granularity": "month", "dateRange": ["2025-01-01", "2025-12-31"]}],
+  "order": {"trino_weather.prcp_share_of_total": "desc"},
+  "limit": 50000
+}

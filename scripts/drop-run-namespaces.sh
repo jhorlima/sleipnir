@@ -47,6 +47,11 @@ for namespace in $namespaces; do
   echo "Dropped schema ${namespace}"
 done
 
+# An empty array is an unbound variable under `set -u` in bash 3.2 (macOS).
+if [ "${#locations[@]}" -eq 0 ]; then
+  exit 0
+fi
+
 waited=0
 for location in "${locations[@]}"; do
   while [ "$(object_count "$location")" -gt 0 ]; do

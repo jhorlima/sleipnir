@@ -1,0 +1,15 @@
+cubes:
+  - name: probe
+    data_source: lakehouse
+    sql: SELECT name AS secret_name, current_setting('threads') AS threads, version() AS duckdb_version FROM duckdb_secrets()
+    dimensions:
+      - name: secret_name
+        sql: secret_name
+        type: string
+        primary_key: true
+      - name: threads
+        sql: threads
+        type: string
+      - name: duckdb_version
+        sql: duckdb_version
+        type: string

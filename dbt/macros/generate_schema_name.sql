@@ -1,4 +1,5 @@
-{#- Namespace <target>_<layer> (SPEC §3.1, §7.2); experiment runs with RUN_ID go to bench_<run_id>_<layer>.
+{#- Namespace <target>_<layer> (SPEC §3.1, §7.2); SCHEMA_SUFFIX=_small builds the small scale
+    next to the r2 tables (Postgres is small-only and keeps its names); experiment runs with RUN_ID go to bench_<run_id>_<layer>.
     The layer is the first folder under models/; a model outside a layer folder fails compilation. -#}
 {% macro generate_schema_name(custom_schema_name, node) -%}
     {%- if node.resource_type != 'model' -%}
@@ -13,7 +14,7 @@
         {%- if run_id -%}
             bench_{{ run_id }}_{{ layer }}
         {%- else -%}
-            {{ target.name }}_{{ layer }}
+            {{ target.name }}_{{ layer }}{{ '' if target.name == 'postgres' else env_var('SCHEMA_SUFFIX', '') }}
         {%- endif -%}
     {%- endif -%}
 {%- endmacro %}

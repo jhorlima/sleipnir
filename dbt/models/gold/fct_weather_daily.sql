@@ -4,13 +4,13 @@
     incremental_strategy=var('incremental_strategy'),
     unique_key=incremental_unique_key(['station_id', 'date'], 'date'),
     event_time='date',
-    batch_size='month',
+    batch_size=var('microbatch_batch_size'),
     begin=var('microbatch_begin'),
     concurrent_batches=false,
     on_schema_change='fail',
     post_hook="{{ maintain_table(this) if var('maintenance', true) else '' }}",
 ) }}
-{{ config(**partitioned_by_month('date')) }}
+{{ config(**partitioned_by_month('date', sort_columns=['station_id', 'date'])) }}
 
 {%- set start_date = incremental_start_date() %}
 

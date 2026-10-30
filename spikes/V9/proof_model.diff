@@ -1,0 +1,71 @@
+diff --git a/cube/model/cubes/trino/station_years.yml b/cube/model/cubes/trino/station_years.yml
+index 3ebb9db..4243b6f 100644
+--- a/cube/model/cubes/trino/station_years.yml
++++ b/cube/model/cubes/trino/station_years.yml
+@@ -21,3 +21,7 @@ cubes:
+       - name: median_station_annual_prcp
+         sql: "approx_percentile({annual_prcp}, 0.5)"
+         type: number
++    pre_aggregations:
++      - name: yearly_median_station_prcp
++        measures: [median_station_annual_prcp]
++        dimensions: [year]
+diff --git a/cube/model/cubes/trino/weather_daily.yml b/cube/model/cubes/trino/weather_daily.yml
+index 5c7c776..f03dd3f 100644
+--- a/cube/model/cubes/trino/weather_daily.yml
++++ b/cube/model/cubes/trino/weather_daily.yml
+@@ -18,13 +18,13 @@ cubes:
+     measures:
+       # Percentiles: Trino's approx_percentile; not re-aggregated by Cube Store.
+       - name: median_tmax
+-        sql: "approx_percentile({CUBE}.tmax, 0.5)"
++        sql: "approx_percentile(CAST({CUBE}.tmax AS DOUBLE), 0.5)"
+         type: number
+       - name: p95_tmax
+-        sql: "approx_percentile({CUBE}.tmax, 0.95)"
++        sql: "approx_percentile(CAST({CUBE}.tmax AS DOUBLE), 0.95)"
+         type: number
+       - name: p95_prcp
+-        sql: "approx_percentile({CUBE}.prcp, 0.95)"
++        sql: "approx_percentile(CAST({CUBE}.prcp AS DOUBLE), 0.95)"
+         type: number
+       - name: total_prcp_country
+         multi_stage: true
+@@ -32,3 +32,37 @@ cubes:
+         type: sum
+         grain:
+           keep_only: [trino_stations.country]
++
++    pre_aggregations:
++      - name: monthly_country
++        measures: [observation_count, days_with_rain, total_prcp]
++        dimensions: [trino_stations.country]
++        time_dimension: date
++        granularity: month
++        partition_granularity: month
++        build_range_start: {sql: "SELECT DATE '2024-01-01'"}
++        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
++      - name: monthly_country_avg
++        measures: [avg_tmax, avg_tmin]
++        dimensions: [trino_stations.country]
++        time_dimension: date
++        granularity: month
++        partition_granularity: month
++        build_range_start: {sql: "SELECT DATE '2024-01-01'"}
++        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
++      - name: yearly_station
++        measures: [observation_count, total_prcp]
++        dimensions: [station_id]
++        time_dimension: date
++        granularity: year
++        partition_granularity: year
++        build_range_start: {sql: "SELECT DATE '2024-01-01'"}
++        build_range_end: {sql: "SELECT DATE '2025-12-31'"}
++      - name: yearly_country_percentiles
++        measures: [median_tmax, p95_tmax]
++        dimensions: [trino_stations.country]
++        time_dimension: date
++        granularity: year
++        partition_granularity: year
++        build_range_start: {sql: "SELECT DATE '2024-01-01'"}
++        build_range_end: {sql: "SELECT DATE '2025-12-31'"}

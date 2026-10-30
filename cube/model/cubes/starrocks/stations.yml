@@ -1,0 +1,6 @@
+# StarRocks: dim_station. Everything else comes from base_stations.
+cubes:
+  - name: starrocks_stations
+    extends: base_stations
+    data_source: starrocks
+    sql_table: lakehouse.trino_gold.dim_station

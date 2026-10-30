@@ -25,7 +25,7 @@
 
 - Host: macOS, 12 CPU, 24 GB RAM. Docker Desktop: limites globais removidos durante as execuções do benchmark.
 - **Docker Compose** (sem Swarm): `deploy.resources.limits` (cpus/memory) por serviço, `profiles` para subir só o necessário e `include` para separar os arquivos por domínio.
-- **Memória da VM:** limites de container não são reservas; a VM do Docker precisa caber o perfil do engine + ~3 GB de infra (perfil L → VM ≥ 16 GB). Com 8 GB, só o perfil M sem outros processos pesados ao lado.
+- **Memória da VM:** limites de container não são reservas; a VM do Docker precisa caber o perfil do engine + ~2 GB de infra + ~3 GB de Cube/Cube Store. As campanhas no perfil `M` rodaram numa VM de 8 CPU / 16 GB; o perfil `L` (≈ 17 GB com o Cube) roda numa VM de 10 CPU / 20 GB, swap de 2 GB nas duas. Os limites do engine vêm do perfil e não mudam com a VM, mas uma VM maior deixa mais page cache para o RustFS: o B3 do Trino no perfil `M` é repetido na VM nova como controle (§10). Desde a campanha `L`, o tamanho da VM é gravado no `engine_config` (`docker_vm`).
 - **Um engine sob teste por vez:** nunca duas transformações ao mesmo tempo (ex.: Trino e Spark em paralelo). Dentro de uma execução, o dbt pode rodar models em paralelo com `threads = DBT_THREADS` (**mesmo valor para todos os engines**, padrão 4); o resto do paralelismo fica a cargo de cada engine.
 - Números absolutos vêm de uma VM em macOS; o valor está na **comparação relativa**.
 - **Disco:** os CSVs são baixados **antes** da ingestão para `LANDING_DIR` (padrão `./landing`; pode apontar para um SSD externo) e o DuckDB lê de lá — download nunca entra na medição. Para mais espaço no lake, mover a **imagem de disco do Docker Desktop** para o SSD (Settings → Resources → Disk image location) e manter os volumes nomeados: bind mount de disco externo passa pelo compartilhamento de arquivos da VM e adicionaria overhead de I/O ao RustFS.
@@ -61,7 +61,7 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 | `trino_silver`, `trino_gold` | Trino via dbt | silver/gold oficiais (fonte padrão dos readers) |
 | `spark_silver`, `spark_gold` | Spark via dbt | mesmo projeto dbt, escrito pelo Spark |
 | `bench_*` | harness | tabelas temporárias de experimentos de layout (apagadas com `PURGE`) |
-| `postgres_bronze/silver/gold` | DuckDB + dbt-postgres | baseline, em schemas do Postgres (fora do lake) |
+| `postgres_bronze/silver/gold` | DuckDB + dbt-postgres | baseline só na escala `small` (D-23), em schemas de um Postgres próprio do benchmark (fora do lake, separado do Postgres do catálogo) |
 
 - **Trino (não padrão, em `config/trino/`):** spill-to-disk ligado e `optimizer.optimize-top-n-ranking=false` — o `ROW_NUMBER() ... = 1` do dedup vira um operador TopNRanking que não faz spill e estoura a memória por query do perfil M.
 - **Acesso ao S3 — o mesmo caminho para todos os engines:** o warehouse tem `sts-enabled: false` e `remote-signing-enabled: false`, então todos leem e escrevem com as mesmas chaves S3 estáticas. Sem isso, Spark/PyIceberg cairiam em silêncio no remote signing pelo Lakekeeper, enquanto Trino (sem remote signing para REST), DuckDB e StarRocks (que não suportam) usariam chaves — caminhos de I/O diferentes contaminariam a comparação. Spark envia também `X-Iceberg-Access-Delegation: client-managed`; DuckDB usa `ACCESS_DELEGATION_MODE 'none'` + secret S3. Warehouse com `key-prefix: lakehouse` e `delete-profile: hard`.
@@ -71,12 +71,12 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 
 | Camada | Escolha | Futuro / alternativa | Notas |
 |---|---|---|---|
-| Object storage | **RustFS** | R2 (fase 4) | MinIO community descontinuado. |
+| Object storage | **RustFS** | R2 (fase 6) | MinIO community descontinuado. |
 | Catálogo | **Lakekeeper** (Iceberg REST) | Polaris, R2 Data Catalog | Backend Postgres. |
 | Formato | **Parquet + Iceberg v2** | Iceberg v3 (V6) | Codec e tamanho de arquivo definidos pelo B6. |
 | Ingestão | **DuckDB 1.5** | Airbyte (se precisar de conectores) | Escreve Iceberg v2 direto no Lakekeeper (V1). |
 | Transformação | **dbt Core 1.12** + dbt-trino 1.10 (Trino 483) | dbt Core v2 quando houver adapter Trino/Postgres | `dbt-trino`, `dbt-spark`, `dbt-postgres`. |
-| Engines de transformação | **Trino**, **Spark 4.1.x** | — | Postgres como baseline. |
+| Engines de transformação | **Trino**, **Spark 4.1.x** | — | Postgres como baseline na escala `small`. |
 | Engines de leitura | **StarRocks**, Trino, DuckDB, Postgres | — | StarRocks via external catalog. |
 | Aceleração | **StarRocks async MV**, Trino MV, **Cube Store** | — | §10.3. |
 | Semantic layer | **Cube** | — | Drivers oficiais: Trino, DuckDB, Postgres; StarRocks via driver MySQL. Sem Spark. |
@@ -87,7 +87,9 @@ Hierarquia do Lakekeeper: **project → warehouse → namespace → table**.
 Versões pinadas em `.env`; nenhuma tag `latest`.
 
 ### 4.1 Spark 4.1.x
-- Iceberg runtime: `org.apache.iceberg:iceberg-spark-runtime-4.1_2.13` + `iceberg-aws-bundle` (Iceberg ≥ 1.11; Scala 2.13 obrigatório).
+- Imagem do projeto (`config/spark/Dockerfile`): `apache/spark:4.1.3-scala2.13-java21-ubuntu` + `iceberg-spark-runtime-4.1_2.13` e `iceberg-aws-bundle` do Iceberg 1.12.0, embutidos (nada é baixado durante uma medição). dbt-spark 1.11.0 com PyHive.
+- O PyHive sempre envia `USE default`, então o Thrift Server cria um namespace `lakehouse.default` vazio ao subir (também visível no Trino); o healthcheck conecta nele.
+- O `remove_orphan_files` do Spark não aceita retenção abaixo de 24 h; no Spark ela é de 25 h (no Trino, 0 s), e a diferença é registrada junto dos números do B6.
 - dbt-spark via **Spark Thrift Server** (`method: thrift`).
 - Ajuste ao container (valores derivados dos limites do perfil, não fixos):
   - `local[N]`, com N = CPUs do perfil (um único JVM, sem overhead de cluster);
@@ -95,6 +97,7 @@ Versões pinadas em `.env`; nenhuma tag `latest`.
   - `spark.sql.shuffle.partitions` = 2–3 × N; AQE ligado (`spark.sql.adaptive.enabled`, `coalescePartitions`, `skewJoin`);
   - `spark.sql.iceberg.vectorization.enabled=true` (padrão) e `spark.serializer=KryoSerializer`;
   - `write.distribution-mode=hash` nas tabelas particionadas, para evitar arquivos pequenos.
+- **Caches do catálogo desligados** (`cache-enabled=false`, `rest-table-cache.max-entries=0`, V14): o Thrift Server mantém vivas as sessões JDBC fechadas, cada uma com o seu `SparkCatalog`, e o dbt-spark abre uma sessão por microbatch; com os caches ligados, cada catálogo retido segura uma `TableMetadata` inteira, o heap cresce com commits × sessões e o B2 na escala `local` termina em GC thrash (perfis `M` e `L`). Desligados, cada comando recarrega a tabela no Lakekeeper; resta uma fuga linear de ~1 MB por sessão. As medições do Spark anteriores a esta mudança têm os caches ligados no `engine_config`.
 - Os parâmetros finais são registrados em `config/spark/` e em `results` (`engine_config`).
 
 ## 5. Datasets
@@ -130,13 +133,21 @@ Ingestão em **lotes incrementais com janela sobreposta**: cada lote `n` inclui 
 
 Regras:
 - O teto vale para **uma execução** (bronze + silver/gold de um único writer + D2). Comparar vários writers lado a lado é feito **localmente**, onde não há teto.
-- **Duas escalas de dados**, escolhidas por `DATA_SCALE`:
-  - `r2` — cabe no teto de 10 GB por execução; usada no cenário R2 e como escala padrão.
-  - `local` — se a ingestão da escala `r2` for rápida e o limite for só throughput de download/rede, a escala local cresce (mais anos de D1, SF maior em D2) até **~20 GB ou ~30 min de ingestão (B1)**, o que vier primeiro. O tamanho final é fixado após a primeira medição do B1 e registrado nos resultados.
-  - Resultados de escalas diferentes nunca são comparados entre si; `results` registra a escala de cada execução.
-  - **Plano (primeiro passo da fase 2):** com só 2025 (0,23 GB), overhead fixo e cache dominam e o B6 não tem o que compactar. Escala `r2` = **GHCN 2010–2025** (16 anos; estimativa ~21 GB de CSV na origem, ~2,7 GB comprimido para baixar, bronze ~1,9 GB, lakehouse ~3,5 GB) + TPC-H no SF que couber no teto; escala `local` = mais anos para trás até ~20 GB de bronze ou ~30 min de B1. Os lotes intermediários em `landing/batches` passam a ser gravados como `.csv.gz` (~3 GB em vez de ~25 GB). Tamanhos finais fixados pelo `make storage-report` após a carga. **Avisar o autor antes de iniciar**, com a estimativa de disco, para liberar espaço ou conectar o SSD.
+- **Duas escalas de dados**, escolhidas por `DATA_SCALE`. Resultados de escalas diferentes nunca são comparados entre si; `results` registra a escala de cada execução.
+
+| Escala | D1 (GHCN) | Download | Lotes `.csv.gz` | Bronze | Lakehouse (bronze + 1 writer) | Status |
+|---|---|---|---|---|---|---|
+| `r2` (padrão) | **GHCN 1998–2025** (`data_scale = r2_1998`): 336 lotes mensais, **1,29 bi de linhas no bronze**. As primeiras medições usaram 2010–2025 (`data_scale = r2`, 742 M linhas) e continuam em `results/` com esse rótulo | 4,86 GB | ~5,9 GB | 3,41 GB | **6,0 GB** (silver 1,88, gold 0,71) + D2 1,88 GB = **7,9 GB** | Medida pelo `make storage-report` |
+| `small` | só 2025: 12 lotes mensais, ~44 M linhas no bronze | 0,17 GB | ~0,2 GB | ~0,12 GB | ~0,23 GB (no Postgres: 8,15 GB de dados + até 8 GB de WAL) | Medida; escala da comparação com o Postgres (D-23) |
+| `local` | histórico completo, **1763–2025** (1750–1762 não existem no NOAA): 3.156 lotes, **3,97 bi de linhas no bronze**. `landing/` num SSD externo (USB, exFAT) | 14,4 GB | ~17 GB | ~10 GB | ~18 GB (sem teto: só local) | B1, B2 Trino, B3 e B4 medidos no perfil `M`; B3, B4 (Trino, StarRocks, DuckDB) e B5a no perfil `L`; B5a também no `M` com 2 buckets por partição. O B2 do Spark falha no `M` (memória); o B2 do Trino e do Spark no `L` ainda não rodaram |
+
+  - **Meta da `r2`: bilhões de linhas dentro de 10 GB.** Na `r2` atual o bronze ocupa ~2,7 bytes/linha e o lakehouse 3,75 GB, só ~38% do orçamento. O teto de 6,5 GB do D1 comporta ~1,3 bi linhas no bronze com o layout atual. Se o B6 confirmar o ganho de ordenar antes de gravar (o Parquet caiu à metade na fase 1), comporta mais. As medições começam na `r2` atual; depois do B6, a `r2` é ampliada em anos até encher o teto e as suítes são repetidas ([plano](specs/phase-2.md), etapa 10).
+  - A escala `local` é limitada pelo tamanho do histórico, não pelo tempo: o B1 da `r2` levou 142 s de insert (5,2 M linhas/s), então ~30 min de B1 exigiriam muito mais dados do que o GHCN tem. O histórico completo chega a ~20 GB.
+  - Os lotes de `landing/batches` são `.csv.gz` (3,4 GB em vez de ~25 GB). O DuckDB lê gzip na mesma vazão do CSV puro, e gerar os lotes (fora da medição) leva ~1 min por ano.
+  - A partir da `r2`, silver e gold são construídos do zero mês a mês (`make dbt-backfill`, D-21).
+  - Na `local`, o build do zero é por ano até 1949 (anos pequenos; por mês o custo fixo de 2.244 lotes dominaria) e por mês a partir de 1950: um lote anual de ~28 M linhas estoura a memória do dedup do silver no Trino perfil `M`. O `batch_size` do microbatch é uma variável do dbt (`microbatch_batch_size`, padrão `month`).
 - Fora do bucket: `landing/` (CSV em disco local), baseline Postgres, MVs do StarRocks (storage local do BE) e Cube Store.
-- **Dimensionamento empírico:** na fase 1, ingerir 1 ano de D1, medir o tamanho por namespace e calcular quantos anos cabem no teto de uma execução. Para D2, gerar SF1, medir e escalar o SF.
+- **D2 = TPC-H SF8: 1,875 GB** medidos (SF1 = 0,227 GB; SF9 passaria de 2 GB), em `lakehouse.duckdb_tpch`, gerado pelo DuckDB em ~65 s (`make tpch SF=8`). Na `r2`, bronze + um writer + D2 = 5,63 GB.
 - Manutenção após cada carga (§10.4): snapshots antigos contam no orçamento.
 - `make storage-report ENGINE=<engine>` mostra o uso por namespace e falha se bronze + `<engine>_*` + D2 passar do teto.
 - ⚠️ V5: confirmar os limites atuais do free tier do R2 (storage e operações Class A/B) e estimar os GETs do benchmark antes de rodar no R2.
@@ -156,8 +167,30 @@ Regras:
 - `fct_weather_daily` — 1 linha por estação/dia, pivot de `TMAX, TMIN, PRCP, SNOW`. Incremental.
 - `agg_weather_monthly_country` — agregado mensal por país. Incremental por mês.
 
+### Materialização por camada e model
+| Camada | Model / tabela | Materialização | Como atualiza | Primeira carga |
+|---|---|---|---|---|
+| Bronze | `ghcn_daily_raw` | tabela Iceberg (DuckDB) | **append** por lote mensal (`_batch_id`); nunca reescrita | os 192 lotes, um a um (B1) |
+| Bronze | `ghcn_stations_raw`, `ghcn_countries_raw` | tabela | **substituída** a cada carga (arquivos de referência pequenos) | idem |
+| Silver | `ghcn_daily` | **incremental** | estratégia do engine (§7.1): `delete+insert` no Trino e no Postgres, `merge` no Spark; janela = datas dos lotes novos − overlap | **por mês** com microbatch (`make dbt-backfill`, D-21) |
+| Silver | `stations` | `table` (**full refresh**) | reconstruída a cada execução (133 k linhas, ~1 s) | idem |
+| Gold | `fct_weather_daily` | **incremental** (ordenada, D-15) | igual ao silver | por mês com microbatch |
+| Gold | `agg_weather_monthly_country` | **incremental** | igual ao silver, por mês | por mês com microbatch |
+| Gold | `dim_station`, `dim_date` | `table` (**full refresh**) | reconstruídas a cada execução (pequenas) | idem |
+| Gold (só B5b, Trino) | `mv_weather_wide` | `table` (**full refresh**) | o "refresh" medido do B5b | idem |
+
+- Regra: tabelas grandes e com eixo de tempo são incrementais; tabelas pequenas de referência são reconstruídas inteiras, porque o custo é de segundos e não há janela para errar.
+- Do zero, nenhuma tabela grande é construída numa query só a partir da `r2`: o build é mês a mês (D-21). Depois disso, cada execução processa só a janela do lote novo.
+
+### Regra de particionamento (D-25)
+- **A ordenação (*cluster by*) é o primeiro ajuste**: `sorted_by` no Trino, `WRITE ORDERED BY` no Spark. No B6, ela cortou a fato pela metade e acelerou as leituras sem piorar nenhuma.
+- **Partição por tempo continua valendo quando os filtros são por período**, mesmo com partições pequenas: na `r2`, tirar a partição mensal de uma fato já ordenada deixou as queries com filtro de período 60–80% mais lentas no Trino (Q2: 378 → 679 ms), com partições de 2–4 MB. Sem filtros alinhados à partição, ela não paga o custo de arquivos pequenos.
+- **Partição que serve a escrita** também fica: bronze por `_batch_id` (ingestão e leitura incremental por lote) e silver alinhada às janelas do `delete+insert`.
+- Partição grossa (ano) sem ordenação é a pior combinação: a Q1 levou 197 s, contra 0,5 s com a mesma partição ordenada.
+- Revista na `r2_1998` (1,29 bi de linhas): a conclusão se mantém, porque adicionar anos aumenta o número de partições, não o tamanho de cada uma (~1,9 MB por mês nas duas escalas). Partições só engordam com mais dados por período, como uma escala com mais estações ou mais variáveis.
+
 ### 7.1 Estratégias incrementais (matriz do B2)
-Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada é medida por engine; a vencedora vira o padrão daquele engine. Padrão atual no Trino: **`delete+insert`** (janela derivada dos dados, substitui datas inteiras). O microbatch do dbt é guiado pelo relógio: em dados históricos precisa de `--event-time-start/--event-time-end` explícitos.
+Bronze é sempre `append`. Nas camadas silver/gold, cada estratégia suportada é medida por engine; a vencedora vira o padrão daquele engine. Padrão atual: **`delete+insert`** no Trino e **`merge`** no Spark (que não tem delete+insert), escolhido pelo target na var `incremental_strategy` (janela derivada dos dados, substitui datas inteiras). O microbatch do dbt é guiado pelo relógio: em dados históricos precisa de `--event-time-start/--event-time-end` explícitos.
 
 | Estratégia | Trino | Spark | Postgres | Observação |
 |---|---|---|---|---|
@@ -187,7 +220,8 @@ Executados como etapa própria (`dbt test`), separados do tempo dos models.
 
 | Tipo | Onde | Regra |
 |---|---|---|
-| `unique_combination_of_columns` (dbt_utils) | `silver.ghcn_daily` | `(station_id, date, element)` |
+| Unicidade de `(station_id, date)` | `gold.fct_weather_daily` | Igual à do silver: teste singular na janela da última execução e `assert_unique_by_year` fora da medição (`make dbt-check-unique` checa as duas tabelas); agrupar as 190 M linhas derruba o Trino no perfil `M` |
+| Unicidade de `(station_id, date, element)` | `silver.ghcn_daily` | Teste singular só na janela que a última execução pode ter gravado (mês mais recente + 2 × overlap). A tabela inteira é checada ano a ano pela macro `assert_unique_by_year`, fora da medição, porque um `GROUP BY` único estoura o spill no perfil `M` a partir da `r2` |
 | `unique` + `not_null` | PKs do gold | — |
 | `relationships` | fato → dims | — |
 | `accepted_values` | `element` | `TMAX, TMIN, PRCP, SNOW, SNWD` |
@@ -212,14 +246,14 @@ O Cube lê **somente pelos engines** (SQL nas tabelas gold). Ele não importa ne
 
 ### 8.2 Data sources
 Uma única instância do Cube com **multi data source**:
-`CUBEJS_DATASOURCES=default,trino,starrocks,duckdb,postgres` + `CUBEJS_DS_<NOME>_DB_{TYPE,HOST,PORT,NAME,USER,PASS}`.
+`CUBEJS_DATASOURCES=default,trino,starrocks,duckdb,postgres` (hoje: `default,trino,duckdb`) + `CUBEJS_DS_<NOME>_DB_{TYPE,HOST,PORT,NAME,USER,PASS}`.
 
 | Data source | Driver | Observação |
 |---|---|---|
 | `trino` | `trino` | catálogo `lakehouse`, tabelas `lakehouse.trino_gold.*` |
 | `starrocks` | `mysql` (porta 9030 do FE) | nomes em três partes: `lakehouse.<gold_namespace>.<tabela>` |
-| `duckdb` | `duckdb` | init SQL carrega `iceberg`/`httpfs` e faz `ATTACH` no Lakekeeper |
-| `postgres` | `postgres` | schema `postgres_gold` |
+| `duckdb` | `duckdb` | DuckDB 1.5.5 **embutido no processo do Cube** (a ingestão usa 1.5.6). Extensões via `CUBEJS_DS_DUCKDB_DB_DUCKDB_EXTENSIONS`; `CREATE SECRET` + `ATTACH` no Lakekeeper exigem um `driverFactory` no `cube.js` (V13). Usa os limites de CPU/memória do container do Cube; nas medições valem os do perfil (D-22). `cube/cube.js` monta o init SQL; o Cube depende do Lakekeeper saudável, porque um init SQL que falha fica em cache |
+| `postgres` | `postgres` | schema `postgres_gold` do Postgres do benchmark; só na escala `small` |
 
 - O `data_source` é fixo em cada cube. Os membros são escritos uma vez em `cube/model/cubes/base/` (cubes `base_*`, data source placeholder, não públicos) e cada engine tem arquivos curtos em `cube/model/cubes/<engine>/` com `extends`, `data_source`, `sql_table` e só o que difere (percentis, joins e referências a outros cubes, que o `extends` não renomeia). Nomes com prefixo: `trino_weather_daily`, `starrocks_weather_daily`, etc. Sem Jinja.
 - Joins e rollups não cruzam data sources (limitação do Cube; irrelevante aqui).
@@ -246,9 +280,21 @@ Cubes (internos, `public: false`): `weather_daily` (sobre `fct_weather_daily`), 
 - Sintaxe específica por engine (ex.: `PERCENTILE_CONT` no StarRocks recebe 2 argumentos) fica no arquivo daquele engine, sobrescrevendo o membro da base.
 
 ### 8.4 Pre-aggregations (só no B5c)
-- Rollup `monthly_country` (país × mês) e `yearly_station` (estação × ano), `partition_granularity: month`/`year`, índices pelas dimensões filtradas.
-- No benchmark, o build é disparado explicitamente no passo 6 do §9 (não pelo timer do refresh worker), e o tempo é medido.
-- Conferir que as colunas de medida no Cube Store são `Float`.
+Rollups provados no V9 (proposta em `spikes/V9/proof_model.diff`, a aplicar em cada engine no B5c):
+
+| Rollup | Grão | Serve |
+|---|---|---|
+| `monthly_country` | país × mês, só medidas aditivas | Q9 (as duas etapas multi-stage) |
+| `monthly_country_avg` | país × mês, médias no grão exato | Q2, Q10 (inclusive a etapa deslocada de 2024) |
+| `yearly_station` | estação × ano | Q3 |
+| `yearly_country_percentiles` | país × ano | Q7 só como variante com `granularity: year`, registrada à parte |
+| `yearly_median_station_prcp` (no cube `station_years`) | estação × ano | Q8, com diferença de 4,6% (percentil aproximado); fica fora do conjunto principal |
+
+- Q4 (filtros de lat/lon) não tem rollup e vai para o engine. Um `dateRange` sem `granularity` casa com rollup quando todas as medidas são aditivas (Q3, Q9); medidas não aditivas exigem o grão exato.
+- Os percentis precisam de `CAST(... AS DOUBLE)` dentro da função; com isso, todas as colunas de medida no Cube Store são `float`.
+- O cache de resultados do Cube fica no volume do Cube Store e sobrevive a reinícios: toda requisição medida no B4/B5 manda `renewQuery: true`, e o volume é recriado antes de uma execução completa.
+- Implementação: os rollups ficam só nos cubes `trinopa_*` / `starrockspa_*` (views `trinopa_weather`, `starrockspa_weather`), então o B4 nunca chega ao Cube Store. São quatro rollups (`monthly_country`, `monthly_country_avg`, `yearly_station`, `yearly_country_percentiles`), com uma partição por ano (64 por engine) e `refresh_key` de 365 dias, para o build não disparar no meio de uma medição. No StarRocks, `sql_alias` curto, porque o driver MySQL recusa nomes de tabela com mais de 64 caracteres. O `make cube-up` não sobe o refresh worker; o build medido (`make b5-refresh SCENARIO=b5c ENGINE=…`) usa um refresh worker avulso com o mesmo limite de CPU e conta do início até as 64 partições prontas (granularidade de ~10 s). Na `r2`: 516 s no Trino e 134 s no StarRocks, ~20 MB no Cube Store.
+- No benchmark, o build é medido no passo 6 do §9. A API `/v1/pre-aggregations/jobs` recusou o JWT (`API scope is missing: jobs`); até resolver, o build é o do refresh worker, medido do início do refresh até a última partição pronta. Na prova (2024–2025): ~3 min 20 s com o Trino no perfil `M` e o refresh worker em 0,5 CPU; 31 MB no Cube Store.
 
 ## 9. Fluxo de uma execução completa
 
@@ -270,6 +316,7 @@ Cada etapa é executada e medida isoladamente, na ordem:
 | `S` | 2 | 4 GB | pouco recurso |
 | `M` | 4 | 8 GB | **padrão** |
 | `L` | 8 | 12 GB | escalabilidade |
+| `L2` | 8 | 12 GB | o `L` sobre o RustFS revisto (D-26, V15): 1.0.2, scanner desligado, 2 CPU, 5 GiB (`env/l2.env`) |
 
 Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+worker no Trino; o JVM único no Spark). Infra compartilhada (RustFS, Lakekeeper, Postgres-catálogo, Cube) fica fora do limite e é constante entre execuções.
 
@@ -286,14 +333,18 @@ Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+w
 ### 10.3 Cenários de aceleração (B5)
 | Cenário | Mecanismo | Como o Cube usa |
 |---|---|---|
-| **B5a** | **StarRocks async MV** `mv_weather_wide`: o SQL "cru" que o Cube gera — o tabelão `fct_weather_daily` × `dim_station` × `dim_date` com todas as colunas usadas pelos cubes. Propriedade `force_external_table_query_rewrite = true`; sessão com `enable_materialized_view_rewrite = true`. | O Cube continua lendo os marts; o otimizador do StarRocks reescreve a query para a MV. |
-| **B5b** | **Trino materialized view** equivalente no conector Iceberg (⚠️ V2). | Trino não reescreve automaticamente: o Cube aponta para a MV (via `sql_table` por variável). |
+| **B5a** | **StarRocks async MVs, uma por tabela do gold** (D-24): `mv_fct_weather_daily`, `mv_dim_station`, `mv_dim_date`, cada uma a cópia da tabela com todas as colunas, sem join e sem agregação. Propriedade `force_external_table_query_rewrite = true`; sessão com `enable_materialized_view_rewrite = true` e `enable_materialized_view_union_rewrite = false` (bug #79345). | O Cube continua lendo os marts; o otimizador do StarRocks reescreve a query para a MV. |
+| **B5b** | **Tabela equivalente à MV** no Trino: model dbt `table` `trino_gold.mv_weather_wide` com o mesmo SQL do B5a. O Trino 483 não cria MV no catálogo REST (V2). O "refresh" medido é `dbt run --select mv_weather_wide` (273,5 s na `r2`). Partição anual + ordenação `(station_id, date)`: com partição mensal o CTAS estoura a memória do escritor no perfil `M`. No Cube: cubes `trinomv_*` e view `trinomv_weather` | O Cube aponta para a tabela via `sql_table`, sem reescrita. |
 | **B5c** | **Cube Store** pre-aggregations (país × mês, estação × ano) sobre Trino e sobre StarRocks. | O Cube roteia para o Cube Store. |
 
-- DDL do B5a: `PARTITION BY date_trunc('month', date)`, `DISTRIBUTED BY HASH(station_id)` com buckets pelo volume (< 5M linhas → 4; 5–50M → 8; 50–200M → 16; > 200M → 32), `ORDER BY` pelas dimensões filtradas, `REFRESH MANUAL`. Não existe `CREATE OR REPLACE` para MV: recriar é `DROP` + `CREATE`.
-- Refresh **depois da transformação e antes da leitura** (passo 6 do §9), com `WITH SYNC MODE` (ou assíncrono + polling de `SHOW MATERIALIZED VIEWS` até estado final), e medido.
+- DDL do B5a: `PARTITION BY date_trunc('month', date)`, `DISTRIBUTED BY HASH(station_id)` com buckets pelas linhas **por partição** (no StarRocks o número de buckets vale para cada partição): ~0,5–1 M linhas por bucket na partição mais cheia, o que dá 2 buckets na fato em todas as escalas (o mês mais cheio tem ~1 M linhas); tabelas sem partição (dimensões) seguem o volume total (< 5 M linhas → 4). Até a campanha `L` a fato usava 16 buckets (regra pelo volume da tabela): na `local`, 16 × 3.156 meses deram ~50 mil tablets e o refresh estourou a memória do BE nos perfis `M` e `L`; as linhas B5a da `r2` e da `r2_1998` foram medidas com 16 buckets. Além disso: `ORDER BY` pelas dimensões filtradas, `REFRESH DEFERRED MANUAL` (sem `DEFERRED`, a criação já popula a MV e o primeiro refresh medido não faz nada). Não existe `CREATE OR REPLACE` para MV: recriar é `DROP` + `CREATE`. DDL em `bench/sql/`. Os arquivos de uma MV apagada ficam na lixeira do BE por 1 h (`catalog_trash_expire_second`).
+- Refresh **depois da transformação e antes da leitura** (passo 6 do §9), com `WITH SYNC MODE` e `SET query_timeout = 3600` na mesma sessão (o SYNC é morto em 300 s), e medido. Depois do refresh o BE compacta por ~10 min; a leitura só começa quando a CPU do container cai abaixo de 10%, senão as queries falham por memória. Na `r2`, a MV larga da prova do V3 levou 540–589 s de refresh e ocupou 4,8 GB depois da compactação (storage local do BE, fora do bucket).
+- Medido na `r2` com uma MV por tabela (DDL em `bench/sql/b5a_*.starrocks.sql`, `make starrocks-mv-create|refresh|drop`): refresh de 382 s para a fato (16 buckets) e 1–2 s para as dimensões; ~1,3 GB depois da compactação, que leva ~25 min. Depois da compactação o BE fica perto do limite de memória mesmo sem queries, então o StarRocks é reiniciado antes da primeira leitura medida (as MVs persistem).
+- A Q8 estoura a memória do BE no perfil `M` com e sem MV, e a Q5 não roda no StarRocks: as duas entram como `failed` para o StarRocks, não como inválidas.
+- Evolução possível: MVs com as agregações que o Cube usa (país × mês, estação × ano), se o StarRocks reescrever as queries do Cube para elas; avaliar depois do B5a com as MVs por tabela.
 - Sem a MV, o StarRocks cai silenciosamente na tabela base. Por isso o B4 do StarRocks (sem MV) é a linha de base do B5a, e o `EXPLAIN` confirma qual dos dois caminhos rodou.
-- **Validação obrigatória no B5a:** o `EXPLAIN` de cada query precisa mostrar `mv_weather_wide`; se a reescrita não ocorrer, a medição é marcada como inválida (⚠️ V3).
+- **Validação obrigatória no B5a:** o `EXPLAIN` de cada query precisa mostrar as MVs no lugar de cada tabela lida; se a reescrita não ocorrer, a medição é marcada como inválida.
+- A Q5 (janela móvel de 7 dias) não roda no StarRocks via Cube: o Cube gera `WITH RECURSIVE` e `CAST(... AS DATETIME(6))`, que o StarRocks 4.1.6 não aceita. Fica registrada como não suportada.
 - Q4–Q6 (§10.5) servem de controle; Q1–Q3 são as candidatas a ganho.
 
 ### 10.4 Manutenção (aplicada após cada carga; parâmetros do B6)
@@ -306,14 +357,18 @@ Os limites valem para o engine sob teste (soma FE+BE no StarRocks; coordinator+w
 | `write.target-file-size-bytes` | 128 MB, 256 MB, 512 MB |
 | `write.parquet.compression-codec` | **zstd** (padrão do Iceberg), snappy, gzip |
 | Partição de `ghcn_daily` / `fct_weather_daily` | `month(date)`, `year(date)` |
+| Ordenação (*cluster by*) de `fct_weather_daily` | nenhuma; `sorted_by (station_id, date)` (Trino) / `WRITE ORDERED BY` (Spark); z-order `(station_id, date)` via `rewrite_data_files(strategy => 'sort')` no Spark |
 
+- Execução (`make b6 VARIANT=… ENGINE=trino`, `make b6-all`): um fator por vez a partir da base (layout atual do gold), 9 variantes: `baseline`, `file128`/`file256`/`file512`, `snappy`, `gzip`, `year`, `sorted` (`sorted_by (station_id, date)` no Trino) e `zorder` (Spark: CTAS + `rewrite_data_files` com `zorder(station_id, date)` e `rewrite-all`, porque uma partição com um único arquivo é ignorada). Cada variante vive em `bench_<run>_<variante>` com a fato e cópias das dimensões (o DuckDB não lê views Iceberg), é lida pelo B3 e apagada com espera do purge antes da próxima.
+- No Trino, a escrita das variantes é um `INSERT` por ano: um CTAS ordenado das 192 partições estoura a memória do `TableWriterOperator` no perfil `M`.
+- Com partição mensal, os arquivos ficam com 2–4 MB; o tamanho-alvo de arquivo (128/256/512 MB) só pesa se a partição for maior. A partição por ano é a variante que testa isso.
 - Hipótese a validar: **zstd** é o melhor equilíbrio entre tamanho e velocidade de leitura; gzip comprime parecido, mas descomprime mais devagar; snappy é o maior em disco. Com ~1–2 GB por camada, partições pequenas (por mês) limitam o tamanho real dos arquivos — por isso partição entra na matriz junto com o tamanho de arquivo.
-- O resultado do B6 define os padrões usados nas demais suítes (registrado em §14).
+- O resultado do B6 define os padrões usados nas demais suítes (D-15, D-25). A Q1 lenta da partição `year(date)` (197 s quente) some quando a tabela é ordenada (0,49 s): o problema é a partição grossa sem ordenação, não a partição anual em si.
 
 ### 10.5 Queries de leitura (D1)
 1. Contagem de observações por ano.
 2. Média de `tmax` por país e mês (ano filtrado).
-3. Top 20 estações por precipitação total em um ano.
+3. Top 20 estações por precipitação total em um ano, só entre estações com precipitação (filtro `set` na medida: no `ORDER BY ... DESC` o Postgres põe os NULLs primeiro, e os outros engines por último).
 4. Join fato × `dim_station` com filtro geográfico (bounding box).
 5. Média móvel 7 dias de `tmax` para N estações (window function).
 6. Lookup pontual: uma estação, intervalo de 30 dias.
@@ -325,15 +380,19 @@ Perguntas só via Cube (B4/B5), que geram SQL mais pesado (CTEs, window, subquer
 9. Share da precipitação por país sobre o total.
 10. Variação ano contra ano de `avg_tmax` por país, mês a mês.
 
-D2: 22 queries TPC-H (dialeto ajustado por engine, semântica igual).
+D2: 22 queries TPC-H com os parâmetros padrão (`bench/queries/tpch/`, um arquivo por engine), validadas por checksum contra o DuckDB em DuckDB, Trino e StarRocks. A fração da Q11 segue a especificação, `0.0001 / SF`; a Q15 usa CTE no lugar da view; Trino e StarRocks usam `substr` na Q22 e `GROUP BY l_suppkey` na Q15. Resultados rotulados "derived from TPC-H, not comparable to published TPC-H results".
 
 ### 10.6 Protocolo
 - Nunca dois engines ao mesmo tempo. Nas leituras (B3–B5), uma query por vez.
+- **Infra no mesmo estado para cada engine:** o RustFS é reiniciado antes da campanha de cada engine. Depois de ~10 h de uso contínuo, ele chegou a 1,5 de 2 GiB e passou a responder devagar; os lotes do Spark subiram de 10 s para 100–500 s e terminaram em timeout de leitura no S3. Com o RustFS recém-iniciado, ele mede o engine, não o desgaste da infraestrutura.
+- O Mac fica acordado durante **toda a campanha**, inclusive nos intervalos entre execuções (um app de "keep awake" com tempo definido): o `caffeinate -i` de cada comando só vale enquanto o comando roda. Num intervalo sem ele, o Mac entrou em *Idle Sleep*; a execução seguinte começou com a máquina dormindo, a VM congelou e o Trino perdeu as queries.
 - **Cold:** reiniciar o engine e limpar os caches → 1 execução.
 - **Warm:** 1 warm-up descartado + **5 execuções** medidas.
 - Timeout: 300 s por query (registra `timeout` e segue).
 - Validar o resultado (row count + checksum) contra a referência DuckDB; resultado divergente invalida a medição. Exceção: medidas aproximadas (percentis via `approx_percentile`) são comparadas com tolerância relativa de 5%, e a tolerância é registrada no resultado.
 - Coletar `docker stats` (CPU/mem) durante cada execução.
+- Implementação (`bench/harness/`, `make bench SUITE=b3|b4|b5 ENGINE=… DATASET=ghcn|tpch`): o cliente roda no container `bench`, na rede do Compose, com o socket do Docker para reiniciar o engine (frio), limpar o page cache da VM e amostrar `docker stats` entre e durante as execuções. As queries diretas ficam em `bench/queries/sql/qN.<engine>.sql`, escritas por engine. A referência DuckDB é calculada fora das etapas medidas. Execuções com timeout ou erro ficam como `timeout`/`failed`, resultados divergentes como `invalid`; o warm-up é gravado com `run_type=warmup` e fica fora do p50/p95.
+- No Cube 1.7.50, só `cache: "no-cache"` no topo do corpo do `/v1/load` força a execução (o `renewQuery: true` sozinho ainda devolveu resultado do cache). Toda requisição medida manda os dois, e isso fica registrado em `notes`.
 
 ### 10.7 Formato dos resultados
 `results/<suite>.parquet`, uma linha por etapa/execução:
@@ -400,11 +459,12 @@ docs/SPEC.en.md           # ao estabilizar
 |---|---|---|
 | **0 — Specs** ✅ | Este documento | Aprovado; pendências viram spikes (§15) |
 | **1 — MVP lakehouse** ✅ | Spikes V1/V4; storage + Lakekeeper + Trino + Traefik; ingestão D1 (1 ano → dimensionar); dbt-trino bronze→gold com testes; Cube sobre Trino | `make up ingest dbt` do zero sem erro; testes dbt passam; Cube responde às 6 perguntas; `storage-report` dentro do teto |
-| **2 — Benchmark** | Carga das escalas `r2` (GHCN 2010–2025) e `local` (§6); harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
+| **2 — Benchmark** ✅ r2, r2_1998, small e local medidas no perfil `M` ([plano](specs/phase-2.md); perfil `L` na `local` medido em duas campanhas, `l` e `l2` (D-26); em aberto na `local`: os incrementais do Spark (o spill do `MERGE` passa do disco do Docker) e o B5b/B5c do StarRocks no `l2`, que ficam para a execução na nuvem) | Carga das escalas `r2` (GHCN 2010–2025) e `local` (§6); harness; Spark e Postgres no B2; StarRocks, DuckDB, Postgres como readers; D2; B5 (MVs + Cube Store); B6 | B1–B6 geram `results/*.parquet` no perfil `M`; relatório gerado |
 | **3 — Orquestração** | Airflow 3 + Cosmos (`ExecutionMode.WATCHER`, CeleryExecutor) executando o fluxo do §9; tarefas que não são dbt (ingestão DuckDB, manutenção, refresh de MV, harness) rodam como **containers** via `DockerOperator` com imagens do projeto, para a imagem do Airflow ter só Cosmos, o provider Docker e as connections dos engines | DAG ponta a ponta; tempos por model ≈ fase 2; overhead do orquestrador registrado |
-| **4 — Extras** | R2 (+ R2 Data Catalog); Superset via Cube; observabilidade e linhagem (§10.8); Polaris; Airbyte se necessário; `SPEC.en.md` | Resultado documentado por item |
+| **4 — Extras** | Superset via Cube; observabilidade e linhagem (§10.8); Polaris; Airbyte se necessário; `SPEC.en.md` | Resultado documentado por item |
 | **5 — Comparação de orquestração** | Dagster + dbt (`dagster-dbt`) executando o mesmo fluxo | Overhead Dagster × Airflow/Cosmos documentado |
-| **6 — Publicação** | README em inglês, resultados, gráficos, artigo (§16); CI no GitHub Actions (`docker compose config`, SQLFluff, `dbt parse`) | Repo público; CI verde; qualquer pessoa reproduz com `make` |
+| **6 — Cloudflare R2** | A escala `r2` final (≥ 1 bi linhas no bronze) rodando com o bucket no R2 (+ R2 Data Catalog), depois de todas as fases locais. Credenciais e endpoint do R2 entram como variáveis próprias em `.env.example` (nunca as reais no repo). **Rede medida à parte:** antes de cada campanha, linha de base de upload/download de um arquivo conhecido e latência de GETs pequenos, gravada em `results/`; cada suíte registra a contagem de GET/PUT (classes A/B) | B1–B5 no R2 comparados com os mesmos passos no RustFS local (mesmos dados, engine e perfil): a diferença é o custo da rede e do object store remoto; operações dentro do free tier (V5) |
+| **7 — Publicação** | README em inglês, resultados, gráficos, artigo (§16); CI no GitHub Actions (`docker compose config`, SQLFluff, `dbt parse`) | Repo público; CI verde; qualquer pessoa reproduz com `make` |
 | **Futuro** | Iceberg v3; dbt Core v2 | — |
 
 ## 14. Decisões registradas
@@ -423,31 +483,40 @@ docs/SPEC.en.md           # ao estabilizar
 | D-10 | dbt Core 1.x | v2 sem adapter Trino/Postgres confirmado. |
 | D-11 | Traefik só para UIs HTTP; harness dentro da rede do Compose | Evita expor portas sem colocar proxy no caminho medido. |
 | D-12 | **Iceberg v2** | Trino ainda não escreve v3 (leitura experimental); StarRocks 4.1 rejeita tabelas v3 com deletion vectors; suporte do Lakekeeper não confirmado. |
-| D-13 | Spark 4.1.x + Iceberg ≥ 1.11 (Scala 2.13), `local[N]` ajustado ao perfil | Versão mais recente; um JVM evita overhead de cluster em um nó. |
+| D-13 | Spark 4.1.3 + Iceberg 1.12.0 (Scala 2.13) + dbt-spark 1.11.0 (Thrift), `local[N]` ajustado ao perfil | Versão mais recente; um JVM evita overhead de cluster em um nó. |
 | D-14 | Um engine por vez; dbt com `threads` igual para todos; medição por model | Comparação justa sem disputa entre engines; o paralelismo interno é mérito de cada engine. |
-| D-15 | Codec/tamanho de arquivo/partição definidos pelo B6 | Escolha baseada em medição, não em suposição. |
+| D-15 | Layout padrão de `fct_weather_daily`, definido pelo B6 (`results/b6.parquet`, Trino `M`, `r2`): zstd + partição `month(date)` + ordenação `(station_id, date)`. No Trino, `sorted_by` ordena toda escrita; no Spark, `WRITE ORDERED BY` só existe depois da criação da tabela, então a ordenação é aplicada pela manutenção (`rewrite_data_files` com `strategy => 'sort'` e `rewrite-all`) | Ordenar reduziu a fato de 0,732 para 0,383 GB (−48%) e a Q1 quente de 806 para 506 ms, sem piorar nenhuma leitura. O tamanho-alvo de arquivo não muda nada (arquivos mensais de 2–4 MB); snappy ocupa 22% a mais e gzip 3% a menos, com leituras no ruído; z-order não melhorou as leituras; partição por ano deixou a Q1 ~250× mais lenta (anomalia em investigação). |
 | D-16 | Uma instância do Cube com multi data source; membros na base e engines via `extends` | Semântica idêntica entre engines sem template; cada arquivo de engine mostra só o que difere. |
 | D-17 | Medidas de rollup sempre `CAST AS DOUBLE` | Drivers truncam DECIMAL a 5 casas no Cube Store. |
 | D-18 | Cube lê só pelos engines, sem integração com dbt | O benchmark mede o caminho engine → Cube; schema do Cube independente. |
 | D-19 | Medidas avançadas via recursos nativos do Cube (multi-stage, `time_shift`, `sub_query`) | Abordagem atual recomendada pelo Cube; gera SQL mais exigente para os engines. |
 | D-20 | Manutenção numa macro única: post-hook no uso normal, desligada e medida à parte nos benchmarks | Um só código para operação e benchmark; tempo dos models não é contaminado. |
+| D-21 | Construção do zero em janelas mensais (`make dbt-backfill`: microbatch e manutenção uma vez por tabela) | Na `r2`, o dedup do silver numa query só (~740 M linhas) e o teste de unicidade da tabela inteira estouram o spill de 10 GB do perfil `M`. Por mês, cada lote leva 2–9 s. |
+| D-22 | Nas medições do DuckDB via Cube (B4/B5), o `cube-api` recebe os limites do perfil (`ENGINE_CPUS`/`ENGINE_MEMORY`), e o DuckDB recebe 75% dessa memória e `ENGINE_CPUS` threads; tudo registrado em `engine_config`. O `make cube-up` não lê o perfil: para o DuckDB os limites vão por variável (perfil `M`: `CUBE_API_CPUS=4 CUBE_API_MEMORY=8g CUBE_DUCKDB_THREADS=4 CUBE_DUCKDB_MEMORY_LIMIT=6GB`; `L`: `8`, `12g`, `8`, `9GB`); para os outros engines o `cube-api` fica no padrão (1 CPU / 1 GB) | O DuckDB roda dentro do processo do Cube. Com os limites padrão do Cube (1 CPU / 1 GB, DuckDB 512 MB), a Q8 estoura a memória na `r2`. O overhead do Node fica dentro do mesmo orçamento, e isso é citado junto dos números. |
+| D-23 | Postgres (writer e reader) só na escala `small` (GHCN 2025), num container próprio (`postgres-bench`, perfil `postgres`, auth `trust` só na rede do Compose) com os limites do perfil e `shared_buffers`/`effective_cache_size`/`work_mem` derivados dele (`config/postgres-bench/entrypoint.sh`); tabelas sem partição; o bronze é copiado do Iceberg pelo DuckDB (`make postgres-load`); nessa escala todos os engines rodam B2/B3 para a comparação | Em linhas, o Postgres usa ~65 bytes/linha contra ~2,7 do Parquet: a `r2` daria ~90 GB e não cabe no disco do Docker. A escala `small` mantém o Postgres como baseline com os mesmos dados que os outros engines. |
+| D-24 | B5a com uma MV do StarRocks por tabela do gold (cópia de todas as colunas, sem join e sem agregação), em vez de uma MV larga com os joins | O StarRocks só reescreve para MV de join quando a query junta as mesmas tabelas, e o Cube junta só os cubes usados. Com uma MV por tabela, cada leitura de tabela é trocada pela sua MV, qualquer que seja o join; é o padrão usado em produção pelo autor. O Cube continua lendo os marts, e o storage extra fica no BE, fora do bucket. |
+| D-25 | Ordenação (*cluster by*) primeiro; partição por tempo só quando os filtros são por período (mesmo com partições pequenas) ou quando serve a escrita (bronze por lote, janelas do `delete+insert`); nunca partição sem ordenação | Segunda rodada do B6 (`results/b6.parquet`): sem partição, a fato ordenada ficou 60–80% mais lenta nos filtros de período; partição anual sem ordenação deixou a Q1 ~400× mais lenta que com ordenação. O limite em bytes da primeira versão desta regra não se sustentou para filtros de tempo no Trino. |
+| D-26 | O perfil `L` na escala `local` roda duas vezes: primeiro com o RustFS em 1 CPU, igual a todos os perfis (infra constante, §10.1), e 5 GiB de memória no B2 a partir do microbatch do Trino e em todo o Spark (com 3 GiB ele foi morto por OOM três vezes no B2 do Trino); os limites do RustFS vão para o `engine_config` (`docker_vm: … rustfs_cpus rustfs_memory_gib`); depois uma segunda campanha `L` com a infra do RustFS revista — versão 1.0.2 (correções de memória do scanner, V15), scanner desligado, 5 GiB e 2 CPU (8 do engine + 2 = os 10 da VM) — onde todos os engines repetem B2–B5 e o B2 do Spark na `local` é medido de novo; é o perfil `l2` (`env/l2.env`), e a campanha exporta `COMPOSE_ENV_FILES=.env,env/l2.env` para que todo `docker compose` (inclusive `make cube-up`) use a mesma infra. As medições no perfil `M` e a primeira campanha `L` ficam com o RustFS 1.0.1, registrado no `engine_config` | Na primeira campanha `L`, o Trino com 8 CPU ficou mais lento nos scans da tabela inteira que no perfil `M` (B3 Q1 +15%, Q1 via Cube 2×), com as queries filtradas estáveis: o object store de 1 CPU limita o engine. A primeira campanha mostra o perfil com a infra constante; a segunda mostra quanto o engine ganha quando o object store não é o gargalo. |
 
 ## 15. Validações pendentes (spikes)
 
 | # | Validação | Quando | Fallback |
 |---|---|---|---|
 | V1 | ✅ Resolvido: DuckDB 1.5.6 escreve Iceberg v2 (CREATE, INSERT, particionado) via Lakekeeper com `ACCESS_DELEGATION_MODE 'none'` + secret S3 estático (detalhes em `spikes/V1/README.md`). Trino 483 lê as tabelas do DuckDB com poda de partição; Spark e StarRocks validados na fase 2 | Fase 1 | — |
-| V2 | Trino MV no conector Iceberg com catálogo REST | Fase 2 | Tabela equivalente via dbt |
-| V3 | StarRocks reescreve automaticamente para MV de join sobre Iceberg | Fase 2 | Documentar limitação; Cube aponta para a MV |
+| V2 | ✅ Resolvido: **não suportado**. O Trino 483 responde `createMaterializedView is not supported for Iceberg REST catalog` (o `CREATE VIEW` lógico funciona); o código no master é igual. Fallback adotado no B5b (detalhes em `spikes/V2/README.md`). Revalidar a cada upgrade do Trino | Fase 2 | — |
+| V3 | ✅ Resolvido (StarRocks 4.1.6, `spikes/V3/README.md` §9): a MV de join é reescrita só quando a query tem **o mesmo formato de join** da MV. O SQL do Cube junta só os cubes usados, então nunca casa com a MV larga; View Delta Join não funcionou com constraints declaradas nas tabelas Iceberg. Resultados iguais com e sem MV (tolerância 1e-9). Adotado e provado: uma MV por tabela, sem join (D-24): todas as leituras de Iceberg do SQL do Cube (Q1–Q4, Q6–Q10) e das queries escritas à mão passam a ler as MVs, com resultados iguais (`spikes/V3/README.md` §10) | Fase 2 | — |
 | V4 | ✅ Resolvido: dbt-trino suporta `microbatch` desde 1.9.0; `concurrent_batches` desde 1.10.2 (detalhes em `spikes/V4/README.md`). A validar na prática: `event_time` DATE comparado com literais TIMESTAMP e conflitos de commit com `concurrent_batches` | Fase 1 | — |
-| V5 | Limites atuais do free tier do R2 (storage, ops Class A/B) | Antes da fase 4 | Reduzir repetições/volume |
+| V5 | Limites atuais do free tier do R2 (storage, ops Class A/B) | Antes da fase 6 | Reduzir repetições/volume |
 | V6 | Iceberg v3: escrita no Trino, deletion vectors no StarRocks, suporte no Lakekeeper | Revisão periódica | Manter v2 |
 | V7 | Endpoints de métricas e integração OpenLineage de cada engine na versão pinada | Fase 4 | Manter só cAdvisor + `dbt-ol` |
 | V8 | Cosmos `ExecutionMode.WATCHER` com Airflow 3 + CeleryExecutor + dbt-trino/dbt-spark | Fase 3 | `ExecutionMode.LOCAL` com `DbtTaskGroup` |
-| V9 | Medidas multi-stage e não aditivas do Cube com pre-aggregations no Cube Store | Fase 2 | Q7–Q10 ficam fora do B5c e o motivo é documentado |
+| V9 | ✅ Resolvido no Trino (`spikes/V9/README.md` §8): Q2, Q3, Q9 e Q10 são servidas por rollups como estão escritas, com resultados iguais à fonte; Q7 só com `granularity: year`; Q8 é servida, mas difere 4,6% (percentil aproximado); Q4 não. Falta repetir no StarRocks | Fase 2 | — |
 | V10 | STS do RustFS (AssumeRole) com a session policy do Lakekeeper → vended credentials para todos os engines | Fase 4 | Manter chaves estáticas |
 | V11 | Cosmos: `ExecutionMode.WATCHER` (dbt instalado na imagem do Airflow/worker) × `ExecutionMode.DOCKER` (dbt numa imagem própria, uma task por model) — overhead e isolamento | Fase 3 | `DockerOperator` chamando `dbt build` |
 | V12 | "Modo seguro": IdP OIDC leve (Dex ou Zitadel) + Lakekeeper com autenticação OIDC (sem OpenFGA) + vended credentials via STS do RustFS (depende do V10); engines com OAuth2 client credentials (DuckDB `CLIENT_ID`/`CLIENT_SECRET`/`OAUTH2_SERVER_URI`). Medido como cenário à parte; o cenário sem auth e com chaves estáticas segue como linha de base | Fase 4 | Manter chaves estáticas sem auth |
+| V15 | Parcial: o RustFS 1.0.1 cresce em memória sob horas de S3 com muitos objetos pequenos até o OOM (3 GiB com o Trino, 5 GiB com o Spark no B2 da `local`). Causa documentada: o scanner de uso de dados guarda metadados em memória e o mimalloc não devolve (rustfs#8456, corrigido na 1.0.2 de 16/10/2026 via #8460; rustfs#8121 fechado sem causa completa). Nenhuma variável limita a memória do processo; `RUSTFS_SCANNER_ENABLED=false` desliga o scanner. Prova local (18 min, 8 threads, PUT/GET/LIST de objetos de 20 KB): +39 MB/min por padrão, +29 MB/min sem scanner, sem platô em nenhum |
+| V14 | ✅ Resolvido em parte: o crescimento do heap do Spark Thrift Server no B2 da escala `local` (4,4 M `BaseSnapshot` vivos, GC thrash) vem das sessões JDBC fechadas que ficam retidas, cada uma com um `SparkCatalog` cujo `CachingCatalog` e `RESTTableCache` (Iceberg 1.12) seguram a `TableMetadata`. Prova no perfil `S` (30 sessões): com os dois caches desligados, nenhuma `TableMetadata`/`BaseSnapshot` retida (antes ~18 mil snapshots), heap 109 MB contra 166 MB. Limites da UI e `spark.ui.enabled=false` não resolvem. Em aberto: qual objeto segura a `SessionState` (fuga linear de ~1 MB por sessão; parecido com SPARK-34689) |
+| V13 | ✅ Resolvido: o Cube v1.7.50 embute DuckDB 1.5.5 e lê os marts Iceberg via Lakekeeper. Extensões por env; `CREATE SECRET` + `ATTACH` (`ACCESS_DELEGATION_MODE 'none'`) via `driverFactory` em `cube/cube.js`. Q1–Q10 respondem e Q1–Q3 batem com a referência DuckDB direta (detalhes em `spikes/V13/README.md`). Pegadinhas: erro no init SQL é engolido e fica em cache até reiniciar o Cube; `INSTALL` baixa extensões a cada start | Fase 2 | — |
 
 ## 16. Publicação
 
@@ -456,7 +525,8 @@ docs/SPEC.en.md           # ao estabilizar
 | Repositório público | Código em inglês, `README.md` (arquitetura, como reproduzir, resultados), licença Apache-2.0, `SPEC.en.md`. |
 | Resultados | `results/*.parquet` + relatório gerado (tabelas e gráficos) versionados, com versões e `engine_config` de cada execução. |
 | Artigo | Blog (versão completa) + post no LinkedIn (resumo com 2–3 gráficos e link). |
-| Rascunho | `docs/blog/post.md` — esqueleto do artigo e diário do projeto, atualizado a cada decisão, spike e resultado. Escrito em inglês; tradução para PT-BR quando estiver pronto. |
+| Diário do projeto | `docs/lab-notebook.md` — registro cronológico de cada decisão, spike, falha e resultado, em inglês; é o rastro por trás de cada número publicado. |
+| Artigos | `docs/blog/NN-<tema>.md` — um arquivo por artigo publicado (Medium, em inglês) e o post do LinkedIn (EN e PT) com o prompt da capa. |
 | Assets | Capa; cards com os números (resultados renderizados como imagem); diagrama da arquitetura; screenshots das UIs; vídeo explicativo da ferramenta e dos benchmarks (skill `/brag`). |
 
 Estrutura do artigo:

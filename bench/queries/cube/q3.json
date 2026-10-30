@@ -2,6 +2,7 @@
   "measures": ["trino_weather.total_prcp"],
   "dimensions": ["trino_weather.station_id"],
   "timeDimensions": [{"dimension": "trino_weather.date", "dateRange": ["2025-01-01", "2025-12-31"]}],
+  "filters": [{"member": "trino_weather.total_prcp", "operator": "set"}],
   "order": [["trino_weather.total_prcp", "desc"], ["trino_weather.station_id", "asc"]],
   "limit": 20
 }

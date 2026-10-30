@@ -1,0 +1,13 @@
+# B5c: the nested-aggregate cube over starrockspa_weather_daily. No rollup: Q8 goes to the engine (SPEC §8.4).
+cubes:
+  - name: starrockspa_station_years
+    extends: starrocks_station_years
+    joins:
+      - name: starrockspa_weather_daily
+        relationship: one_to_many
+        sql: "{CUBE}.station_id = {starrockspa_weather_daily}.station_id AND {CUBE}.year = EXTRACT(YEAR FROM {starrockspa_weather_daily}.date)"
+    dimensions:
+      - name: annual_prcp
+        sql: "{starrockspa_weather_daily.total_prcp}"
+        type: number
+        sub_query: true

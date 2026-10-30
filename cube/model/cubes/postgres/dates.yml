@@ -1,0 +1,6 @@
+# Postgres: dim_date. Everything else comes from base_dates.
+cubes:
+  - name: postgres_dates
+    extends: base_dates
+    data_source: postgres
+    sql_table: postgres_gold.dim_date

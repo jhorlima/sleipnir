@@ -2,11 +2,8 @@ version: 2
 
 models:
   - name: ghcn_daily
+    # Key uniqueness: tests/ghcn_daily_unique_in_latest_window.sql and macro assert_unique_by_year.
     description: Typed, QC-filtered and deduplicated GHCN-Daily observations (one row per station, date and element).
-    data_tests:
-      - dbt_utils.unique_combination_of_columns:
-          arguments:
-            combination_of_columns: [station_id, date, element]
     columns:
       - name: station_id
         data_tests: [not_null]

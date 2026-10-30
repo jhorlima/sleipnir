@@ -24,6 +24,8 @@ services:
         limits:
           cpus: "${ENGINE_CPUS:-4}"
           memory: ${ENGINE_MEMORY:-8g}
+    # Equal to the memory limit: no swap, so an engine out of memory fails instead of slowing down unseen.
+    memswap_limit: ${ENGINE_MEMORY:-8g}
     labels:
       traefik.enable: "true"
       traefik.http.routers.trino.rule: Host(`trino.localhost`)
@@ -34,3 +36,93 @@ services:
         condition: service_healthy
       rustfs:
         condition: service_healthy
+
+  # Spark Thrift Server in one JVM (local[N]); dbt-spark connects with method: thrift.
+  # Settings that follow the profile are computed in config/spark/thriftserver.sh.
+  spark:
+    image: sleipnir-spark:${SPARK_VERSION:-4.1.3-scala2.13-java21-ubuntu}-iceberg${ICEBERG_VERSION:-1.12.0}
+    build:
+      context: ./config/spark
+      args:
+        SPARK_VERSION: ${SPARK_VERSION:-4.1.3-scala2.13-java21-ubuntu}
+        ICEBERG_VERSION: ${ICEBERG_VERSION:-1.12.0}
+    profiles: [spark]
+    entrypoint: ["/opt/spark/conf/thriftserver.sh"]
+    environment:
+      ENGINE_CPUS: ${ENGINE_CPUS:-4}
+      ENGINE_MEMORY: ${ENGINE_MEMORY:-8g}
+      S3_REGION: ${S3_REGION:?set in .env}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+      LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE:?set in .env}
+    volumes:
+      - ./config/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+      - ./config/spark/thriftserver.sh:/opt/spark/conf/thriftserver.sh:ro
+    # A real query through the Thrift protocol, as dbt-spark sends it.
+    healthcheck:
+      test: ["CMD", "/opt/spark/bin/beeline", "-u", "jdbc:hive2://localhost:10000", "-e", "SELECT 1"]
+      start_period: 120s
+      start_interval: 3s
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "${ENGINE_CPUS:-4}"
+          memory: ${ENGINE_MEMORY:-8g}
+    # Equal to the memory limit: no swap, so an engine out of memory fails instead of slowing down unseen.
+    memswap_limit: ${ENGINE_MEMORY:-8g}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.spark.rule: Host(`spark.localhost`)
+      traefik.http.routers.spark.entrypoints: web
+      traefik.http.services.spark.loadbalancer.server.port: "4040"
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+
+  # Read-only engine on the lake. One container = FE + BE, so the profile limit is their sum (SPEC §10.1).
+  # FE heap and BE mem_limit follow the profile (config/starrocks/entrypoint.sh); the catalog is created by scripts/starrocks-init.sh.
+  starrocks:
+    image: starrocks/allin1-ubuntu:${STARROCKS_VERSION:-4.1.6}
+    profiles: [starrocks]
+    entrypoint: ["/usr/bin/tini-static", "--", "/etc/sleipnir/entrypoint.sh"]
+    environment:
+      ENGINE_MEMORY: ${ENGINE_MEMORY:-8g}
+    volumes:
+      - ./config/starrocks/entrypoint.sh:/etc/sleipnir/entrypoint.sh:ro
+      # Catalog, MV definitions and MV data survive an engine restart.
+      - starrocks-meta:/data/deploy/starrocks/fe/meta
+      - starrocks-storage:/data/deploy/starrocks/be/storage
+    # The Alive column of SHOW BACKENDS: the BE has registered with the FE and answers.
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -P 9030 -u root -N -e 'SHOW BACKENDS' | grep -q true"]
+      start_period: 120s
+      start_interval: 3s
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "${ENGINE_CPUS:-4}"
+          memory: ${ENGINE_MEMORY:-8g}
+    # Equal to the memory limit: no swap, so an engine out of memory fails instead of slowing down unseen.
+    memswap_limit: ${ENGINE_MEMORY:-8g}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.starrocks.rule: Host(`starrocks.localhost`)
+      traefik.http.routers.starrocks.entrypoints: web
+      traefik.http.services.starrocks.loadbalancer.server.port: "8030"
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+
+volumes:
+  starrocks-meta:
+  starrocks-storage:

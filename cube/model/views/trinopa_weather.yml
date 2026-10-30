@@ -1,0 +1,21 @@
+# B5c view: same members as trino_weather, over the cubes that carry the rollups (cubes/trino_pa/).
+views:
+  - name: trinopa_weather
+    public: true
+    cubes:
+      - join_path: trinopa_weather_daily
+        includes: "*"
+        excludes:
+          - id
+          - total_prcp_all
+          - total_prcp_country
+          - total_prcp_prior_month
+      - join_path: trinopa_weather_daily.trino_stations
+        includes: [country, elevation, latitude, longitude]
+      - join_path: trinopa_weather_daily.trino_dates
+        includes: [year, quarter, month]
+      - join_path: trinopa_station_years
+        includes:
+          - median_station_annual_prcp
+          - name: year
+            alias: station_year

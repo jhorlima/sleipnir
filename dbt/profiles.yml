@@ -12,3 +12,23 @@ sleipnir:
       database: lakehouse
       schema: trino
       threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+    # Thrift Server on the Lakekeeper catalog (set as Spark's default catalog), so no database here.
+    spark:
+      type: spark
+      method: thrift
+      host: spark
+      port: 10000
+      schema: spark
+      connect_retries: 5
+      connect_timeout: 60
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+    # Own Postgres container (postgres-bench), not the catalog Postgres. Trust auth ignores the password, but dbt-postgres requires one.
+    postgres:
+      type: postgres
+      host: postgres-bench
+      port: 5432
+      user: sleipnir
+      password: unused
+      dbname: sleipnir
+      schema: postgres
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"

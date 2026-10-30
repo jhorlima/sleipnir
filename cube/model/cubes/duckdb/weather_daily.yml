@@ -1,0 +1,34 @@
+# DuckDB: fct_weather_daily. Everything else comes from base_weather_daily; only what differs is here.
+cubes:
+  - name: duckdb_weather_daily
+    extends: base_weather_daily
+    data_source: duckdb
+    # Reads the gold tables written by dbt-trino (schema trino_gold).
+    sql_table: lakehouse.trino_gold.fct_weather_daily
+
+    # Joins and the country grain reference cubes by name, so they are restated for this engine.
+    joins:
+      - name: duckdb_stations
+        relationship: many_to_one
+        sql: "{CUBE}.station_id = {duckdb_stations}.station_id"
+      - name: duckdb_dates
+        relationship: many_to_one
+        sql: "{CUBE}.date = {duckdb_dates}.date"
+
+    measures:
+      # Percentiles: DuckDB's PERCENTILE_CONT (exact); not re-aggregated by Cube Store.
+      - name: median_tmax
+        sql: "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {CUBE}.tmax)"
+        type: number
+      - name: p95_tmax
+        sql: "PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY {CUBE}.tmax)"
+        type: number
+      - name: p95_prcp
+        sql: "PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY {CUBE}.prcp)"
+        type: number
+      - name: total_prcp_country
+        multi_stage: true
+        sql: "{total_prcp}"
+        type: sum
+        grain:
+          keep_only: [duckdb_stations.country]

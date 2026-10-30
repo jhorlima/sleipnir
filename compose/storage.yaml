@@ -7,6 +7,8 @@ services:
       RUSTFS_ADDRESS: ":9000"
       RUSTFS_CONSOLE_ENABLE: "true"
       RUSTFS_CONSOLE_ADDRESS: ":9001"
+      # The data-usage scanner holds metadata in memory under hours of small-object writes (V15).
+      RUSTFS_SCANNER_ENABLED: ${RUSTFS_SCANNER_ENABLED:-true}
     volumes:
       - rustfs-data:/data
     healthcheck:
@@ -18,7 +20,8 @@ services:
       resources:
         limits:
           cpus: "${RUSTFS_CPUS:-1}"
-          memory: ${RUSTFS_MEMORY:-1g}
+          # 1g and 2g were OOM-killed (seen as "Unknown host rustfs"): long dbt runs and Spark's full sort rewrite of the fact.
+          memory: ${RUSTFS_MEMORY:-3g}
     labels:
       traefik.enable: "true"
       traefik.http.routers.rustfs.rule: Host(`rustfs.localhost`)

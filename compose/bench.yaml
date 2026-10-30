@@ -1,0 +1,36 @@
+services:
+  # In-network client of the read suites (B3-B5), run by `make bench`. No depends_on: the engine under test is
+  # started on its own, with its profile. It also hosts the DuckDB engine, so it gets the engine limits.
+  bench:
+    image: sleipnir-bench:${BENCH_VERSION:-0.1.0}
+    build: ./bench
+    profiles: [bench]
+    environment:
+      BENCH_IMAGE: sleipnir-bench:${BENCH_VERSION:-0.1.0}
+      DATA_SCALE: ${DATA_SCALE:-}
+      SF: ${SF:-1}
+      QUERY_TIMEOUT_S: ${QUERY_TIMEOUT_S:-300}
+      GOLD_NAMESPACE: ${GOLD_NAMESPACE:-trino_gold}
+      ENGINE_CPUS: ${ENGINE_CPUS:-4}
+      ENGINE_MEMORY: ${ENGINE_MEMORY:-8g}
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:?set in .env}
+      S3_REGION: ${S3_REGION:?set in .env}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+      S3_ENDPOINT: rustfs:9000
+      LAKEKEEPER_CATALOG_URL: http://lakekeeper:8181/catalog
+      LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE:?set in .env}
+    volumes:
+      - ./bench:/repo/bench:ro
+      - ./config:/repo/config:ro
+      - ${RESULTS_DIR:-./results}:/repo/results
+      # Read-write because a cold run restarts the engine container and a privileged helper drops the page cache,
+      # both between measured steps, and docker stats must be sampled during them; doing that from the host
+      # would mean one host round trip per run.
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        limits:
+          cpus: "${ENGINE_CPUS:-4}"
+          memory: ${ENGINE_MEMORY:-8g}
+    memswap_limit: ${ENGINE_MEMORY:-8g}

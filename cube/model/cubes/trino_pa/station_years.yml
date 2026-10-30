@@ -1,0 +1,14 @@
+# B5c: the nested-aggregate cube over trinopa_weather_daily (the join and the sub_query name the weather cube).
+# No rollup: Q8 goes to the engine (its rollup is out of the main set, SPEC §8.4).
+cubes:
+  - name: trinopa_station_years
+    extends: trino_station_years
+    joins:
+      - name: trinopa_weather_daily
+        relationship: one_to_many
+        sql: "{CUBE}.station_id = {trinopa_weather_daily}.station_id AND {CUBE}.year = EXTRACT(YEAR FROM {trinopa_weather_daily}.date)"
+    dimensions:
+      - name: annual_prcp
+        sql: "{trinopa_weather_daily.total_prcp}"
+        type: number
+        sub_query: true

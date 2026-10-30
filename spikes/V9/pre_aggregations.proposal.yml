@@ -1,0 +1,100 @@
+# PROPOSAL (not applied): goes into cube/model/cubes/trino/weather_daily.yml (and station_years.yml for q8).
+# Pre-aggregations are written in the engine cube because they reference cubes by name
+# (trino_stations); Cube does not rewrite names inside inherited members.
+# Base cubes are never queried, so base_weather_daily keeps `pre_aggregations: []` or drops the key.
+#
+# Order matters: the first matching rollup wins, and a rollup missing a query measure is skipped.
+
+# --- trino_weather_daily ----------------------------------------------------------------------
+pre_aggregations:
+  # Additive leaf measures only: re-aggregates to any coarser grain (year, all time) and to any
+  # subset of country. Serves q9: the total_prcp stage and the grain keep_only [] stage.
+  - name: monthly_country
+    measures:
+      - observation_count
+      - days_with_rain
+      - total_prcp
+    dimensions:
+      - trino_stations.country
+    time_dimension: date
+    granularity: month
+    partition_granularity: month
+    build_range_start:
+      sql: SELECT DATE '2010-01-01'
+    build_range_end:
+      sql: SELECT DATE '2025-12-31'
+    indexes:
+      - name: country_idx
+        columns:
+          - trino_stations.country
+
+  # avg is NOT additive: only a query at exactly country x month can use it. That is q2 and q10
+  # (q10's prior-year stage asks for 2024, so the build range must cover the year before the
+  # first queried one).
+  - name: monthly_country_avg
+    measures:
+      - avg_tmax
+      - avg_tmin
+    dimensions:
+      - trino_stations.country
+    time_dimension: date
+    granularity: month
+    partition_granularity: month
+    build_range_start:
+      sql: SELECT DATE '2010-01-01'
+    build_range_end:
+      sql: SELECT DATE '2025-12-31'
+    indexes:
+      - name: country_idx
+        columns:
+          - trino_stations.country
+
+  # station x year (SPEC 8.4). Additive: serves q3 (total_prcp by station for one year).
+  - name: yearly_station
+    measures:
+      - observation_count
+      - total_prcp
+    dimensions:
+      - station_id
+    time_dimension: date
+    granularity: year
+    partition_granularity: year
+    build_range_start:
+      sql: SELECT DATE '2010-01-01'
+    build_range_end:
+      sql: SELECT DATE '2025-12-31'
+    indexes:
+      - name: station_idx
+        columns:
+          - station_id
+
+  # OPTIONAL, q7 only (non-additive percentiles): exact grain country x year. Needs the percentile
+  # measures cast to DOUBLE in the engine file, e.g.
+  #   sql: "approx_percentile(CAST({CUBE}.tmax AS DOUBLE), 0.5)"
+  # (approx_percentile over DECIMAL returns DECIMAL -> Decimal(18,5) in Cube Store), and the query
+  # must set granularity: year (queries/q7_year_granularity.json).
+  - name: yearly_country_percentiles
+    measures:
+      - median_tmax
+      - p95_tmax
+    dimensions:
+      - trino_stations.country
+    time_dimension: date
+    granularity: year
+    partition_granularity: year
+    build_range_start:
+      sql: SELECT DATE '2010-01-01'
+    build_range_end:
+      sql: SELECT DATE '2025-12-31'
+
+# --- trino_station_years (q8), UNPROVEN ---------------------------------------------------------
+# The measure runs approx_percentile over the sub_query dimension annual_prcp, so a rollup is only
+# valid at the exact grain (year). Unknown: whether the rollup build SQL accepts a measure that
+# references a sub_query dimension. If the build fails, q8 stays out of B5c.
+#
+# pre_aggregations:
+#   - name: yearly_median_station_prcp
+#     measures:
+#       - median_station_annual_prcp
+#     dimensions:
+#       - year

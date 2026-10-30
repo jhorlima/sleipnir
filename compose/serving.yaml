@@ -10,7 +10,7 @@ x-cube-env-common: &cube-env-common
 
   # Cube refuses CUBEJS_DATASOURCES without `default`, which reads the un-prefixed CUBEJS_DB_* vars.
   # No cube uses it: it is an in-memory DuckDB, so it needs no running engine and never fails /readyz.
-  CUBEJS_DATASOURCES: default,trino
+  CUBEJS_DATASOURCES: default,trino,duckdb,starrocks,postgres
   CUBEJS_DB_TYPE: duckdb
 
   CUBEJS_DS_TRINO_DB_TYPE: trino
@@ -19,6 +19,32 @@ x-cube-env-common: &cube-env-common
   CUBEJS_DS_TRINO_DB_USER: cube
   CUBEJS_DS_TRINO_DB_PRESTO_CATALOG: lakehouse
   CUBEJS_DS_TRINO_DB_SCHEMA: trino_gold
+
+  # StarRocks over its MySQL protocol (FE query port); tables are lakehouse.<namespace>.<table>.
+  CUBEJS_DS_STARROCKS_DB_TYPE: mysql
+  CUBEJS_DS_STARROCKS_DB_HOST: starrocks
+  CUBEJS_DS_STARROCKS_DB_PORT: "9030"
+  CUBEJS_DS_STARROCKS_DB_USER: root
+
+  # Benchmark Postgres (small scale only, SPEC D-23); trust auth on the compose network, so no password.
+  CUBEJS_DS_POSTGRES_DB_TYPE: postgres
+  CUBEJS_DS_POSTGRES_DB_HOST: postgres-bench
+  CUBEJS_DS_POSTGRES_DB_PORT: "5432"
+  CUBEJS_DS_POSTGRES_DB_NAME: sleipnir
+  CUBEJS_DS_POSTGRES_DB_USER: sleipnir
+
+  # DuckDB runs inside the cube-api / cube-refresh-worker processes (limits below are inside their cgroups).
+  # cube/cube.js adds the S3 secret and ATTACHes the Lakekeeper catalog from the variables below.
+  CUBEJS_DS_DUCKDB_DB_TYPE: duckdb
+  CUBEJS_DS_DUCKDB_DB_DUCKDB_EXTENSIONS: iceberg,httpfs
+  CUBEJS_DS_DUCKDB_DB_DUCKDB_MEMORY_LIMIT: ${CUBE_DUCKDB_MEMORY_LIMIT:-512MB}
+  CUBE_DUCKDB_THREADS: ${CUBE_DUCKDB_THREADS:-1}
+  S3_REGION: ${S3_REGION:?set in .env}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set in .env}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?set in .env}
+  S3_ENDPOINT: rustfs:9000
+  LAKEKEEPER_ENDPOINT: http://lakekeeper:8181/catalog
+  LAKEKEEPER_WAREHOUSE: ${LAKEKEEPER_WAREHOUSE:?set in .env}
 
 x-cube-healthcheck: &cube-healthcheck
   test: ["CMD", "node", "-e", "fetch('http://localhost:4000/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
@@ -49,6 +75,7 @@ services:
       CUBEJS_PG_SQL_PORT: "15432"
     volumes:
       - ./cube/model:/cube/conf/model:ro
+      - ./cube/cube.js:/cube/conf/cube.js:ro
     healthcheck: *cube-healthcheck
     deploy:
       resources:
@@ -63,6 +90,9 @@ services:
     depends_on:
       cubestore-router:
         condition: service_healthy
+      # DuckDB's init SQL (ATTACH) runs once; if Lakekeeper is down then, it stays failed until Cube restarts.
+      lakekeeper:
+        condition: service_healthy
 
   cube-refresh-worker:
     image: cubejs/cube:${CUBE_VERSION}
@@ -72,6 +102,7 @@ services:
       CUBEJS_REFRESH_WORKER: "true"
     volumes:
       - ./cube/model:/cube/conf/model:ro
+      - ./cube/cube.js:/cube/conf/cube.js:ro
     healthcheck: *cube-healthcheck
     deploy:
       resources:
@@ -80,6 +111,9 @@ services:
           memory: ${CUBE_REFRESH_WORKER_MEMORY:-512m}
     depends_on:
       cubestore-router:
+        condition: service_healthy
+      # DuckDB's init SQL (ATTACH) runs once; if Lakekeeper is down then, it stays failed until Cube restarts.
+      lakekeeper:
         condition: service_healthy
 
   cubestore-router:
