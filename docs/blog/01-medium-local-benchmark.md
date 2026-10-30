@@ -38,14 +38,14 @@ A few things I didn't know before starting:
 - The early centuries are tiny compared with recent years, which reach ~28 M rows each. That difference ends up mattering (more on that later).
 - In 1797 so few stations reported that an *approximate* median came out 12% off the exact one. Fine for a dashboard, but it fails a correctness check.
 
-I loaded it at four scales:
+I loaded it at four scales. The names are a bit cryptic, so here's what they mean (and yes, `r2` *is* about Cloudflare R2):
 
-| Scale | Years | Bronze rows |
-|---|---|---|
-| `small` | 2025 | 44 M (used for the Postgres baseline) |
-| `r2` | 2010–2025 | 742 M |
-| `r2_1998` | 1998–2025 | 1.29 B |
-| `local` | 1763–2025 | **3.97 B** |
+| Scale | Years | Bronze rows | What the name means |
+|---|---|---|---|
+| `small` | 2025 | 44 M | One year, small enough for the Postgres baseline. |
+| `r2` | 2010–2025 | 742 M | Sized to fit **Cloudflare R2's free tier (10 GB)**, so the same run can later be repeated with the data in R2. |
+| `r2_1998` | 1998–2025 | 1.29 B | `r2` grown back to 1998: more than a billion rows, and one engine's whole lakehouse plus TPC-H still fits in 10 GB (7.9 GB). |
+| `local` | 1763–2025 | **3.97 B** | The full history. It only runs locally: it's well past the 10 GB of the free tier. |
 
 To give the incremental strategies real work, the ingestion creates duplicates on purpose: each batch repeats the last 7 days of the previous one, and ~1% of the rows come back with a revised value.
 
