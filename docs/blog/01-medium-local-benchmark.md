@@ -4,25 +4,29 @@
 
 **TL;DR** The engine that surprised me most was **DuckDB**. Running inside a single process, with no server at all, it loaded 742 M rows in 146 s, had the best TPC-H time, won three of the five filtered questions, and nearly halved its whole-table scan when I doubled the CPU. But the more interesting stuff is in the rest of the post: doubling the CPU made one Trino query **2× slower** (the bottleneck was the object store), a Spark session leak held **4.4 million** Iceberg snapshot objects in memory, pre-aggregations answered in **16–34 ms** at any scale, and Postgres needed **35×** the disk of Parquet. All of this on one laptop, so read it as "this setup", not as a ranking :)
 
-## Why I built this
+## How it started
 
-It started small. I was looking for a public dataset to build a fact layer on and push Cube's pre-aggregations to their limits. Once I found one, I thought: why stop there?
+A few weeks ago I just wanted a public dataset big enough to push Cube.dev's pre-aggregations to their limit.
 
-I've worked with these tools for years: Trino, Spark, dbt, partitioning, cluster by, incremental models, delete+insert, table maintenance. I know how they behave in the projects I've worked on. What I wanted was to look at them from a different angle: new compression and partitioning choices, a bigger dataset than I'd usually throw at DuckDB, and every engine with exactly the same limits. And I wanted to see how far AI could take me on the scaffolding, so I could spend my time on the tests instead of the plumbing.
+I found one: over 260 years of daily weather records from stations all over the world, published by the US weather and climate agency (NOAA). From 1763 to 2025, that's 3.97 billion rows.
 
-The benchmarks I found that tested things the way I wanted were on older engine versions and different data volumes. Spark 4 was out, Trino and StarRocks had moved a lot, and I had three questions I couldn't answer from what was already published:
+Then I thought... why stop at Cube when I had Claude to help me test more tools?! I've worked with Trino, Spark and dbt for years, with partitioning, cluster by, incremental models, delete+insert and table maintenance. I know how they behave in the projects I've worked on. This was a chance to look at all of it from another angle, with a public dataset, every engine on exactly the same limits, and a bigger pile of data than I'd usually throw at DuckDB.
+
+My bet going in: **DuckDB would win almost everything.** (Spoiler: it didn't, and that's where it got interesting.)
+
+The benchmarks I could find that tested things this way were on older engine versions and different data volumes. Spark 4 was out, Trino and StarRocks had moved a lot, and I had three questions I couldn't answer from what was already published:
 
 - **How far does Postgres go** before you actually need a lakehouse stack?
 - **Do the new versions of Spark and Trino** change the picture?
 - **Is DuckDB a good option for ingestion and compression** at billions of rows?
 
+So I built a small lakehouse on my laptop and called it Sleipnir (Odin's eight-legged horse... several engines, one body).
+
 ## What I wanted to find out
 
 Put simply: if every engine gets the same machine, the same tables and the same semantic layer, how fast does each one load, transform and serve the data? And what do the usual acceleration tricks (materialized views, pre-aggregations, compaction) actually buy you?
 
-I wanted the boring version: the same files, the same limits, the same questions, and every answer checked before its time counts. And I wanted it on a **single worker** first, on purpose. Before adding replicas, I want a baseline to compare against: what one node can do, so that the multi-worker version (in the cloud, with network and throughput in the picture) has something to be measured against.
-
-So I built a small lakehouse on a laptop and called it Sleipnir (Odin's eight-legged horse... several engines, one body).
+I wanted the boring version: the same files, the same limits, the same questions, and every answer checked before its time counts. And I wanted it on a **single worker** first, on purpose: a baseline of what one node can do, so that the multi-worker version in the cloud (with network and throughput in the picture) has something to be measured against.
 
 ## The data
 
@@ -62,7 +66,7 @@ For a second, more standard workload I also generated **TPC-H** at SF8 with Duck
 
 One writer, many readers on the same files. Every engine reads the same Iceberg tables through the same catalog.
 
-A note on how this got built: most of the stack was written with an AI coding assistant. I wrote a spec first (architecture, suites, rules, open questions), then worked through it with the assistant, with small agents doing scoped tasks and spikes in parallel. That made it possible to stand up a stack with seven moving parts in days instead of weeks. It did **not** make it right by default: a good part of this post is about bugs that only showed up when the numbers looked weird. AI makes building fast; checking is still on you :)
+A note on how this got built: most of the stack was written with Claude, as an AI coding assistant. I wrote a spec first (architecture, suites, rules, open questions), then worked through it with Claude, with small agents doing scoped tasks and spikes in parallel. That made it possible to stand up a stack with seven moving parts in days instead of weeks. It did **not** make it right by default: a good part of this post is about bugs that only showed up when the numbers looked weird. AI makes building fast; checking is still on you :)
 
 ## The machine
 
