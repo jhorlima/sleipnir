@@ -28,14 +28,14 @@ SOURCE_LINE = "Sleipnir benchmark, single laptop; results/*.parquet"
 PAGE_STYLE = """
 <link href="https://fonts.googleapis.com/css2?family=League+Gothic&family=Oswald:wght@400;500;600&display=block" rel="stylesheet">
 <style>
-  :root { --paper: #F5F7F3; --grid: #BFD8D2; --ink: #1E2A2F; --red: #D9382B; --muted: #5E6B70; }
+  :root { --paper: #F5F7F3; --grid: #BFD8D2; --grid-faint: rgba(191, 216, 210, 0.4); --ink: #1E2A2F; --red: #D9382B; --muted: #5E6B70; }
   html, body { margin: 0; background: var(--paper); }
   .sheet {
     width: %(width)dpx; box-sizing: border-box; padding: 56px 64px 40px;
     background-color: var(--paper);
     background-image:
-      linear-gradient(var(--grid) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      linear-gradient(var(--grid-faint) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-faint) 1px, transparent 1px);
     background-size: 24px 24px;
     font-family: 'Oswald', sans-serif; color: var(--ink);
   }
@@ -48,9 +48,9 @@ PAGE_STYLE = """
   td:first-child { font-weight: 500; }
   strong { color: var(--red); font-weight: 600; }
   code { font-family: 'Oswald', sans-serif; font-weight: 500; }
-  .notes { margin: 20px 0 0; font-size: 21px; color: var(--muted); line-height: 1.45; }
+  .notes { margin: 20px 0 0; padding: 10px 14px 4px; background: var(--paper); font-size: 21px; color: var(--muted); line-height: 1.45; }
   .notes p { margin: 0 0 6px; }
-  .source { margin-top: 28px; font-size: 20px; color: var(--muted); }
+  .source { display: inline-block; margin-top: 28px; padding: 4px 14px; background: var(--paper); font-size: 20px; color: var(--muted); }
 </style>
 """
 
