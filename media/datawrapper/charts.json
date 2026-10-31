@@ -1,0 +1,149 @@
+{
+  "t01": {
+    "title": "The data",
+    "id": "n9qRl",
+    "public_url": "https://datawrapper.dwcdn.net/n9qRl/3/",
+    "embed_width": 600,
+    "embed_height": 530
+  },
+  "t02": {
+    "title": "The stack",
+    "id": "YKOkR",
+    "public_url": "https://datawrapper.dwcdn.net/YKOkR/3/",
+    "embed_width": 600,
+    "embed_height": 422
+  },
+  "t03": {
+    "title": "The machine",
+    "id": "GrhBf",
+    "public_url": "https://datawrapper.dwcdn.net/GrhBf/3/",
+    "embed_width": 600,
+    "embed_height": 390
+  },
+  "t04": {
+    "title": "Loading (DuckDB)",
+    "id": "TMwDy",
+    "public_url": "https://datawrapper.dwcdn.net/TMwDy/3/",
+    "embed_width": 600,
+    "embed_height": 269
+  },
+  "t05": {
+    "title": "Transforming: build from scratch (dbt)",
+    "id": "WAYVy",
+    "public_url": "https://datawrapper.dwcdn.net/WAYVy/3/",
+    "embed_width": 600,
+    "embed_height": 430
+  },
+  "t06": {
+    "title": "Transforming: reprocess the latest batch",
+    "id": "bkhwO",
+    "public_url": "https://datawrapper.dwcdn.net/bkhwO/3/",
+    "embed_width": 600,
+    "embed_height": 307
+  },
+  "t07": {
+    "title": "Reading: the questions",
+    "id": "Iuzcs",
+    "public_url": "https://datawrapper.dwcdn.net/Iuzcs/3/",
+    "embed_width": 600,
+    "embed_height": 544
+  },
+  "t08": {
+    "title": "Reading: direct SQL (warm, ms)",
+    "id": "afeYZ",
+    "public_url": "https://datawrapper.dwcdn.net/afeYZ/3/",
+    "embed_width": 600,
+    "embed_height": 301
+  },
+  "t09": {
+    "title": "Reading: direct SQL (warm, ms)",
+    "id": "Lr2uc",
+    "public_url": "https://datawrapper.dwcdn.net/Lr2uc/3/",
+    "embed_width": 600,
+    "embed_height": 269
+  },
+  "t10": {
+    "title": "Reading: through Cube (warm, ms)",
+    "id": "uQ3jY",
+    "public_url": "https://datawrapper.dwcdn.net/uQ3jY/3/",
+    "embed_width": 600,
+    "embed_height": 378
+  },
+  "t11": {
+    "title": "Reading: through Cube (warm, ms)",
+    "id": "07ZzD",
+    "public_url": "https://datawrapper.dwcdn.net/07ZzD/3/",
+    "embed_width": 600,
+    "embed_height": 394
+  },
+  "t12": {
+    "title": "TPC-H SF8, 22 queries (r2 scale, profile M)",
+    "id": "DrF7P",
+    "public_url": "https://datawrapper.dwcdn.net/DrF7P/3/",
+    "embed_width": 600,
+    "embed_height": 240
+  },
+  "t13": {
+    "title": "One year of data, with Postgres (small, 44 M rows, profile M)",
+    "id": "F80qy",
+    "public_url": "https://datawrapper.dwcdn.net/F80qy/3/",
+    "embed_width": 600,
+    "embed_height": 349
+  },
+  "t14": {
+    "title": "One year of data, with Postgres (small, 44 M rows, profile M)",
+    "id": "j7RzO",
+    "public_url": "https://datawrapper.dwcdn.net/j7RzO/3/",
+    "embed_width": 600,
+    "embed_height": 211
+  },
+  "t15": {
+    "title": "Acceleration (r2, profile M, warm ms; in parentheses the same question without it)",
+    "id": "HEje3",
+    "public_url": "https://datawrapper.dwcdn.net/HEje3/3/",
+    "embed_width": 600,
+    "embed_height": 413
+  },
+  "t16": {
+    "title": "Table layout and maintenance (B6, Trino, r2, profile M)",
+    "id": "ier0w",
+    "public_url": "https://datawrapper.dwcdn.net/ier0w/3/",
+    "embed_width": 600,
+    "embed_height": 636
+  },
+  "t17": {
+    "title": "Table layout and maintenance (B6, Trino, r2, profile M)",
+    "id": "j7PDP",
+    "public_url": "https://datawrapper.dwcdn.net/j7PDP/3/",
+    "embed_width": 600,
+    "embed_height": 439
+  },
+  "t18": {
+    "title": "Table layout and maintenance (B6, Trino, r2, profile M)",
+    "id": "kQtCV",
+    "public_url": "https://datawrapper.dwcdn.net/kQtCV/3/",
+    "embed_width": 600,
+    "embed_height": 296
+  },
+  "t19": {
+    "title": "The M → L surprise",
+    "id": "1npII",
+    "public_url": "https://datawrapper.dwcdn.net/1npII/3/",
+    "embed_width": 600,
+    "embed_height": 365
+  },
+  "t20": {
+    "title": "The M → L surprise",
+    "id": "l3pcb",
+    "public_url": "https://datawrapper.dwcdn.net/l3pcb/3/",
+    "embed_width": 600,
+    "embed_height": 180
+  },
+  "t21": {
+    "title": "How long it took",
+    "id": "Epe4f",
+    "public_url": "https://datawrapper.dwcdn.net/Epe4f/3/",
+    "embed_width": 600,
+    "embed_height": 274
+  }
+}
