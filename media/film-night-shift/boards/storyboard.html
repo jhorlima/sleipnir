@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The night shift: storyboard</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 40px 32px 64px;
+        background: #f4f4f2;
+        color: #1e2a2f;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      h1 {
+        font-size: 28px;
+        margin: 0 0 6px;
+      }
+      .lede {
+        margin: 0 0 32px;
+        color: #5e6b70;
+        max-width: 72ch;
+        line-height: 1.5;
+      }
+      .act {
+        display: block;
+        font-size: 18px;
+        font-weight: 700;
+        margin: 36px 0 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+        gap: 24px;
+      }
+      .frame {
+        background: #ffffff;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid #e2e4e1;
+      }
+      .frame img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+      }
+      .title {
+        font-weight: 700;
+        font-size: 17px;
+        padding: 14px 18px 2px;
+      }
+      .time {
+        font-size: 14px;
+        color: #5e6b70;
+        padding: 0 18px;
+      }
+      .words {
+        font-size: 15px;
+        line-height: 1.5;
+        margin: 8px 18px 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>C: The night shift</h1>
+    <p class="lede">One real night run, 22:50 to 10:37, as a log book on the recorder paper. 30 s, 1920 x 1080, 30 fps, effects only. Every number comes from <code>media/shared/data.json</code>.</p>
+
+    <section class="act">Act 1: The run starts</section>
+    <div class="grid">
+      <div class="frame">
+        <img src="stills/frame-00-at-2.4s.png" alt="" />
+        <div class="title">01: 22:50</div>
+        <div class="time">0.0 to 3.0s</div>
+        <p class="words">"22:50" is stamped in the margin; the pen starts its trace on the laptop screen. Sound: pop on the stamp, click-soft as the pen touches down.</p>
+      </div>
+    </div>
+
+    <section class="act">Act 2: The night goes wrong</section>
+    <div class="grid">
+      <div class="frame">
+        <img src="stills/frame-01-at-5.4s.png" alt="" />
+        <div class="title">02: The laptop falls asleep</div>
+        <div class="time">3.0 to 6.0s</div>
+        <p class="words">Hard cut on a glitch: the lid shuts, three z's rise, Trino's "ABANDONED_TASK" is stamped across the sheet. Sound: glitch-3, then error.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-02-at-8.4s.png" alt="" />
+        <div class="title">03: Swap</div>
+        <div class="time">6.0 to 9.0s</div>
+        <p class="words">The swap dial sweeps to the stop: 15.7 of 16 GB. Sound: whoosh-short on the sheet turn, error at the stop.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-03-at-11.4s.png" alt="" />
+        <div class="title">04: Spark's heap</div>
+        <div class="time">9.0 to 12.0s</div>
+        <p class="words">Snapshot tally marks pile into a heap; "4.4 M" is stamped when it peaks. Sound: error on the stamp.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-04-at-14.4s.png" alt="" />
+        <div class="title">05: Object store OOM</div>
+        <div class="time">12.0 to 15.0s</div>
+        <p class="words">RustFS overflows its 3 GB box (OOM), gets 5 GB and overflows again; the second stamp is red. Sound: error on each stamp.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-05-at-17.4s.png" alt="" />
+        <div class="title">06: Disk full</div>
+        <div class="time">15.0 to 18.0s</div>
+        <p class="words">Spark's MERGE spills ~33 GB; the Docker disk bar fills to "103 GB full" and spills over its end. Sound: error on the spill.</p>
+      </div>
+    </div>
+
+    <section class="act">Act 3: Morning</section>
+    <div class="grid">
+      <div class="frame">
+        <img src="stills/frame-06-at-21.4s.png" alt="" />
+        <div class="title">07: Fixed, line by line</div>
+        <div class="time">18.0 to 22.0s</div>
+        <p class="words">Each incident is struck through and stamped "fixed", one every 0.6 s; the last stamp is red. Sound: pop on each stamp.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-07-at-24.1s.png" alt="" />
+        <div class="title">08: 10:37</div>
+        <div class="time">22.0 to 24.5s</div>
+        <p class="words">"10:37" is stamped under the grey 22:50; the trace on the screen reaches the top. Sound: pop on the stamp.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-08-at-27.6s.png" alt="" />
+        <div class="title">09: The claim</div>
+        <div class="time">24.5 to 28.0s</div>
+        <p class="words">"~40 h, 8 days, 261 runs." stamped line by line, then "Next stop: the cloud." with the cloud in red. Sound: pop per line, impact-bass-1 on "the cloud."</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-09-at-29.5s.png" alt="" />
+        <div class="title">10: Sleipnir</div>
+        <div class="time">28.0 to 30.0s</div>
+        <p class="words">"Sleipnir" stamped, the repo URL under it, held to the last frame.</p>
+      </div>
+    </div>
+  </body>
+</html>

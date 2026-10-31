@@ -1,0 +1,68 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #oom-margin {
+      top: 150px;
+    }
+    #oom-note {
+      font-size: 52px;
+    }
+    /* The RustFS mark sits in the middle of a square canvas; the wrapper crops it to the wordmark. */
+    #oom-logo-crop {
+      position: absolute;
+      left: 610px;
+      top: 110px;
+      width: 720px;
+      height: 150px;
+      overflow: hidden;
+    }
+    #oom-logo {
+      width: 720px;
+      height: 720px;
+      margin-top: -285px;
+    }
+    #oom-boxes {
+      position: absolute;
+      left: 640px;
+      top: 300px;
+      width: 1080px;
+      height: 648px;
+    }
+  </style>
+  <div id="root" data-composition-id="oom" data-width="1920" data-height="1080">
+    <div class="sheet"></div>
+    <div class="margin-rule"></div>
+    <div id="oom-margin" class="margin">
+      <div id="oom-note" class="label">The object store runs out of memory</div>
+    </div>
+    <div id="oom-logo-crop" data-layout-allow-overflow>
+      <img id="oom-logo" class="logo" src="assets/logos/rustfs.png" alt="RustFS" />
+    </div>
+    <svg id="oom-boxes" viewBox="0 0 1100 660" fill="none" stroke="#1E2A2F" stroke-width="6" stroke-linejoin="round">
+      <defs>
+        <pattern id="oom-hatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="16" stroke="#1E2A2F" stroke-width="4" />
+        </pattern>
+      </defs>
+
+      <path d="M40 330 Q90 270 160 300 Q240 250 320 292 Q400 262 460 330 Z" fill="url(#oom-hatch)" />
+      <rect x="40" y="330" width="420" height="310" fill="url(#oom-hatch)" />
+      <rect x="150" y="410" width="200" height="150" fill="#F5F7F3" />
+      <text x="250" y="532" text-anchor="middle" stroke="none" fill="#1E2A2F" font-family="League Gothic" font-size="130">3 GB</text>
+      <text x="70" y="250" stroke="none" fill="#1E2A2F" font-family="League Gothic" font-size="150" transform="rotate(-6 70 250)">OOM</text>
+
+      <path d="M620 230 Q690 160 770 196 Q850 140 930 186 Q1010 156 1060 230 Z" fill="url(#oom-hatch)" />
+      <rect x="620" y="230" width="440" height="410" fill="url(#oom-hatch)" />
+      <rect x="740" y="360" width="200" height="150" fill="#F5F7F3" />
+      <text x="840" y="482" text-anchor="middle" stroke="none" fill="#1E2A2F" font-family="League Gothic" font-size="130">5 GB</text>
+      <text x="650" y="150" stroke="none" fill="#D9382B" font-family="League Gothic" font-size="150" transform="rotate(-6 650 150)">OOM</text>
+    </svg>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    window.__timelines["oom"] = tl;
+  </script>
+</template>

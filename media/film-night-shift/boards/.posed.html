@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --paper: #f5f7f3;
+        --grid: #bfd8d2;
+        --graphite: #1e2a2f;
+        --pen-red: #d9382b;
+        --muted-1: #5e6b70;
+        --muted-2: #8a979b;
+        --margin-x: 560px;
+        --content-x: 640px;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--paper);
+        color: var(--graphite);
+      }
+
+      /* One sheet of the recorder paper: flat paper, 1.5% fibre noise, printed grid. */
+      .sheet {
+        position: absolute;
+        inset: 0;
+        background-color: var(--paper);
+        background-image:
+          url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/></filter><rect width='240' height='240' filter='url(%23n)' opacity='0.015'/></svg>"),
+          repeating-linear-gradient(to right, var(--grid) 0 2px, transparent 2px 120px),
+          repeating-linear-gradient(to bottom, var(--grid) 0 2px, transparent 2px 120px),
+          repeating-linear-gradient(to right, var(--grid) 0 1px, transparent 1px 24px),
+          repeating-linear-gradient(to bottom, var(--grid) 0 1px, transparent 1px 24px);
+      }
+      /* The log book's margin: a graphite rule; time stamps live to its left. */
+      .margin-rule {
+        position: absolute;
+        left: var(--margin-x);
+        top: 0;
+        width: 3px;
+        height: 1080px;
+        background: var(--graphite);
+      }
+      .margin {
+        position: absolute;
+        left: 192px;
+        width: 330px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        text-align: right;
+      }
+      .display {
+        font-family: "League Gothic", sans-serif;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        font-variant-numeric: tabular-nums;
+        line-height: 0.9;
+      }
+      .label {
+        font-family: "Oswald", sans-serif;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        line-height: 1.15;
+      }
+      .engine-name {
+        font-size: 44px;
+        color: var(--muted-1);
+        margin-top: 8px;
+      }
+      /* League Gothic has no tilde; borrow Oswald's. */
+      .claim-tilde {
+        font-family: "Oswald", sans-serif;
+        font-size: 0.6em;
+        vertical-align: 0.25em;
+      }
+      .red {
+        color: var(--pen-red);
+      }
+      /* A stamp: ink with a 2 px spread. */
+      .stamp {
+        text-shadow:
+          0 0 1px currentColor,
+          0 0 2px currentColor;
+      }
+      .logo {
+        mix-blend-mode: multiply;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="30"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="start" data-composition-id="start" data-composition-src="compositions/start.html" data-start="0" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="sleep" data-composition-id="sleep" data-composition-src="compositions/sleep.html" data-start="3" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="swap" data-composition-id="swap" data-composition-src="compositions/swap.html" data-start="6" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="heap" data-composition-id="heap" data-composition-src="compositions/heap.html" data-start="9" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="oom" data-composition-id="oom" data-composition-src="compositions/oom.html" data-start="12" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="disk" data-composition-id="disk" data-composition-src="compositions/disk.html" data-start="15" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="fixed" data-composition-id="fixed" data-composition-src="compositions/fixed.html" data-start="18" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="morning" data-composition-id="morning" data-composition-src="compositions/morning.html" data-start="22" data-duration="2.5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="claim" data-composition-id="claim" data-composition-src="compositions/claim.html" data-start="24.5" data-duration="3.5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="end" data-composition-id="end" data-composition-src="compositions/end.html" data-start="28" data-duration="2" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+    </div>
+    <script>
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

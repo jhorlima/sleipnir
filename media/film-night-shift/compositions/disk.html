@@ -1,0 +1,63 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #disk-margin {
+      top: 150px;
+    }
+    #disk-logo {
+      width: 200px;
+      height: 200px;
+    }
+    #disk-note {
+      font-size: 52px;
+      margin-top: 24px;
+    }
+    #disk-value {
+      position: absolute;
+      left: 640px;
+      top: 110px;
+      font-size: 250px;
+    }
+    #disk-gauge {
+      position: absolute;
+      left: 640px;
+      top: 430px;
+      width: 1100px;
+      height: 300px;
+    }
+    #disk-line {
+      position: absolute;
+      left: 640px;
+      top: 800px;
+      font-size: 56px;
+    }
+  </style>
+  <div id="root" data-composition-id="disk" data-width="1920" data-height="1080">
+    <div class="sheet"></div>
+    <div class="margin-rule"></div>
+    <div id="disk-margin" class="margin">
+      <img id="disk-logo" class="logo" src="assets/logos/spark.svg" alt="Apache Spark" />
+      <div id="disk-name" class="label engine-name">Spark</div>
+      <div id="disk-note" class="label">The Docker disk fills up</div>
+    </div>
+    <div id="disk-value" class="display stamp red">103 GB full</div>
+    <svg id="disk-gauge" viewBox="0 0 1100 300" fill="none" stroke="#1E2A2F" stroke-width="6" stroke-linejoin="round">
+      <defs>
+        <pattern id="disk-hatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="16" stroke="#1E2A2F" stroke-width="4" />
+        </pattern>
+      </defs>
+      <path d="M10 10 L10 26 M137.5 10 L137.5 26 M265 10 L265 26 M392.5 10 L392.5 26 M520 10 L520 26 M647.5 10 L647.5 26 M775 10 L775 26 M902.5 10 L902.5 26 M1030 10 L1030 26" stroke-width="5" />
+      <rect x="10" y="50" width="1020" height="200" rx="10" fill="url(#disk-hatch)" />
+      <path d="M1030 90 Q1060 110 1052 150 Q1080 170 1070 210 Q1090 230 1084 262" stroke-width="6" stroke-linecap="round" />
+    </svg>
+    <div id="disk-line" class="label">Spark MERGE spilled ~33 GB</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    window.__timelines["disk"] = tl;
+  </script>
+</template>

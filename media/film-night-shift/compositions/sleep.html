@@ -1,0 +1,78 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #sleep-margin {
+      top: 150px;
+    }
+    #sleep-logo {
+      width: 200px;
+      height: 200px;
+    }
+    #sleep-note {
+      font-size: 52px;
+      margin-top: 24px;
+    }
+    #sleep-laptop {
+      position: absolute;
+      left: 680px;
+      top: 420px;
+      width: 1040px;
+      height: 666px;
+    }
+    #sleep-z {
+      position: absolute;
+      left: 1380px;
+      top: 360px;
+      width: 300px;
+      height: 260px;
+      font-family: "Oswald", sans-serif;
+      font-weight: 500;
+      color: var(--graphite);
+    }
+    #sleep-z span {
+      position: absolute;
+    }
+    #sleep-stamp {
+      position: absolute;
+      left: 660px;
+      top: 140px;
+      font-size: 190px;
+      transform: rotate(-4deg);
+      transform-origin: left center;
+    }
+    #sleep-line {
+      position: absolute;
+      left: 640px;
+      top: 900px;
+      font-size: 56px;
+    }
+  </style>
+  <div id="root" data-composition-id="sleep" data-width="1920" data-height="1080">
+    <div class="sheet"></div>
+    <div class="margin-rule"></div>
+    <div id="sleep-margin" class="margin">
+      <img id="sleep-logo" class="logo" src="assets/logos/trino.svg" alt="Trino" />
+      <div id="sleep-name" class="label engine-name">Trino</div>
+      <div id="sleep-note" class="label">The laptop falls asleep</div>
+    </div>
+    <div id="sleep-stamp" class="display stamp red">ABANDONED_TASK</div>
+    <svg id="sleep-laptop" viewBox="0 0 1000 640" fill="none" stroke="#1E2A2F" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M110 300 L180 236 L820 236 L890 300 Z" fill="#F5F7F3" />
+      <path d="M110 300 L890 300 L985 378 Q992 396 972 396 L28 396 Q8 396 15 378 Z" fill="#F5F7F3" />
+      <path d="M430 396 L436 384 L564 384 L570 396" />
+    </svg>
+    <div id="sleep-z">
+      <span style="left: 0; top: 180px; font-size: 64px">z</span>
+      <span style="left: 70px; top: 100px; font-size: 92px">z</span>
+      <span style="left: 160px; top: 0; font-size: 128px">Z</span>
+    </div>
+    <div id="sleep-line" class="label">macOS idle sleep froze the Docker VM</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    window.__timelines["sleep"] = tl;
+  </script>
+</template>

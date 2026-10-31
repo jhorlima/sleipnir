@@ -1,0 +1,30 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #end-name {
+      position: absolute;
+      left: 640px;
+      top: 250px;
+      font-size: 400px;
+    }
+    #end-repo {
+      position: absolute;
+      left: 646px;
+      top: 670px;
+      font-size: 60px;
+    }
+  </style>
+  <div id="root" data-composition-id="end" data-width="1920" data-height="1080">
+    <div class="sheet"></div>
+    <div class="margin-rule"></div>
+    <div id="end-name" class="display stamp red">Sleipnir</div>
+    <div id="end-repo" class="label">github.com/jhorlima/sleipnir</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    window.__timelines["end"] = tl;
+  </script>
+</template>

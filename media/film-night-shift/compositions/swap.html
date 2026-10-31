@@ -1,0 +1,63 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #swap-margin {
+      top: 150px;
+    }
+    #swap-note {
+      font-size: 52px;
+    }
+    #swap-dial {
+      position: absolute;
+      left: 660px;
+      top: 110px;
+      width: 1060px;
+      height: 636px;
+    }
+    #swap-readout {
+      position: absolute;
+      left: 640px;
+      top: 730px;
+      display: flex;
+      align-items: baseline;
+      gap: 32px;
+    }
+    #swap-value {
+      font-size: 220px;
+    }
+    #swap-unit {
+      font-size: 56px;
+    }
+  </style>
+  <div id="root" data-composition-id="swap" data-width="1920" data-height="1080">
+    <div class="sheet"></div>
+    <div class="margin-rule"></div>
+    <div id="swap-margin" class="margin">
+      <div id="swap-note" class="label">macOS swap fills up</div>
+    </div>
+    <svg id="swap-dial" viewBox="0 0 1000 600" fill="none" stroke="#1E2A2F" stroke-linecap="butt">
+      <defs>
+        <pattern id="swap-hatch" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="14" stroke="#1E2A2F" stroke-width="5" />
+        </pattern>
+      </defs>
+      <path d="M45 520 A455 455 0 0 1 955 520" stroke="url(#swap-hatch)" stroke-width="50" stroke-dasharray="1402.3 9999" />
+      <path d="M20 520 A480 480 0 0 1 980 520" stroke-width="6" />
+      <path d="M100 520 A400 400 0 0 1 900 520" stroke-width="36" stroke-dasharray="4 74.54" />
+      <line x1="500" y1="520" x2="879.3" y2="497.3" stroke-width="12" stroke-linecap="round" />
+      <circle cx="500" cy="520" r="26" fill="#1E2A2F" stroke="none" />
+      <line x1="0" y1="520" x2="1000" y2="520" stroke-width="6" />
+    </svg>
+    <div id="swap-readout">
+      <div class="display"><span id="swap-value" class="stamp red">15.7</span><span id="swap-of" style="font-size: 220px"> / 16 GB</span></div>
+      <div id="swap-unit" class="label">swap in use</div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    window.__timelines["swap"] = tl;
+  </script>
+</template>

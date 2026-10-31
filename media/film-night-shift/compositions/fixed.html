@@ -1,0 +1,56 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #fixed-margin {
+      top: 150px;
+    }
+    #fixed-note {
+      font-size: 52px;
+    }
+    #fixed-list {
+      position: absolute;
+      left: 640px;
+      top: 130px;
+      width: 1100px;
+    }
+    .fixed-row {
+      position: relative;
+      height: 160px;
+      display: flex;
+      align-items: center;
+    }
+    .fixed-text {
+      font-size: 72px;
+      text-decoration: line-through;
+      text-decoration-thickness: 7px;
+      text-decoration-color: var(--graphite);
+    }
+    .fixed-stamp {
+      position: absolute;
+      left: 820px;
+      font-size: 110px;
+      transform: rotate(-5deg);
+    }
+  </style>
+  <div id="root" data-composition-id="fixed" data-width="1920" data-height="1080">
+    <div class="sheet"></div>
+    <div class="margin-rule"></div>
+    <div id="fixed-margin" class="margin">
+      <div id="fixed-note" class="label">Fixed,<br />line by line</div>
+    </div>
+    <div id="fixed-list">
+      <div class="fixed-row"><span id="fixed-sleep" class="fixed-text label">Laptop sleep</span><span id="fixed-sleep-stamp" class="fixed-stamp display stamp">fixed</span></div>
+      <div class="fixed-row"><span id="fixed-swap" class="fixed-text label">Swap</span><span id="fixed-swap-stamp" class="fixed-stamp display stamp">fixed</span></div>
+      <div class="fixed-row"><span id="fixed-heap" class="fixed-text label">Spark heap</span><span id="fixed-heap-stamp" class="fixed-stamp display stamp">fixed</span></div>
+      <div class="fixed-row"><span id="fixed-oom" class="fixed-text label">Object store OOM</span><span id="fixed-oom-stamp" class="fixed-stamp display stamp">fixed</span></div>
+      <div class="fixed-row"><span id="fixed-disk" class="fixed-text label">Docker disk full</span><span id="fixed-disk-stamp" class="fixed-stamp display stamp red">fixed</span></div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    window.__timelines["fixed"] = tl;
+  </script>
+</template>
