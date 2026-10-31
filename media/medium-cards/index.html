@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --paper: #f5f7f3;
+        --grid: #bfd8d2;
+        --ink: #1e2a2f;
+        --pen-red: #d9382b;
+        --muted: #5e6b70;
+        --muted-light: #8a979b;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--paper);
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        font-family: "Oswald", sans-serif;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+      }
+      #paper {
+        position: absolute;
+        inset: 0;
+        background-color: var(--paper);
+        background-image:
+          linear-gradient(to right, var(--grid) 2px, transparent 2px),
+          linear-gradient(to bottom, var(--grid) 2px, transparent 2px),
+          linear-gradient(to right, var(--grid) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+        background-size:
+          120px 120px,
+          120px 120px,
+          24px 24px,
+          24px 24px;
+      }
+      #fibre {
+        position: absolute;
+        inset: 0;
+        opacity: 0.015;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      .card {
+        position: absolute;
+        inset: 0;
+      }
+      .card svg {
+        position: absolute;
+        inset: 0;
+      }
+      .title {
+        position: absolute;
+        left: 120px;
+        top: 84px;
+        font-size: 56px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        line-height: 1.15;
+      }
+      .sub {
+        position: absolute;
+        left: 120px;
+        top: 168px;
+        font-size: 38px;
+        font-weight: 400;
+        letter-spacing: 0.02em;
+        color: var(--muted);
+      }
+      .source {
+        position: absolute;
+        left: 120px;
+        top: 996px;
+        font-size: 34px;
+        font-weight: 400;
+        letter-spacing: 0.02em;
+        color: var(--muted);
+      }
+      .stamp {
+        font-family: "League Gothic", sans-serif;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        -webkit-text-stroke: 1px currentColor;
+      }
+      .red {
+        color: var(--pen-red);
+      }
+      text {
+        font-family: "Oswald", sans-serif;
+        letter-spacing: 0.02em;
+      }
+      text.num {
+        font-family: "League Gothic", sans-serif;
+        letter-spacing: 0.01em;
+        stroke: currentColor;
+        stroke-width: 1px;
+        paint-order: stroke;
+      }
+
+      /* 01 cover */
+      .legend-logo {
+        position: absolute;
+        left: 120px;
+        width: 120px;
+        height: 120px;
+        object-fit: contain;
+        mix-blend-mode: multiply;
+      }
+      .legend-name {
+        position: absolute;
+        left: 270px;
+        font-size: 44px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        line-height: 1;
+      }
+      #cover-rows {
+        position: absolute;
+        left: 800px;
+        top: 250px;
+        font-size: 210px;
+        line-height: 0.95;
+      }
+      #cover-sub {
+        position: absolute;
+        left: 800px;
+        top: 690px;
+        font-size: 40px;
+        font-weight: 400;
+        letter-spacing: 0.02em;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      #cover-signature {
+        position: absolute;
+        left: 120px;
+        top: 932px;
+        font-size: 44px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        line-height: 1;
+      }
+
+      /* 06 effort: League Gothic draws ~ as a raised mark */
+      .tilde {
+        font-family: "Oswald", sans-serif;
+        font-size: 0.55em;
+        vertical-align: 0.25em;
+        -webkit-text-stroke: 0;
+      }
+      #effort-line {
+        position: absolute;
+        left: 120px;
+        top: 96px;
+        font-size: 190px;
+        line-height: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="6"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="paper"></div>
+      <div id="fibre"></div>
+
+      <!-- 01 cover: the race's opening frame -->
+      <div id="card-cover" class="card clip" data-start="0" data-duration="1" data-track-index="1">
+        <img class="legend-logo" src="assets/logos/trino.svg" alt="Trino" style="top: 270px" />
+        <div class="legend-name" style="top: 308px">Trino</div>
+        <img class="legend-logo" src="assets/logos/spark.svg" alt="Apache Spark" style="top: 420px" />
+        <div class="legend-name" style="top: 458px">Spark</div>
+        <img class="legend-logo" src="assets/logos/starrocks.png" alt="StarRocks" style="top: 570px" />
+        <div class="legend-name" style="top: 608px">StarRocks</div>
+        <img class="legend-logo" src="assets/logos/duckdb.svg" alt="DuckDB" style="top: 720px" />
+        <div class="legend-name" style="top: 758px">DuckDB</div>
+        <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+          <g stroke-width="4" stroke-linecap="round">
+            <line x1="560" y1="330" x2="700" y2="330" stroke="#5E6B70" />
+            <line x1="560" y1="480" x2="700" y2="480" stroke="#8A979B" />
+            <line x1="560" y1="630" x2="700" y2="630" stroke="#5E6B70" />
+            <line x1="560" y1="780" x2="700" y2="780" stroke="#8A979B" />
+          </g>
+          <g fill="#1E2A2F">
+            <circle cx="704" cy="330" r="9" />
+            <circle cx="704" cy="480" r="9" />
+            <circle cx="704" cy="630" r="9" />
+            <circle cx="704" cy="780" r="9" />
+          </g>
+        </svg>
+        <div id="cover-rows" class="stamp">
+          <span class="red">3.97</span> billion<br />weather rows
+        </div>
+        <div id="cover-sub">
+          NOAA GHCN-Daily, 1763-2025<br />Four query engines, one Iceberg lakehouse, one laptop
+        </div>
+        <div id="cover-signature">Sleipnir</div>
+        <div class="source">Sleipnir benchmark, single laptop; results/*.parquet</div>
+      </div>
+
+      <!-- 02 object store: whole-table query through Cube, M / L / L2 -->
+      <div id="card-object-store" class="card clip" data-start="1" data-duration="1" data-track-index="1">
+        <div class="title">More CPU made Trino slower, until the object store got 2 CPUs</div>
+        <div class="sub">Whole-table query through Cube at 3.97 B rows, seconds, lower is better</div>
+        <!-- y = 860 - 8 * seconds -->
+        <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+          <line x1="400" y1="860" x2="1600" y2="860" stroke="#1E2A2F" stroke-width="2" />
+          <g stroke="#8A979B" stroke-width="4" fill="none">
+            <polyline points="520,296 1000,504 1480,533.6" />
+            <polyline points="520,376 1000,560.8 1480,615.2" />
+          </g>
+          <g fill="#8A979B">
+            <circle cx="520" cy="296" r="9" />
+            <circle cx="1000" cy="504" r="9" />
+            <circle cx="520" cy="376" r="9" />
+            <circle cx="1000" cy="560.8" r="9" />
+            <circle cx="1480" cy="533.6" r="9" />
+            <circle cx="1480" cy="615.2" r="9" />
+          </g>
+          <polyline points="520,600.8 1000,337.6 1480,663.2" stroke="#D9382B" stroke-width="6" fill="none" stroke-linejoin="round" />
+          <g fill="#D9382B">
+            <circle cx="520" cy="600.8" r="11" />
+            <circle cx="1000" cy="337.6" r="11" />
+            <circle cx="1480" cy="663.2" r="11" />
+          </g>
+          <g font-size="38" fill="#5E6B70" font-weight="500" text-anchor="end">
+            <text x="490" y="309">StarRocks 70.5</text>
+            <text x="490" y="389">DuckDB 60.5</text>
+          </g>
+          <text x="490" y="614" font-size="38" fill="#D9382B" font-weight="500" text-anchor="end">Trino 32.4</text>
+          <g font-size="38" fill="#5E6B70" font-weight="500" text-anchor="middle">
+            <text x="1000" y="478">44.5</text>
+            <text x="1000" y="610">37.4</text>
+          </g>
+          <g font-size="38" fill="#5E6B70" font-weight="500">
+            <text x="1508" y="547">40.8</text>
+            <text x="1508" y="628">30.6</text>
+          </g>
+          <text x="1000" y="306" font-size="44" fill="#D9382B" font-weight="500" text-anchor="middle">65.3</text>
+          <text class="num" x="1508" y="790" font-size="110" fill="#D9382B">24.6 s</text>
+          <g text-anchor="middle" fill="#1E2A2F">
+            <text x="520" y="912" font-size="44" font-weight="500">M</text>
+            <text x="1000" y="912" font-size="44" font-weight="500">L</text>
+            <text x="1480" y="912" font-size="44" font-weight="500">L2</text>
+          </g>
+          <g text-anchor="middle" fill="#5E6B70" font-size="34">
+            <text x="520" y="958">4 CPU / 8 GB</text>
+            <text x="1000" y="958">8 CPU / 12 GB</text>
+            <text x="1480" y="958">L, object store at 2 CPU</text>
+          </g>
+        </svg>
+        <div class="source">Sleipnir benchmark, single laptop; results/*.parquet</div>
+      </div>
+
+      <!-- 03 build from scratch at 3.97 B rows; bar px = 0.08 * seconds -->
+      <div id="card-build" class="card clip" data-start="2" data-duration="1" data-track-index="1">
+        <div class="title">From scratch at 3.97 B rows, Spark failed on M</div>
+        <div class="sub">dbt build of every model, seconds, lower is better</div>
+        <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+          <line x1="520" y1="270" x2="520" y2="840" stroke="#1E2A2F" stroke-width="2" />
+          <g font-size="40" font-weight="500" fill="#1E2A2F" text-anchor="end">
+            <text x="490" y="334">Trino, M</text>
+            <text x="490" y="444">Trino, L</text>
+            <text x="490" y="554">Trino, L2</text>
+            <text x="490" y="694">Spark, M</text>
+            <text x="490" y="804">Spark, L2</text>
+          </g>
+          <g fill="#5E6B70">
+            <rect x="521" y="290" width="1011.1" height="60" />
+            <rect x="521" y="400" width="748.1" height="60" />
+            <rect x="521" y="510" width="730" height="60" />
+          </g>
+          <rect x="521" y="760" width="1104.2" height="60" fill="#8A979B" />
+          <g font-size="40" font-weight="500" fill="#1E2A2F">
+            <text x="1552" y="334">12,639 s</text>
+            <text x="1289" y="444">9,351 s</text>
+            <text x="1271" y="554">9,125 s</text>
+            <text x="1645" y="804">13,803 s</text>
+          </g>
+          <g transform="rotate(-4 640 680)">
+            <rect x="548" y="640" width="190" height="84" fill="none" stroke="#D9382B" stroke-width="5" />
+            <text class="num" x="643" y="712" font-size="78" fill="#D9382B" text-anchor="middle">failed</text>
+          </g>
+        </svg>
+        <div class="sub" style="top: 900px">M 4 CPU / 8 GB, L 8 CPU / 12 GB, L2 is L with the object store at 2 CPU</div>
+        <div class="source">Sleipnir benchmark, single laptop; results/*.parquet</div>
+      </div>
+
+      <!-- 04 sort vs partition (Trino, 2010-2025 data, profile M) -->
+      <div id="card-layout" class="card clip" data-start="3" data-duration="1" data-track-index="1">
+        <div class="title">Sort first: half the size, and the yearly count in 0.51 s</div>
+        <div class="sub">Same fact table rewritten by Trino, 2010-2025 data, profile M</div>
+        <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+          <g font-size="44" font-weight="500" fill="#1E2A2F">
+            <text x="120" y="320">Size on disk</text>
+            <text x="1000" y="320">Yearly count, full scan</text>
+          </g>
+          <g font-size="34" fill="#5E6B70">
+            <text x="120" y="386">Unsorted, monthly partitions</text>
+            <text x="120" y="536">Sorted by station and date</text>
+            <text x="1000" y="386">Unsorted, yearly partitions</text>
+            <text x="1000" y="536">Sorted by station and date</text>
+          </g>
+          <line x1="120" y1="400" x2="120" y2="630" stroke="#1E2A2F" stroke-width="2" />
+          <line x1="1000" y1="400" x2="1000" y2="700" stroke="#1E2A2F" stroke-width="2" />
+          <!-- size: 767 px per GB; time: 3.14 px per second -->
+          <g fill="#5E6B70">
+            <rect x="121" y="404" width="560" height="60" />
+            <rect x="121" y="554" width="291.5" height="60" />
+            <rect x="1001" y="404" width="620" height="60" />
+          </g>
+          <rect x="1001" y="554" width="4" height="60" fill="#D9382B" />
+          <g font-size="40" font-weight="500" fill="#1E2A2F">
+            <text x="700" y="448">0.73 GB</text>
+            <text x="432" y="598">0.38 GB</text>
+            <text x="1640" y="448">197.5 s</text>
+          </g>
+          <text class="num" x="1030" y="700" font-size="140" fill="#D9382B">0.51 s</text>
+        </svg>
+        <div class="sub" style="top: 780px">Both sorted rows keep monthly partitions. Partitioning by year without a sort was the worst case.</div>
+        <div class="source">Sleipnir benchmark, single laptop; results/*.parquet</div>
+      </div>
+
+      <!-- 05 Cube Store vs Trino through Cube; x = 120 + 0.33 px per ms -->
+      <div id="card-cube-store" class="card clip" data-start="4" data-duration="1" data-track-index="1">
+        <div class="title">Cube Store answers in milliseconds, Trino through Cube in seconds</div>
+        <div class="sub">Time per question on one shared axis</div>
+        <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+          <line x1="120" y1="290" x2="120" y2="800" stroke="#1E2A2F" stroke-width="2" />
+          <text x="150" y="330" font-size="40" font-weight="500" fill="#1E2A2F">Cube Store, pre-built rollups, at every scale</text>
+          <rect x="121" y="370" width="5.3" height="80" fill="#D9382B" />
+          <rect x="126.3" y="370" width="5.9" height="80" fill="#D9382B" fill-opacity="0.45" />
+          <text class="num" x="170" y="560" font-size="200" fill="#D9382B">16-34 ms</text>
+          <text x="150" y="660" font-size="40" font-weight="500" fill="#1E2A2F">Trino through Cube, per question</text>
+          <rect x="121" y="690" width="989" height="80" fill="#5E6B70" />
+          <rect x="1111.5" y="691.5" width="327" height="77" fill="none" stroke="#5E6B70" stroke-width="3" />
+          <text class="num" x="1470" y="770" font-size="140" fill="#1E2A2F">3-4 s</text>
+        </svg>
+        <div class="sub" style="top: 860px">Building the rollups is what takes time; once built, a question is a lookup.</div>
+        <div class="source">Sleipnir benchmark, single laptop; results/*.parquet</div>
+      </div>
+
+      <!-- 06 effort; night axis 22:00 to 11:00, x = 120 + 2.1538 px per minute -->
+      <div id="card-effort" class="card clip" data-start="5" data-duration="1" data-track-index="1">
+        <div id="effort-line" class="stamp"><span class="tilde">~</span>40 h · 8 days · 261 runs</div>
+        <div class="sub" style="top: 300px">~40 h of dbt builds (failed runs included), 8 days with measurements, 261 measured runs</div>
+        <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+          <text x="120" y="520" font-size="44" font-weight="500" fill="#1E2A2F">One night run, laptop lid open, nobody touching it</text>
+          <line x1="120" y1="840" x2="1800" y2="840" stroke="#1E2A2F" stroke-width="2" />
+          <g stroke="#1E2A2F" stroke-width="2">
+            <line x1="120" y1="828" x2="120" y2="852" />
+            <line x1="249.2" y1="828" x2="249.2" y2="852" />
+            <line x1="378.5" y1="828" x2="378.5" y2="852" />
+            <line x1="507.7" y1="828" x2="507.7" y2="852" />
+            <line x1="636.9" y1="828" x2="636.9" y2="852" />
+            <line x1="766.2" y1="828" x2="766.2" y2="852" />
+            <line x1="895.4" y1="828" x2="895.4" y2="852" />
+            <line x1="1024.6" y1="828" x2="1024.6" y2="852" />
+            <line x1="1153.8" y1="828" x2="1153.8" y2="852" />
+            <line x1="1283.1" y1="828" x2="1283.1" y2="852" />
+            <line x1="1412.3" y1="828" x2="1412.3" y2="852" />
+            <line x1="1541.5" y1="828" x2="1541.5" y2="852" />
+            <line x1="1670.8" y1="828" x2="1670.8" y2="852" />
+            <line x1="1800" y1="828" x2="1800" y2="852" />
+          </g>
+          <line x1="227.7" y1="780" x2="1750.5" y2="780" stroke="#D9382B" stroke-width="6" stroke-linecap="round" />
+          <circle cx="227.7" cy="780" r="11" fill="#D9382B" />
+          <circle cx="1750.5" cy="780" r="11" fill="#D9382B" />
+          <text class="num" x="227.7" y="740" font-size="120" fill="#D9382B">22:50</text>
+          <text class="num" x="1750.5" y="740" font-size="120" fill="#D9382B" text-anchor="end">10:37</text>
+          <text x="120" y="900" font-size="34" fill="#5E6B70">One tick per hour</text>
+        </svg>
+        <div class="source">Sleipnir benchmark, single laptop; results/*.parquet</div>
+      </div>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

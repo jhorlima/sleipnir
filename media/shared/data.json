@@ -1,0 +1,80 @@
+{
+  "_source": "Every value comes from results/*.parquet as published in docs/blog/01-medium-local-benchmark.md and docs/lab-notebook.md. Do not put a number on screen that is not here.",
+  "dataset": {
+    "name": "NOAA GHCN-Daily",
+    "years": "1763-2025",
+    "bronze_rows_local": "3.97 B",
+    "bronze_rows_local_long": "3,969,975,896",
+    "first_row": {
+      "csv": "ITE00100554,17630101,TMAX,-36",
+      "station": "Milan",
+      "date": "1 January 1763",
+      "value": "-3.6 °C",
+      "note": "values are tenths of °C"
+    },
+    "example_row": {
+      "csv": "USW00094728,20250601,TMAX,189",
+      "station": "New York, Central Park",
+      "date": "1 June 2025",
+      "value": "18.9 °C"
+    }
+  },
+  "scales": {
+    "small": {"years": "2025", "rows": "44 M"},
+    "r2": {"years": "2010-2025", "rows": "742 M"},
+    "r2_1998": {"years": "1998-2025", "rows": "1.29 B"},
+    "local": {"years": "1763-2025", "rows": "3.97 B"}
+  },
+  "profiles": {
+    "M": "4 CPU / 8 GB per engine",
+    "L": "8 CPU / 12 GB per engine",
+    "L2": "L with the object store at 2 CPU"
+  },
+  "load_duckdb": {
+    "r2": {"rows": "742 M", "seconds": 146, "rows_per_s": "5.1 M"},
+    "local": {"rows": "3.97 B", "seconds": 1292, "rows_per_s": "3.1 M"}
+  },
+  "build_from_scratch_local": {
+    "trino_M_s": 12639,
+    "trino_L_s": 9351,
+    "trino_L2_s": 9125,
+    "spark_M": "failed",
+    "spark_L2_s": 13803
+  },
+  "q1_whole_table_through_cube_local": {
+    "trino_M_s": 32.4,
+    "trino_L_s": 65.3,
+    "trino_L2_s": 24.6,
+    "starrocks_M_s": 70.5,
+    "starrocks_L_s": 44.5,
+    "starrocks_L2_s": 40.8,
+    "duckdb_M_s": 60.5,
+    "duckdb_L_s": 37.4,
+    "duckdb_L2_s": 30.6
+  },
+  "q1_whole_table_direct_local": {
+    "trino_M_s": 2.7, "trino_L_s": 3.1,
+    "starrocks_M_s": 3.8, "starrocks_L_s": 1.8,
+    "duckdb_M_s": 5.9, "duckdb_L_s": 3.1
+  },
+  "cube_store_ms": "16-34",
+  "cube_store_build_s": {"starrocks_r2": 165, "trino_local": 846},
+  "trino_through_cube_floor_s": "3-4",
+  "tpch_sf8_warm_geomean_ms": {"duckdb": 304, "starrocks": 551, "trino": 1874},
+  "layout_r2": {
+    "unsorted_gb": 0.73, "sorted_gb": 0.38,
+    "yearly_unsorted_q1_s": 197.5, "sorted_q1_s": 0.51
+  },
+  "postgres_small": {"rows": "44 M", "parquet_gb": 0.23, "postgres_gb": 8.15, "ratio": "35x"},
+  "incidents": {
+    "laptop_sleep": "Trino ABANDONED_TASK: macOS idle sleep froze the Docker VM",
+    "swap": "15.7 of 16 GB swap in use",
+    "spark_snapshots": "4.4 M Iceberg snapshot objects in the Spark heap",
+    "object_store_oom": "RustFS OOM-killed at 3 GB, then at 5 GB",
+    "disk_full": "Spark MERGE spilled ~33 GB; Docker disk 103 GB full",
+    "starrocks_tablets": "16 buckets x 3,156 partitions = ~50,000 tablets"
+  },
+  "night_run": {"start": "22:50", "end": "10:37"},
+  "effort": {"days_with_runs": 8, "days_span": 18, "runs": 261, "b2_hours": "~40", "ssd_health": "~1%"},
+  "repo": "github.com/jhorlima/sleipnir"
+}
