@@ -2,6 +2,8 @@
 
 *What I learned racing Trino, Spark, StarRocks and DuckDB on the same Iceberg lakehouse, and everything that broke along the way.*
 
+![Four engines and 3.97 billion weather rows on recorder chart paper](../assets/medium/01-cover.png)
+
 **TL;DR** The engine that surprised me most was **DuckDB**. Running inside a single process, with no server at all, it loaded 742 M rows in 146 s, had the best TPC-H time, won three of the five filtered questions, and nearly halved its whole-table scan when I doubled the CPU. But the more interesting stuff is in the rest of the post: doubling the CPU made one Trino query **2× slower** (the bottleneck was the object store), a Spark session leak held **4.4 million** Iceberg snapshot objects in memory, pre-aggregations answered in **16–34 ms** at any scale, and Postgres needed **35×** the disk of Parquet. All of this on one laptop, so read it as "this setup", not as a ranking :)
 
 ## How it started
@@ -20,7 +22,9 @@ The benchmarks I could find that tested things this way were on older engine ver
 - **Do the new versions of Spark and Trino** change the picture?
 - **Is DuckDB a good option for ingestion and compression** at billions of rows?
 
-So I built a small lakehouse on my laptop and called it Sleipnir (Odin's eight-legged horse... several engines, one body).
+So I built a small lakehouse on my laptop and called it **Sleipnir**.
+
+Why the name? In Norse mythology, Sleipnir is Odin's horse: eight legs, the fastest of all horses. That felt right for a benchmark that is, in the end, a race. And it fits the shape of the project: many legs (Trino, Spark, StarRocks, DuckDB, Postgres) carrying one body, the same lakehouse, where every engine reads and writes the same tables. A horse with eight legs only runs if they move together, and that was the whole point: same data, same limits, same questions for every engine.
 
 ## What I wanted to find out
 
@@ -114,6 +118,8 @@ Unless a table says otherwise, times are the median of 5 warm runs, and profile 
 The full history is slower per row: the early centuries are thousands of tiny batches that each pay a fixed cost, and the CSVs came from a USB SSD.
 
 ### Transforming: build from scratch (dbt)
+
+![Build from scratch at 3.97 B rows: Trino on M, L and L2, Spark failed on M and finished on L2](../assets/medium/03-build.png)
 
 | Scale | Trino 483 | Spark 4.1 | Postgres 18 |
 |---|---|---|---|
@@ -217,6 +223,8 @@ Derived from TPC-H, not comparable to published TPC-H results.
 
 ### Acceleration (`r2`, profile M, warm ms; in parentheses the same question without it)
 
+![Cube Store answers in 16-34 ms, Trino through Cube in 3-4 s](../assets/medium/05-cube-store.png)
+
 | | Q2 | Q3 | Q9 | Q10 | Refresh / build |
 |---|---|---|---|---|---|
 | Cube Store on Trino | 22 (4,076) | 18 (4,072) | 32 (4,380) | 33 (6,168) | 515 s |
@@ -231,6 +239,8 @@ At `local`, the StarRocks MV refreshed in 909 s on M and ~600 s on L, and the Cu
 - **StarRocks materialized views** (one plain copy per gold table) did not beat StarRocks reading Iceberg directly (at `local`, Q1: 2.5 s with the MV, 1.8 s without). A copy saves no work. An MV pays off when it pre-joins or pre-aggregates something, which is a different test.
 
 ### Table layout and maintenance (B6, Trino, `r2`, profile M)
+
+![Sort first: half the size, and the yearly count in 0.51 s instead of 197.5 s](../assets/medium/04-layout.png)
 
 Each variant is a full copy of the 190 M-row fact table, written by Trino (z-order by Spark), read with the same direct-SQL questions (warm, ms):
 
@@ -275,6 +285,8 @@ Table maintenance (compaction, manifests, expiring snapshots, orphan files) ran 
 
 ## The M → L surprise
 
+![More CPU made Trino slower, until the object store got 2 CPUs](../assets/medium/02-object-store.png)
+
 I expected profile L (twice the CPU) to be faster everywhere. For DuckDB and StarRocks it mostly was. For Trino, the whole-table query through Cube got **2× slower**: 32 s → 65 s.
 
 Q1 (whole-table yearly count) at 3.97 B rows, warm:
@@ -301,6 +313,8 @@ Where this matters: if you benchmark (or size) an engine against a self-hosted o
 Looking back, I could have explored the object store's limits on purpose instead of just bumping into them. My local S3 sat on the same machine, with almost no latency per request and only a CPU and memory cap. Real S3 behaves differently: AWS documents around 3,500 writes and 5,500 reads per second per prefix, and every request pays tens of milliseconds, which adds up fast when a table is thousands of small Parquet files. Throttling the local object store to something closer to that (latency, request rate) would have made the local numbers a better preview of the cloud ones. That goes on the list too.
 
 ## How long it took
+
+![~40 h, 8 days, 261 runs, and one night run from 22:50 to 10:37](../assets/medium/06-effort.png)
 
 About three weeks from the first commit to the last measurement. The spec and the first working lakehouse took two days (October 9–10), with the AI assistant doing most of the scaffolding. The benchmark itself ran from **October 11 to October 28**:
 

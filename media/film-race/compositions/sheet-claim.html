@@ -1,0 +1,74 @@
+<template id="sheet-claim-template">
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #claim-sheet {
+      position: absolute; left: 0; top: 0; width: 1940px; height: 1080px; overflow: hidden;
+      background-color: #F5F7F3;
+      clip-path: polygon(0px 0px, 1940px 0px, 1926px 27px, 1940px 54px, 1926px 81px, 1940px 108px, 1926px 135px, 1940px 162px, 1926px 189px, 1940px 216px, 1926px 243px, 1940px 270px, 1926px 297px, 1940px 324px, 1926px 351px, 1940px 378px, 1926px 405px, 1940px 432px, 1926px 459px, 1940px 486px, 1926px 513px, 1940px 540px, 1926px 567px, 1940px 594px, 1926px 621px, 1940px 648px, 1926px 675px, 1940px 702px, 1926px 729px, 1940px 756px, 1926px 783px, 1940px 810px, 1926px 837px, 1940px 864px, 1926px 891px, 1940px 918px, 1926px 945px, 1940px 972px, 1926px 999px, 1940px 1026px, 1926px 1053px, 1940px 1080px, 0px 1080px);
+    }
+    #claim-strip {
+      position: absolute; left: 0; top: 0; width: 1960px; height: 1080px;
+      background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix type='saturate' values='0'/></filter><rect width='240' height='240' filter='url(%23n)' opacity='0.06'/></svg>"),
+        linear-gradient(to right, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to bottom, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to right, #BFD8D2 1px, transparent 1px),
+        linear-gradient(to bottom, #BFD8D2 1px, transparent 1px);
+      background-size: 240px 240px, 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    }
+    #claim-window { position: absolute; left: 0; top: 0; width: 1558px; height: 1080px; overflow: hidden; }
+    #claim-ink { position: absolute; left: 0; top: 0; width: 1960px; height: 1080px; }
+    #claim-strip svg, #claim-ink svg, #claim-static { position: absolute; left: 0; top: 0; }
+    
+      .unstamped { opacity: 0; }
+      .title { position: absolute; font-family: "Oswald"; font-weight: 500; line-height: 1.2; letter-spacing: 0.02em; white-space: nowrap; color: #1E2A2F; }
+      .stamp { position: absolute; font-family: "League Gothic"; font-weight: 400; line-height: 1; letter-spacing: 0.01em;
+        font-variant-numeric: tabular-nums; white-space: nowrap; color: #1E2A2F; -webkit-text-stroke: 2px currentColor; }
+      .claim { position: absolute; font-family: "League Gothic"; font-weight: 400; font-size: 190px; line-height: 1; letter-spacing: 0.01em;
+        white-space: nowrap; color: #1E2A2F; -webkit-text-stroke: 2px currentColor; }
+      .label { position: absolute; font-family: "Oswald"; font-weight: 500; font-size: 44px; line-height: 1.2; letter-spacing: 0.02em; white-space: nowrap; color: #1E2A2F; }
+      .label.big { font-size: 56px; line-height: 1.15; }
+      .label.small { font-size: 40px; }
+      .label.muted { color: #5E6B70; }
+      .sec { position: absolute; display: flex; flex-direction: column; white-space: nowrap; color: #1E2A2F; }
+      .sec-name { font-family: "League Gothic"; line-height: 1; letter-spacing: 0.01em; }
+      .sec-profile { font-family: "Oswald"; font-weight: 500; line-height: 1.2; letter-spacing: 0.02em; }
+      .red { color: #D9382B; }
+      .logo-stamp { position: absolute; mix-blend-mode: multiply; object-fit: contain; }
+
+  </style>
+  <div id="root" data-composition-id="sheet-claim" data-width="1920" data-height="1080">
+    <div id="claim-sheet">
+      <div id="claim-strip">
+        <svg width="1960" height="1080" viewBox="0 0 1960 1080">
+          
+        </svg>
+
+      </div>
+      <svg id="claim-static" width="1920" height="1080" viewBox="0 0 1920 1080"></svg>
+      <div id="claim-window">
+        <div id="claim-ink">
+          <svg width="1960" height="1080" viewBox="0 0 1960 1080">
+
+          </svg>
+        </div>
+      </div>
+      
+      <div id="claim-stamp-1" class="claim unstamped" style="left:288px;top:210px;transform-origin:left center;">Same data.</div>
+      <div id="claim-stamp-2" class="claim unstamped" style="left:288px;top:396px;transform-origin:left center;">Same limits.</div>
+      <div id="claim-stamp-3" class="claim red unstamped" style="left:288px;top:582px;transform-origin:left center;">Different stories.</div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set("#claim-stamp-1", { opacity: 1 }, 0.35);
+    tl.fromTo("#claim-stamp-1", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 0.35);
+    tl.set("#claim-stamp-2", { opacity: 1 }, 0.65);
+    tl.fromTo("#claim-stamp-2", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 0.65);
+    tl.set("#claim-stamp-3", { opacity: 1 }, 0.95);
+    tl.fromTo("#claim-stamp-3", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 0.95);
+    tl.fromTo("#claim-sheet", { x: 0 }, { x: -1980, duration: 0.267, ease: "power3.in" }, 2.7);
+    tl.set({}, {}, 2.967);
+    window.__timelines["sheet-claim"] = tl;
+  </script>
+</template>

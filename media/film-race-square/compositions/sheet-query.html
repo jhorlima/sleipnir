@@ -1,0 +1,92 @@
+<template id="sheet-query-template">
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #query-sheet {
+      position: absolute; left: 0; top: 0; width: 1100px; height: 1080px; overflow: hidden;
+      background-color: #F5F7F3;
+      clip-path: polygon(0px 0px, 1100px 0px, 1086px 27px, 1100px 54px, 1086px 81px, 1100px 108px, 1086px 135px, 1100px 162px, 1086px 189px, 1100px 216px, 1086px 243px, 1100px 270px, 1086px 297px, 1100px 324px, 1086px 351px, 1100px 378px, 1086px 405px, 1100px 432px, 1086px 459px, 1100px 486px, 1086px 513px, 1100px 540px, 1086px 567px, 1100px 594px, 1086px 621px, 1100px 648px, 1086px 675px, 1100px 702px, 1086px 729px, 1100px 756px, 1086px 783px, 1100px 810px, 1086px 837px, 1100px 864px, 1086px 891px, 1100px 918px, 1086px 945px, 1100px 972px, 1086px 999px, 1100px 1026px, 1086px 1053px, 1100px 1080px, 0px 1080px);
+    }
+    #query-strip {
+      position: absolute; left: 0; top: 0; width: 1720px; height: 1080px;
+      background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix type='saturate' values='0'/></filter><rect width='240' height='240' filter='url(%23n)' opacity='0.06'/></svg>"),
+        linear-gradient(to right, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to bottom, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to right, #BFD8D2 1px, transparent 1px),
+        linear-gradient(to bottom, #BFD8D2 1px, transparent 1px);
+      background-size: 240px 240px, 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    }
+    #query-window { position: absolute; left: 0; top: 0; width: 858px; height: 1080px; overflow: hidden; }
+    #query-ink { position: absolute; left: 0; top: 0; width: 1720px; height: 1080px; }
+    #query-strip svg, #query-ink svg, #query-static { position: absolute; left: 0; top: 0; }
+    
+      .unstamped { opacity: 0; }
+      .title { position: absolute; font-family: "Oswald"; font-weight: 500; line-height: 1.2; letter-spacing: 0.02em; white-space: nowrap; color: #1E2A2F; }
+      .stamp { position: absolute; font-family: "League Gothic"; font-weight: 400; line-height: 1; letter-spacing: 0.01em;
+        font-variant-numeric: tabular-nums; white-space: nowrap; color: #1E2A2F; -webkit-text-stroke: 2px currentColor; }
+      .claim { position: absolute; font-family: "League Gothic"; font-weight: 400; font-size: 190px; line-height: 1; letter-spacing: 0.01em;
+        white-space: nowrap; color: #1E2A2F; -webkit-text-stroke: 2px currentColor; }
+      .label { position: absolute; font-family: "Oswald"; font-weight: 500; font-size: 44px; line-height: 1.2; letter-spacing: 0.02em; white-space: nowrap; color: #1E2A2F; }
+      .label.big { font-size: 56px; line-height: 1.15; }
+      .label.small { font-size: 40px; }
+      .label.muted { color: #5E6B70; }
+      .sec { position: absolute; display: flex; flex-direction: column; white-space: nowrap; color: #1E2A2F; }
+      .sec-name { font-family: "League Gothic"; line-height: 1; letter-spacing: 0.01em; }
+      .sec-profile { font-family: "Oswald"; font-weight: 500; line-height: 1.2; letter-spacing: 0.02em; }
+      .red { color: #D9382B; }
+      .logo-stamp { position: absolute; mix-blend-mode: multiply; object-fit: contain; }
+
+  </style>
+  <div id="root" data-composition-id="sheet-query" data-width="1080" data-height="1080">
+    <div id="query-sheet">
+      <div id="query-strip">
+        <svg width="1720" height="1080" viewBox="0 0 1720 1080">
+          
+        </svg>
+        <div id="query-stamp-1" class="sec unstamped" style="left:870px;top:802px;transform-origin:left center;"><span class="sec-name" style="font-size:46px">M</span><span class="sec-profile" style="font-size:34px">4 CPU / 8 GB</span></div>
+        <div id="query-stamp-2" class="sec unstamped" style="left:1070px;top:802px;transform-origin:left center;"><span class="sec-name" style="font-size:46px">L</span><span class="sec-profile" style="font-size:34px">8 CPU / 12 GB</span></div>
+        <div id="query-stamp-3" class="label small muted unstamped" style="left:892px;top:521px;transform-origin:left center;font-size:36px">32.4 s</div>
+        <div id="query-stamp-6" class="sec unstamped" style="left:1270px;top:802px;transform-origin:left center;"><span class="sec-name" style="font-size:46px">L2</span></div>
+      </div>
+      <svg id="query-static" width="1080" height="1080" viewBox="0 0 1080 1080"><line  x1="150" y1="790" x2="980" y2="790" stroke="#1E2A2F" stroke-width="3" stroke-linecap="butt"/></svg>
+      <div id="query-window">
+        <div id="query-ink">
+          <svg width="1720" height="1080" viewBox="0 0 1720 1080">
+            <line  x1="860" y1="306" x2="860" y2="790" stroke="#1E2A2F" stroke-width="2" stroke-linecap="butt" stroke-dasharray="12 8"/>
+            <line  x1="1060" y1="306" x2="1060" y2="790" stroke="#1E2A2F" stroke-width="2" stroke-linecap="butt" stroke-dasharray="12 8"/>
+            <line  x1="1260" y1="306" x2="1260" y2="790" stroke="#1E2A2F" stroke-width="2" stroke-linecap="butt" stroke-dasharray="12 8"/>
+            <polyline id="query-trace-trino-0" points="860,790 884,577 1060,577 1084,361 1260,361 1284,628 1460,628" fill="none" stroke="#D9382B" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="title" style="left:186px;top:60px;font-size:40px">Trino through Cube, 3.97 B rows</div>
+      <div id="query-stamp-4" class="stamp red unstamped" style="left:186px;top:128px;font-size:190px;transform-origin:left center;">65.3 s</div>
+      <div id="query-stamp-5" class="label big unstamped" style="left:700px;top:401px;transform-origin:left center;font-size:36px">object store<br>at 2 CPU</div>
+      <div id="query-stamp-7" class="stamp red unstamped" style="left:560px;top:128px;font-size:190px;transform-origin:left center;">24.6 s</div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set(["#query-strip", "#query-ink"], { x: 0 }, 0);
+    tl.to(["#query-strip", "#query-ink"], { x: -400, duration: 3.333, ease: "none" }, 0.3);
+    tl.to(["#query-strip", "#query-ink"], { x: -600, duration: 1.667, ease: "none" }, 5.033);
+    tl.set("#query-stamp-1", { opacity: 1 }, 3.683);
+    tl.fromTo("#query-stamp-1", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 3.683);
+    tl.set("#query-stamp-2", { opacity: 1 }, 3.683);
+    tl.fromTo("#query-stamp-2", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 3.683);
+    tl.set("#query-stamp-3", { opacity: 1 }, 3.683);
+    tl.fromTo("#query-stamp-3", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 3.683);
+    tl.set("#query-stamp-4", { opacity: 1 }, 3.883);
+    tl.fromTo("#query-stamp-4", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 3.883);
+    tl.set("#query-stamp-5", { opacity: 1 }, 4.683);
+    tl.fromTo("#query-stamp-5", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 4.683);
+    tl.set("#query-stamp-6", { opacity: 1 }, 4.683);
+    tl.fromTo("#query-stamp-6", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 4.683);
+    tl.set("#query-stamp-7", { opacity: 1 }, 6.75);
+    tl.fromTo("#query-stamp-7", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 6.75);
+    tl.set("#query-stamp-4", { color: "#1E2A2F" }, 6.75);
+    tl.fromTo("#query-sheet", { x: 0 }, { x: -1140, duration: 0.267, ease: "power3.in" }, 7.7);
+    tl.set({}, {}, 7.967);
+    window.__timelines["sheet-query"] = tl;
+  </script>
+</template>

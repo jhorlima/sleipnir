@@ -1,0 +1,106 @@
+<template id="instrument-template">
+  <style>
+    #root { position: absolute; inset: 0; }
+    #instrument-svg { position: absolute; left: 0; top: 0; }
+    #key-plate {
+      position: absolute; left: 0; top: 0; width: 150px; height: 1080px;
+      background-color: #F5F7F3;
+      background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix type='saturate' values='0'/></filter><rect width='240' height='240' filter='url(%23n)' opacity='0.06'/></svg>"),
+        linear-gradient(to right, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to bottom, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to right, #BFD8D2 1px, transparent 1px),
+        linear-gradient(to bottom, #BFD8D2 1px, transparent 1px);
+      background-size: 240px 240px, 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    }
+    .key-logo { position: absolute; mix-blend-mode: multiply; object-fit: contain; }
+  </style>
+  <div id="root" data-composition-id="instrument" data-width="1080" data-height="1080">
+    <div id="key-plate"></div>
+    <svg id="instrument-svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+      <line  x1="150" y1="0" x2="150" y2="1080" stroke="#1E2A2F" stroke-width="2" stroke-linecap="butt"/>
+      <line  x1="980" y1="120" x2="980" y2="980" stroke="#1E2A2F" stroke-width="4" stroke-linecap="butt"/>
+      <line id="swatch-duckdb" x1="27" y1="436" x2="123" y2="436" stroke="#8A979B" stroke-width="4" stroke-linecap="butt" stroke-dasharray="10 10"/><line id="swatch-trino" x1="27" y1="576" x2="123" y2="576" stroke="#8A979B" stroke-width="4" stroke-linecap="butt" stroke-dasharray="10 10"/><line id="swatch-spark" x1="27" y1="716" x2="123" y2="716" stroke="#8A979B" stroke-width="4" stroke-linecap="butt" stroke-dasharray="10 10"/><line id="swatch-starrocks" x1="27" y1="856" x2="123" y2="856" stroke="#8A979B" stroke-width="4" stroke-linecap="butt" stroke-dasharray="10 10"/>
+      <g id="pen-duckdb"><polygon id="pen-duckdb-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-duckdb-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-duckdb-arm" x1="88" y1="0" x2="120" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-duckdb-pivot" cx="120" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g><g id="pen-trino"><polygon id="pen-trino-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-trino-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-trino-arm" x1="88" y1="0" x2="120" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-trino-pivot" cx="120" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g><g id="pen-spark"><polygon id="pen-spark-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-spark-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-spark-arm" x1="88" y1="0" x2="120" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-spark-pivot" cx="120" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g><g id="pen-starrocks"><polygon id="pen-starrocks-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-starrocks-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-starrocks-arm" x1="88" y1="0" x2="120" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-starrocks-pivot" cx="120" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g><g id="pen-cube" style="opacity:0"><polygon id="pen-cube-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-cube-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-cube-arm" x1="88" y1="0" x2="120" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-cube-pivot" cx="120" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g>
+    </svg>
+    <img class="key-logo" src="assets/logos/duckdb.svg" alt="DuckDB" style="left:33px;top:338px;width:84px;height:84px">
+    <img class="key-logo" src="assets/logos/trino.svg" alt="Trino" style="left:33px;top:478px;width:84px;height:84px">
+    <img class="key-logo" src="assets/logos/spark.svg" alt="Apache Spark" style="left:33px;top:618px;width:84px;height:84px">
+    <img class="key-logo" src="assets/logos/starrocks.png" alt="StarRocks" style="left:33px;top:758px;width:84px;height:84px">
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set("#pen-duckdb", { x: 860, y: 380 }, 0);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 0);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#1E2A2F" } }, 0);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 0);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 1.92);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#8A979B" } }, 1.92);
+    tl.to("#pen-duckdb", { x: 866, duration: 0.133, ease: "power3.out" }, 1.92);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 1.92);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 12.7);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#1E2A2F" } }, 12.7);
+    tl.to("#pen-duckdb", { x: 860, duration: 0.133, ease: "power3.out" }, 12.7);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 12.7);
+    tl.set("#pen-trino", { x: 860, y: 520 }, 0);
+    tl.set("#pen-trino-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 0);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#1E2A2F" } }, 0);
+    tl.set("#swatch-trino", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 0);
+    tl.set("#pen-trino-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 1.92);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#8A979B" } }, 1.92);
+    tl.to("#pen-trino", { x: 866, duration: 0.133, ease: "power3.out" }, 1.92);
+    tl.set("#swatch-trino", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 1.92);
+    tl.to("#pen-trino", { y: 790, duration: 0.18, ease: "power3.out" }, 1.92);
+    tl.set("#pen-trino-nib", { attr: { fill: "#D9382B", stroke: "#1E2A2F" } }, 2.13);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#1E2A2F" } }, 2.13);
+    tl.to("#pen-trino", { x: 860, duration: 0.133, ease: "power3.out" }, 2.13);
+    tl.set("#swatch-trino", { attr: { stroke: "#D9382B", "stroke-dasharray": "none" } }, 2.13);
+    tl.to("#pen-trino", { y: 577, duration: 0.2, ease: "none" }, 2.2);
+    tl.to("#pen-trino", { y: 361, duration: 0.2, ease: "none" }, 3.867);
+    tl.to("#pen-trino", { y: 628, duration: 0.2, ease: "none" }, 6.933);
+    tl.set("#pen-trino-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 9.62);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#8A979B" } }, 9.62);
+    tl.to("#pen-trino", { x: 866, duration: 0.133, ease: "power3.out" }, 9.62);
+    tl.set("#swatch-trino", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 9.62);
+    tl.to("#pen-trino", { y: 520, duration: 0.2, ease: "power3.out" }, 9.62);
+    tl.set("#pen-trino-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 12.75);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#1E2A2F" } }, 12.75);
+    tl.to("#pen-trino", { x: 860, duration: 0.133, ease: "power3.out" }, 12.75);
+    tl.set("#swatch-trino", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 12.75);
+    tl.set("#pen-spark", { x: 860, y: 660 }, 0);
+    tl.set("#pen-spark-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 0);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#1E2A2F" } }, 0);
+    tl.set("#swatch-spark", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 0);
+    tl.set("#pen-spark-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 1.92);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#8A979B" } }, 1.92);
+    tl.to("#pen-spark", { x: 866, duration: 0.133, ease: "power3.out" }, 1.92);
+    tl.set("#swatch-spark", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 1.92);
+    tl.set("#pen-spark-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 12.8);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#1E2A2F" } }, 12.8);
+    tl.to("#pen-spark", { x: 860, duration: 0.133, ease: "power3.out" }, 12.8);
+    tl.set("#swatch-spark", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 12.8);
+    tl.set("#pen-starrocks", { x: 860, y: 800 }, 0);
+    tl.set("#pen-starrocks-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 0);
+    tl.set(["#pen-starrocks-body", "#pen-starrocks-arm", "#pen-starrocks-pivot"], { attr: { stroke: "#1E2A2F" } }, 0);
+    tl.set("#swatch-starrocks", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 0);
+    tl.set("#pen-starrocks-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 1.92);
+    tl.set(["#pen-starrocks-body", "#pen-starrocks-arm", "#pen-starrocks-pivot"], { attr: { stroke: "#8A979B" } }, 1.92);
+    tl.to("#pen-starrocks", { x: 866, duration: 0.133, ease: "power3.out" }, 1.92);
+    tl.set("#swatch-starrocks", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 1.92);
+    tl.set("#pen-starrocks-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 12.85);
+    tl.set(["#pen-starrocks-body", "#pen-starrocks-arm", "#pen-starrocks-pivot"], { attr: { stroke: "#1E2A2F" } }, 12.85);
+    tl.to("#pen-starrocks", { x: 860, duration: 0.133, ease: "power3.out" }, 12.85);
+    tl.set("#swatch-starrocks", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 12.85);
+    tl.set("#pen-cube", { x: 866, y: 786 }, 0);
+    tl.set("#pen-cube-nib", { attr: { fill: "#D9382B", stroke: "#1E2A2F" } }, 9.85);
+    tl.set(["#pen-cube-body", "#pen-cube-arm", "#pen-cube-pivot"], { attr: { stroke: "#1E2A2F" } }, 9.85);
+    tl.to("#pen-cube", { x: 860, duration: 0.133, ease: "power3.out" }, 9.85);
+    tl.set("#pen-cube-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 12.42);
+    tl.set(["#pen-cube-body", "#pen-cube-arm", "#pen-cube-pivot"], { attr: { stroke: "#8A979B" } }, 12.42);
+    tl.to("#pen-cube", { x: 866, duration: 0.133, ease: "power3.out" }, 12.42);
+    tl.set("#pen-cube", { opacity: 1 }, 9.65);
+    tl.set("#pen-cube", { opacity: 0 }, 12.65);
+    tl.set({}, {}, 14.9);
+    window.__timelines["instrument"] = tl;
+  </script>
+</template>

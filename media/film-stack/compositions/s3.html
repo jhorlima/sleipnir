@@ -1,0 +1,143 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #s3-file {
+      left: 120px;
+      top: 300px;
+      width: 1000px;
+      height: 660px;
+      white-space: normal;
+    }
+    .s3-title {
+      position: absolute;
+      left: 36px;
+      top: 28px;
+      font-size: 56px;
+    }
+    .s3-strips {
+      position: absolute;
+      left: 36px;
+      top: 130px;
+      display: flex;
+      gap: 18px;
+    }
+    .s3-strip {
+      height: 490px;
+      border: 2px solid var(--ink);
+      padding: 14px 14px 0;
+      display: flex;
+      flex-direction: column;
+      transform-origin: center top;
+    }
+    .s3-head {
+      font-size: 36px;
+      color: var(--muted);
+      line-height: 1.2;
+    }
+    .s3-value {
+      font-size: 52px;
+      line-height: 1.3;
+      margin-top: 8px;
+    }
+    .s3-slots {
+      flex: 1;
+      margin: 0 -14px;
+      border-top: 2px solid var(--ink);
+      background-image: linear-gradient(transparent 62px, var(--faint) 62px);
+      background-size: 100% 64px;
+    }
+    /* RustFS is a wordmark centred in a square image: show only its band. */
+    .s3-rustfs {
+      width: 400px;
+      height: 90px;
+      overflow: hidden;
+      position: relative;
+    }
+    .s3-rustfs img {
+      position: absolute;
+      left: -10px;
+      top: -195px;
+      width: 420px;
+      height: 420px;
+      mix-blend-mode: multiply;
+    }
+  </style>
+  <div id="root" data-composition-id="s3" data-width="1920" data-height="1080">
+    <div id="s3-sheet" class="sheet">
+      <div id="s3-stage" class="at display ink" style="left: 120px; top: 110px; font-size: 160px">bronze</div>
+      <svg class="pen" viewBox="0 0 1920 1080">
+        <path id="s3-outline" class="trace" d="M120 300 H1024 L1120 396 V960 H120 Z" stroke="#1e2a2f" stroke-width="3" />
+        <path id="s3-fold" class="trace" d="M1024 300 V396 H1120" stroke="#1e2a2f" stroke-width="3" />
+        <path id="s3-write" class="trace" d="M1290 360 C 1230 360, 1190 390, 1150 430" stroke="#d9382b" stroke-width="6" />
+        <path id="s3-write-head" class="trace" d="M1140 404 L 1147 434 L 1176 426" stroke="#d9382b" stroke-width="6" />
+      </svg>
+      <div id="s3-file" class="at">
+        <div id="s3-title" class="s3-title ink">Parquet</div>
+        <div class="s3-strips">
+          <div id="s3-strip-id" class="s3-strip ink" style="width: 330px"><div class="s3-head">id</div><div class="s3-value">USW00094728</div><div class="s3-slots"></div></div>
+          <div id="s3-strip-date" class="s3-strip ink" style="width: 250px"><div class="s3-head">date</div><div class="s3-value">20250601</div><div class="s3-slots"></div></div>
+          <div id="s3-strip-element" class="s3-strip ink" style="width: 160px"><div class="s3-head">element</div><div class="s3-value">TMAX</div><div class="s3-slots"></div></div>
+          <div id="s3-strip-value" class="s3-strip ink" style="width: 130px"><div class="s3-head">value</div><div class="s3-value">189</div><div class="s3-slots"></div></div>
+        </div>
+      </div>
+      <div id="s3-duckdb" class="at stack ink" style="left: 1320px; top: 300px">
+        <div class="duck"><img src="assets/logos/duckdb.svg" alt="DuckDB" /></div>
+        <div class="label">DuckDB writes it</div>
+      </div>
+      <div id="s3-iceberg" class="at ink" style="left: 1320px; top: 500px">
+        <img class="logo" src="assets/logos/iceberg.svg" alt="Apache Iceberg" style="width: 400px; height: auto" />
+        <div class="label quiet" style="margin: 0 0 0 6px">table format</div>
+      </div>
+      <div id="s3-rustfs" class="at ink" style="left: 1320px; top: 700px">
+        <div class="s3-rustfs"><img src="assets/logos/rustfs.png" alt="RustFS" /></div>
+        <div class="label quiet" style="margin: 0 0 0 6px">object storage</div>
+      </div>
+      <div id="s3-lakekeeper" class="at stack ink" style="left: 1320px; top: 880px">
+        <img class="logo" src="assets/logos/lakekeeper.png" alt="Lakekeeper" />
+        <div class="label">Lakekeeper catalog</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      function stamp(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scale: 1.12, "--spread": "2px" }, { scale: 1, "--spread": "0px", duration: 0.2, ease: "power3.out", immediateRender: false }, at);
+      }
+      // The pen draws the path from its start. The gap is longer than the path so no round cap shows before the pen arrives.
+      function draw(selector, at, duration) {
+        const path = document.querySelector(selector);
+        const length = path.getTotalLength();
+        tl.fromTo(path, { strokeDasharray: length + " " + (length + 2), strokeDashoffset: length + 1 }, { strokeDashoffset: 0, duration: duration, ease: "power2.inOut" }, at);
+      }
+      // A column strip is printed top to bottom: the row becomes columns.
+      function printStrip(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scaleY: 0 }, { scaleY: 1, duration: 0.3, ease: "power2.inOut", immediateRender: false }, at);
+      }
+
+      stamp("#s3-stage", 0.1);
+      draw("#s3-outline", 0.3, 0.8);
+      draw("#s3-fold", 0.9, 0.3);
+      stamp("#s3-title", 0.9);
+      printStrip("#s3-strip-id", 1.1);
+      printStrip("#s3-strip-date", 1.23);
+      printStrip("#s3-strip-element", 1.37);
+      printStrip("#s3-strip-value", 1.5);
+      stamp("#s3-duckdb", 1.8);
+      draw("#s3-write", 1.85, 0.6);
+      draw("#s3-write-head", 2.4, 0.15);
+      stamp("#s3-iceberg", 1.93);
+      stamp("#s3-rustfs", 2.07);
+      stamp("#s3-lakekeeper", 2.2);
+      tl.to("#s3-sheet", { x: -1920, duration: 0.4, ease: "power3.in" }, 3.6);
+
+      window.__timelines["s3"] = tl;
+    })();
+  </script>
+</template>

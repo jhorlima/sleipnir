@@ -1,0 +1,67 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #s1-under {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -6px;
+      height: 5px;
+      background: var(--ink);
+      transform-origin: left center;
+    }
+  </style>
+  <div id="root" data-composition-id="s1" data-width="1920" data-height="1080">
+    <div id="s1-sheet" class="sheet">
+      <div class="at row" style="left: 120px; top: 260px">
+        <span id="s1-row" class="typed">ITE00100554,17630101,TMAX,</span><span style="position: relative"><span id="s1-value" class="typed">-36</span><i id="s1-under"></i></span>
+      </div>
+      <div id="s1-place" class="at display ink" style="left: 120px; top: 440px; font-size: 140px">Milan, 1 January 1763.</div>
+      <div id="s1-celsius" class="at display red ink" style="left: 1060px; top: 640px; font-size: 230px">-3.6 °C</div>
+      <svg class="pen" viewBox="0 0 1920 1080">
+        <path id="s1-leader" class="trace" d="M1300 390 C 1310 470, 1290 560, 1240 640" stroke="#1e2a2f" stroke-width="4" />
+      </svg>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      function typeOn(selector, at) {
+        const line = document.querySelector(selector);
+        const characters = Array.from(line.textContent);
+        line.textContent = "";
+        characters.forEach(function (character, index) {
+          const span = document.createElement("span");
+          span.textContent = character;
+          line.appendChild(span);
+          tl.set(span, { opacity: 1 }, at + index / 30);
+        });
+      }
+      function stamp(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scale: 1.12, "--spread": "2px" }, { scale: 1, "--spread": "0px", duration: 0.2, ease: "power3.out", immediateRender: false }, at);
+      }
+      // The pen draws the path from its start. The gap is longer than the path so no round cap shows before the pen arrives.
+      function draw(selector, at, duration) {
+        const path = document.querySelector(selector);
+        const length = path.getTotalLength();
+        tl.fromTo(path, { strokeDasharray: length + " " + (length + 2), strokeDashoffset: length + 1 }, { strokeDashoffset: 0, duration: duration, ease: "power2.inOut" }, at);
+      }
+
+      typeOn("#s1-row", 0);
+      typeOn("#s1-value", 26 / 30);
+      tl.fromTo("#s1-under", { scaleX: 0 }, { scaleX: 1, duration: 0.2, ease: "power2.inOut" }, 0.97);
+      draw("#s1-leader", 1.0, 0.6);
+      stamp("#s1-place", 1.05);
+      stamp("#s1-celsius", 1.45);
+      // The drum runs: the sheet leaves for 2025.
+      tl.to("#s1-sheet", { x: -1920, duration: 0.4, ease: "power3.in" }, 2.6);
+
+      window.__timelines["s1"] = tl;
+    })();
+  </script>
+</template>

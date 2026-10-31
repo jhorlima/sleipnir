@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The race: storyboard</title>
+    <style>
+      :root {
+        --page: #f4f5f3;
+        --card: #ffffff;
+        --ink: #1e2a2f;
+        --muted: #5e6b70;
+        --line: #dfe3e0;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: var(--page);
+        color: var(--ink);
+        font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+        line-height: 1.45;
+        padding: 40px 24px 64px;
+      }
+      header { max-width: 1280px; margin: 0 auto 32px; }
+      h1 { font-size: 28px; font-weight: 700; }
+      header p { color: var(--muted); margin-top: 6px; max-width: 760px; }
+      main {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 24px;
+      }
+      .act {
+        grid-column: 1 / -1;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--muted);
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+      .frame {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .frame img { width: 100%; aspect-ratio: 16 / 9; display: block; border-bottom: 1px solid var(--line); }
+      .title { font-weight: 700; font-size: 16px; padding: 14px 16px 0; }
+      .time { color: var(--muted); font-size: 13px; padding: 2px 16px 0; font-variant-numeric: tabular-nums; }
+      .words { font-size: 14px; padding: 8px 16px 16px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Film A: The race</h1>
+      <p>One continuous take on recorder chart paper, 34 s at 30 fps, effects only. Each still is the key moment of its shot. Every number comes from media/shared/data.json.</p>
+    </header>
+    <main>
+      <section class="act">Act 1: The hook</section>
+      <div class="frame">
+        <img src="stills/frame-00-at-2s.png" alt="" />
+        <div class="title">01: Hook</div>
+        <div class="time">0.0 to 2.4s</div>
+        <p class="words">Four pens rest on the paper beside the engine key; "3.97 billion weather rows" is stamped huge, "3.97" in red.</p>
+      </div>
+
+      <section class="act">Act 2: The race</section>
+      <div class="frame">
+        <img src="stills/frame-01-at-6.1s.png" alt="" />
+        <div class="title">02: Load</div>
+        <div class="time">2.4 to 6.3s</div>
+        <p class="words">The drum turns and DuckDB's red pen climbs; "742 M rows in 146 s" is stamped, "146 s" in red.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-02-at-11.4s.png" alt="" />
+        <div class="title">03: Trino builds</div>
+        <div class="time">6.3 to 12.1s</div>
+        <p class="words">New sheet. Trino's red step falls from 12,639 s on M to 9,351 s on L; Spark's grey line breaks off on M.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-03-at-15.1s.png" alt="" />
+        <div class="title">04: Spark fails, then finishes</div>
+        <div class="time">12.1 to 15.5s</div>
+        <p class="words">The drum runs into L2 and Spark's line reaches 13,803 s; "Spark failed" lands in red beside its break on M, and Trino's line and "9,351 s" turn graphite.</p>
+      </div>
+
+      <section class="act">Act 3: The turn</section>
+      <div class="frame">
+        <img src="stills/frame-04-at-20.8s.png" alt="" />
+        <div class="title">05: More CPU, slower</div>
+        <div class="time">15.5 to 21.05s</div>
+        <p class="words">New sheet. Through Cube, StarRocks and DuckDB get faster on L, but Trino's red pen climbs from 32.4 s to "65.3 s", stamped in red.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-05-at-24.3s.png" alt="" />
+        <div class="title">06: The object store</div>
+        <div class="time">21.05 to 24.7s</div>
+        <p class="words">"object store at 2 CPU" is stamped over L2; Trino's red line drops to "24.6 s" in red, and "65.3 s" turns graphite.</p>
+      </div>
+
+      <section class="act">Act 4: Payoff and end</section>
+      <div class="frame">
+        <img src="stills/frame-06-at-28.3s.png" alt="" />
+        <div class="title">07: Cube Store</div>
+        <div class="time">24.7 to 28.7s</div>
+        <p class="words">New sheet. A red line runs flat on the zero line; the Cube logo and "16-34 ms" are stamped on the bass hit.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-07-at-31.1s.png" alt="" />
+        <div class="title">08: Claim</div>
+        <div class="time">28.7 to 31.4s</div>
+        <p class="words">Pens lifted. "Same data. Same limits. Different stories." is stamped in three beats, the last in red.</p>
+      </div>
+      <div class="frame">
+        <img src="stills/frame-08-at-33.7s.png" alt="" />
+        <div class="title">09: End</div>
+        <div class="time">31.4 to 34.0s</div>
+        <p class="words">Pens back down. "Sleipnir" is stamped in red over the repo URL and holds.</p>
+      </div>
+    </main>
+  </body>
+</html>

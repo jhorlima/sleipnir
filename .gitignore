@@ -9,3 +9,11 @@ __pycache__/
 .DS_Store
 .claude/settings.local.json
 .claude/worktrees/
+
+# Media: Pixabay sound effects are not redistributed (media/README.md); renders and caches are rebuilt.
+media/**/sfx/*.mp3
+media/**/.media/audio/
+media/**/node_modules/
+media/**/renders/
+media/**/.hyperframes/
+media/medium-cards/out/

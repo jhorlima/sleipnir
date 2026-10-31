@@ -1,0 +1,69 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #morning-margin {
+      top: 150px;
+    }
+    #morning-start {
+      font-size: 110px;
+      color: var(--muted-1);
+    }
+    #morning-time {
+      font-size: 220px;
+      margin-top: 12px;
+    }
+    #morning-note {
+      font-size: 52px;
+      margin-top: 18px;
+    }
+    #morning-laptop {
+      position: absolute;
+      left: 680px;
+      top: 230px;
+      width: 1040px;
+      height: 666px;
+    }
+  </style>
+  <div id="root" data-composition-id="morning" data-width="1920" data-height="1080">
+    <div id="morning-page" class="page">
+      <div class="sheet"></div>
+      <div class="margin-rule"></div>
+      <div id="morning-margin" class="margin">
+        <div id="morning-start" class="display">22:50</div>
+        <div id="morning-time" class="display stamp red">10:37</div>
+        <div id="morning-note" class="label">The run finishes</div>
+      </div>
+      <svg id="morning-laptop" viewBox="0 0 1000 640" fill="none" stroke="#1E2A2F" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+        <rect x="110" y="20" width="780" height="500" rx="24" />
+        <rect x="148" y="58" width="704" height="424" rx="6" />
+        <path d="M110 520 L890 520 L985 598 Q992 616 972 616 L28 616 Q8 616 15 598 Z" />
+        <path d="M430 616 L436 604 L564 604 L570 616" />
+        <polyline points="180,380 240,372 300,384 360,350" stroke-width="5" />
+        <polyline id="morning-trace" class="pen" pathLength="1" points="360,350 420,362 480,300 540,318 600,240 660,262 720,196 790,214 820,150" stroke-width="5" />
+      </svg>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    function stamp(selector, at) {
+      tl.fromTo(selector, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, at);
+      tl.fromTo(selector, { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, at);
+    }
+    function write(selector, at, duration) {
+      tl.fromTo(selector, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration, ease: "none" }, at);
+    }
+
+    tl.fromTo("#morning-page", { x: 1920 }, { x: 0, duration: 0.5, ease: "power2.inOut" }, 0);
+    tl.fromTo("#morning-trace", { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.8, ease: "power2.inOut" }, 0.6);
+    stamp("#morning-time", 1.5);
+    write("#morning-note", 1.65, 0.4);
+
+    tl.to("#morning-page", { x: -1920, duration: 0.5, ease: "power2.inOut" }, 2.75);
+
+    window.__timelines["morning"] = tl;
+  </script>
+</template>

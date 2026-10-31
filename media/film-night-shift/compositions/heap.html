@@ -1,0 +1,95 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #heap-margin {
+      top: 150px;
+    }
+    #heap-logo {
+      width: 200px;
+      height: 200px;
+    }
+    #heap-note {
+      font-size: 52px;
+      margin-top: 24px;
+    }
+    #heap-value {
+      position: absolute;
+      left: 640px;
+      top: 110px;
+      font-size: 260px;
+    }
+    #heap-line {
+      position: absolute;
+      left: 640px;
+      top: 360px;
+      font-size: 52px;
+    }
+    #heap-pile {
+      position: absolute;
+      left: 640px;
+      top: 410px;
+      width: 1140px;
+      height: 580px;
+    }
+  </style>
+  <div id="root" data-composition-id="heap" data-width="1920" data-height="1080">
+    <div id="heap-page" class="page">
+      <div class="sheet"></div>
+      <div class="margin-rule"></div>
+      <div id="heap-margin" class="margin">
+        <img id="heap-logo" class="logo" src="assets/logos/spark.svg" alt="Apache Spark" />
+        <div id="heap-name" class="label engine-name">Spark</div>
+        <div id="heap-note" class="label">Spark's heap piles up</div>
+      </div>
+      <div id="heap-value" class="display stamp red">4.4 M</div>
+      <div id="heap-line" class="label">Iceberg snapshot objects in the Spark heap</div>
+      <svg id="heap-pile" viewBox="0 0 1100 560" fill="none" stroke="#1E2A2F">
+        <defs>
+          <pattern id="heap-tally" width="76" height="92" patternUnits="userSpaceOnUse">
+            <g stroke-width="4" stroke-linecap="round">
+              <line x1="12" y1="14" x2="12" y2="72" />
+              <line x1="26" y1="14" x2="26" y2="72" />
+              <line x1="40" y1="14" x2="40" y2="72" />
+              <line x1="54" y1="14" x2="54" y2="72" />
+              <line x1="4" y1="64" x2="64" y2="22" />
+            </g>
+          </pattern>
+          <clipPath id="heap-rise">
+            <rect id="heap-rise-rect" x="0" y="0" width="1100" height="560" />
+          </clipPath>
+        </defs>
+        <path clip-path="url(#heap-rise)" d="M0 560 L0 430 L90 380 L170 330 L250 300 L330 230 L420 190 L500 150 L580 120 L660 70 L740 100 L820 150 L900 210 L980 290 L1060 370 L1100 410 L1100 560 Z" fill="url(#heap-tally)" stroke="none" />
+        <line x1="0" y1="557" x2="1100" y2="557" stroke-width="6" />
+      </svg>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    function stamp(selector, at) {
+      tl.fromTo(selector, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, at);
+      tl.fromTo(selector, { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, at);
+    }
+    function write(selector, at, duration) {
+      tl.fromTo(selector, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration, ease: "none" }, at);
+    }
+
+    tl.fromTo("#heap-page", { x: 1920 }, { x: 0, duration: 0.5, ease: "power2.inOut" }, 0);
+    stamp("#heap-logo", 0.55);
+    write("#heap-name", 0.6, 0.2);
+    write("#heap-note", 0.75, 0.45);
+
+    // The marks pile up one row of tallies at a time, bottom first.
+    tl.fromTo("#heap-rise-rect", { attr: { y: 560, height: 0 } }, { attr: { y: 0, height: 560 }, duration: 0.8, ease: "steps(6)" }, 0.6);
+
+    stamp("#heap-value", 1.45);
+    write("#heap-line", 1.5, 0.6);
+
+    tl.to("#heap-page", { x: -1920, duration: 0.5, ease: "power2.inOut" }, 3.5);
+
+    window.__timelines["heap"] = tl;
+  </script>
+</template>

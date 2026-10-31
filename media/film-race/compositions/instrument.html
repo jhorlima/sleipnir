@@ -1,0 +1,184 @@
+<template id="instrument-template">
+  <style>
+    #root { position: absolute; inset: 0; }
+    #instrument-svg { position: absolute; left: 0; top: 0; }
+    #key-plate {
+      position: absolute; left: 0; top: 0; width: 240px; height: 1080px;
+      background-color: #F5F7F3;
+      background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix type='saturate' values='0'/></filter><rect width='240' height='240' filter='url(%23n)' opacity='0.06'/></svg>"),
+        linear-gradient(to right, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to bottom, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to right, #BFD8D2 1px, transparent 1px),
+        linear-gradient(to bottom, #BFD8D2 1px, transparent 1px);
+      background-size: 240px 240px, 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    }
+    .key-logo { position: absolute; mix-blend-mode: multiply; object-fit: contain; }
+  </style>
+  <div id="root" data-composition-id="instrument" data-width="1920" data-height="1080">
+    <div id="key-plate"></div>
+    <svg id="instrument-svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+      <line  x1="240" y1="0" x2="240" y2="1080" stroke="#1E2A2F" stroke-width="2" stroke-linecap="butt"/>
+      <line  x1="1704" y1="96" x2="1704" y2="984" stroke="#1E2A2F" stroke-width="4" stroke-linecap="butt"/>
+      <line id="swatch-duckdb" x1="48" y1="406" x2="192" y2="406" stroke="#8A979B" stroke-width="4" stroke-linecap="butt" stroke-dasharray="10 10"/><line id="swatch-trino" x1="48" y1="586" x2="192" y2="586" stroke="#8A979B" stroke-width="4" stroke-linecap="butt" stroke-dasharray="10 10"/><line id="swatch-spark" x1="48" y1="766" x2="192" y2="766" stroke="#8A979B" stroke-width="4" stroke-linecap="butt" stroke-dasharray="10 10"/><line id="swatch-starrocks" x1="48" y1="946" x2="192" y2="946" stroke="#8A979B" stroke-width="4" stroke-linecap="butt" stroke-dasharray="10 10"/>
+      <g id="pen-duckdb"><polygon id="pen-duckdb-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-duckdb-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-duckdb-arm" x1="88" y1="0" x2="144" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-duckdb-pivot" cx="144" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g><g id="pen-trino"><polygon id="pen-trino-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-trino-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-trino-arm" x1="88" y1="0" x2="144" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-trino-pivot" cx="144" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g><g id="pen-spark"><polygon id="pen-spark-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-spark-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-spark-arm" x1="88" y1="0" x2="144" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-spark-pivot" cx="144" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g><g id="pen-starrocks"><polygon id="pen-starrocks-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-starrocks-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-starrocks-arm" x1="88" y1="0" x2="144" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-starrocks-pivot" cx="144" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g><g id="pen-cube" style="opacity:0"><polygon id="pen-cube-nib" points="0,0 18,-7 18,7" fill="none" stroke="#8A979B" stroke-width="2" stroke-linejoin="round"/><rect id="pen-cube-body" x="18" y="-9" width="70" height="18" rx="4" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/><line id="pen-cube-arm" x1="88" y1="0" x2="144" y2="0" stroke="#8A979B" stroke-width="3"/><circle id="pen-cube-pivot" cx="144" cy="0" r="7" fill="#F5F7F3" stroke="#8A979B" stroke-width="3"/></g>
+    </svg>
+    <img class="key-logo" src="assets/logos/duckdb.svg" alt="DuckDB" style="left:60px;top:270px;width:120px;height:120px">
+    <img class="key-logo" src="assets/logos/trino.svg" alt="Trino" style="left:60px;top:450px;width:120px;height:120px">
+    <img class="key-logo" src="assets/logos/spark.svg" alt="Apache Spark" style="left:60px;top:630px;width:120px;height:120px">
+    <img class="key-logo" src="assets/logos/starrocks.png" alt="StarRocks" style="left:60px;top:810px;width:120px;height:120px">
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set("#pen-duckdb", { x: 1560, y: 330 }, 0);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 0);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#1E2A2F" } }, 0);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 0);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 2.42);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#8A979B" } }, 2.42);
+    tl.to("#pen-duckdb", { x: 1566, duration: 0.133, ease: "power3.out" }, 2.42);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 2.42);
+    tl.to("#pen-duckdb", { y: 840, duration: 0.18, ease: "power3.out" }, 2.42);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "#D9382B", stroke: "#1E2A2F" } }, 2.63);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#1E2A2F" } }, 2.63);
+    tl.to("#pen-duckdb", { x: 1560, duration: 0.133, ease: "power3.out" }, 2.63);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#D9382B", "stroke-dasharray": "none" } }, 2.63);
+    tl.to("#pen-duckdb", { y: 395, duration: 2, ease: "none" }, 2.7);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 6.32);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#8A979B" } }, 6.32);
+    tl.to("#pen-duckdb", { x: 1566, duration: 0.133, ease: "power3.out" }, 6.32);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 6.32);
+    tl.to("#pen-duckdb", { y: 330, duration: 0.2, ease: "power3.out" }, 6.32);
+    tl.to("#pen-duckdb", { y: 840, duration: 0.18, ease: "power3.out" }, 15.52);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "#8A979B", stroke: "#1E2A2F" } }, 15.77);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#1E2A2F" } }, 15.77);
+    tl.to("#pen-duckdb", { x: 1560, duration: 0.133, ease: "power3.out" }, 15.77);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#8A979B", "stroke-dasharray": "none" } }, 15.77);
+    tl.to("#pen-duckdb", { y: 356, duration: 0.2, ease: "none" }, 15.8);
+    tl.to("#pen-duckdb", { y: 541, duration: 0.2, ease: "none" }, 17.8);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 21.4);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#8A979B" } }, 21.4);
+    tl.to("#pen-duckdb", { x: 1566, duration: 0.133, ease: "power3.out" }, 21.4);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 21.4);
+    tl.to("#pen-duckdb", { y: 330, duration: 0.2, ease: "power3.out" }, 21.42);
+    tl.set("#pen-duckdb-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 31.7);
+    tl.set(["#pen-duckdb-body", "#pen-duckdb-arm", "#pen-duckdb-pivot"], { attr: { stroke: "#1E2A2F" } }, 31.7);
+    tl.to("#pen-duckdb", { x: 1560, duration: 0.133, ease: "power3.out" }, 31.7);
+    tl.set("#swatch-duckdb", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 31.7);
+    tl.set("#pen-trino", { x: 1560, y: 510 }, 0);
+    tl.set("#pen-trino-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 0);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#1E2A2F" } }, 0);
+    tl.set("#swatch-trino", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 0);
+    tl.set("#pen-trino-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 2.42);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#8A979B" } }, 2.42);
+    tl.to("#pen-trino", { x: 1566, duration: 0.133, ease: "power3.out" }, 2.42);
+    tl.set("#swatch-trino", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 2.42);
+    tl.to("#pen-trino", { y: 840, duration: 0.18, ease: "power3.out" }, 6.32);
+    tl.set("#pen-trino-nib", { attr: { fill: "#D9382B", stroke: "#1E2A2F" } }, 6.53);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#1E2A2F" } }, 6.53);
+    tl.to("#pen-trino", { x: 1560, duration: 0.133, ease: "power3.out" }, 6.53);
+    tl.set("#swatch-trino", { attr: { stroke: "#D9382B", "stroke-dasharray": "none" } }, 6.53);
+    tl.to("#pen-trino", { y: 334, duration: 0.2, ease: "none" }, 6.6);
+    tl.to("#pen-trino", { y: 466, duration: 0.2, ease: "none" }, 8.6);
+    tl.to("#pen-trino", { y: 475, duration: 0.2, ease: "none" }, 12.1);
+    tl.set("#pen-trino-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 14.15);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#1E2A2F" } }, 14.15);
+    tl.set("#swatch-trino", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 14.15);
+    tl.set("#pen-trino-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 15.52);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#8A979B" } }, 15.52);
+    tl.to("#pen-trino", { x: 1566, duration: 0.133, ease: "power3.out" }, 15.52);
+    tl.set("#swatch-trino", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 15.52);
+    tl.to("#pen-trino", { y: 840, duration: 0.18, ease: "power3.out" }, 15.52);
+    tl.set("#pen-trino-nib", { attr: { fill: "#D9382B", stroke: "#1E2A2F" } }, 15.73);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#1E2A2F" } }, 15.73);
+    tl.to("#pen-trino", { x: 1560, duration: 0.133, ease: "power3.out" }, 15.73);
+    tl.set("#swatch-trino", { attr: { stroke: "#D9382B", "stroke-dasharray": "none" } }, 15.73);
+    tl.to("#pen-trino", { y: 581, duration: 0.2, ease: "none" }, 15.8);
+    tl.to("#pen-trino", { y: 318, duration: 0.2, ease: "none" }, 17.8);
+    tl.to("#pen-trino", { y: 643, duration: 0.2, ease: "none" }, 21.5);
+    tl.set("#pen-trino-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 24.72);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#8A979B" } }, 24.72);
+    tl.to("#pen-trino", { x: 1566, duration: 0.133, ease: "power3.out" }, 24.72);
+    tl.set("#swatch-trino", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 24.72);
+    tl.to("#pen-trino", { y: 510, duration: 0.2, ease: "power3.out" }, 24.72);
+    tl.set("#pen-trino-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 31.76);
+    tl.set(["#pen-trino-body", "#pen-trino-arm", "#pen-trino-pivot"], { attr: { stroke: "#1E2A2F" } }, 31.76);
+    tl.to("#pen-trino", { x: 1560, duration: 0.133, ease: "power3.out" }, 31.76);
+    tl.set("#swatch-trino", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 31.76);
+    tl.set("#pen-spark", { x: 1560, y: 690 }, 0);
+    tl.set("#pen-spark-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 0);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#1E2A2F" } }, 0);
+    tl.set("#swatch-spark", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 0);
+    tl.set("#pen-spark-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 2.42);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#8A979B" } }, 2.42);
+    tl.to("#pen-spark", { x: 1566, duration: 0.133, ease: "power3.out" }, 2.42);
+    tl.set("#swatch-spark", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 2.42);
+    tl.to("#pen-spark", { y: 840, duration: 0.18, ease: "power3.out" }, 6.32);
+    tl.set("#pen-spark-nib", { attr: { fill: "#8A979B", stroke: "#1E2A2F" } }, 6.55);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#1E2A2F" } }, 6.55);
+    tl.to("#pen-spark", { x: 1560, duration: 0.133, ease: "power3.out" }, 6.55);
+    tl.set("#swatch-spark", { attr: { stroke: "#8A979B", "stroke-dasharray": "none" } }, 6.55);
+    tl.to("#pen-spark", { y: 700, duration: 1, ease: "none" }, 6.6);
+    tl.to("#pen-spark", { y: 712, duration: 0.05, ease: "none" }, 7.6);
+    tl.to("#pen-spark", { y: 694, duration: 0.08, ease: "none" }, 7.65);
+    tl.to("#pen-spark", { y: 706, duration: 0.1, ease: "none" }, 7.73);
+    tl.set("#pen-spark-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 7.86);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#8A979B" } }, 7.86);
+    tl.to("#pen-spark", { x: 1566, duration: 0.133, ease: "power3.out" }, 7.86);
+    tl.set("#swatch-spark", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 7.86);
+    tl.to("#pen-spark", { y: 690, duration: 0.2, ease: "power3.out" }, 7.92);
+    tl.to("#pen-spark", { y: 840, duration: 0.15, ease: "power3.out" }, 11.88);
+    tl.set("#pen-spark-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 12.06);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#1E2A2F" } }, 12.06);
+    tl.to("#pen-spark", { x: 1560, duration: 0.133, ease: "power3.out" }, 12.06);
+    tl.set("#swatch-spark", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 12.06);
+    tl.to("#pen-spark", { y: 288, duration: 0.2, ease: "none" }, 12.1);
+    tl.set("#pen-spark-nib", { attr: { fill: "#D9382B", stroke: "#1E2A2F" } }, 14.15);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#1E2A2F" } }, 14.15);
+    tl.set("#swatch-spark", { attr: { stroke: "#D9382B", "stroke-dasharray": "none" } }, 14.15);
+    tl.set("#pen-spark-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 15.52);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#8A979B" } }, 15.52);
+    tl.to("#pen-spark", { x: 1566, duration: 0.133, ease: "power3.out" }, 15.52);
+    tl.set("#swatch-spark", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 15.52);
+    tl.to("#pen-spark", { y: 690, duration: 0.2, ease: "power3.out" }, 15.52);
+    tl.set("#pen-spark-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 31.82);
+    tl.set(["#pen-spark-body", "#pen-spark-arm", "#pen-spark-pivot"], { attr: { stroke: "#1E2A2F" } }, 31.82);
+    tl.to("#pen-spark", { x: 1560, duration: 0.133, ease: "power3.out" }, 31.82);
+    tl.set("#swatch-spark", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 31.82);
+    tl.set("#pen-starrocks", { x: 1560, y: 870 }, 0);
+    tl.set("#pen-starrocks-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 0);
+    tl.set(["#pen-starrocks-body", "#pen-starrocks-arm", "#pen-starrocks-pivot"], { attr: { stroke: "#1E2A2F" } }, 0);
+    tl.set("#swatch-starrocks", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 0);
+    tl.set("#pen-starrocks-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 2.42);
+    tl.set(["#pen-starrocks-body", "#pen-starrocks-arm", "#pen-starrocks-pivot"], { attr: { stroke: "#8A979B" } }, 2.42);
+    tl.to("#pen-starrocks", { x: 1566, duration: 0.133, ease: "power3.out" }, 2.42);
+    tl.set("#swatch-starrocks", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 2.42);
+    tl.to("#pen-starrocks", { y: 840, duration: 0.18, ease: "power3.out" }, 15.52);
+    tl.set("#pen-starrocks-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 15.75);
+    tl.set(["#pen-starrocks-body", "#pen-starrocks-arm", "#pen-starrocks-pivot"], { attr: { stroke: "#1E2A2F" } }, 15.75);
+    tl.to("#pen-starrocks", { x: 1560, duration: 0.133, ease: "power3.out" }, 15.75);
+    tl.set("#swatch-starrocks", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 15.75);
+    tl.to("#pen-starrocks", { y: 276, duration: 0.2, ease: "none" }, 15.8);
+    tl.to("#pen-starrocks", { y: 484, duration: 0.2, ease: "none" }, 17.8);
+    tl.set("#pen-starrocks-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 21.4);
+    tl.set(["#pen-starrocks-body", "#pen-starrocks-arm", "#pen-starrocks-pivot"], { attr: { stroke: "#8A979B" } }, 21.4);
+    tl.to("#pen-starrocks", { x: 1566, duration: 0.133, ease: "power3.out" }, 21.4);
+    tl.set("#swatch-starrocks", { attr: { stroke: "#8A979B", "stroke-dasharray": "10 10" } }, 21.4);
+    tl.to("#pen-starrocks", { y: 870, duration: 0.2, ease: "power3.out" }, 21.42);
+    tl.set("#pen-starrocks-nib", { attr: { fill: "#5E6B70", stroke: "#1E2A2F" } }, 31.88);
+    tl.set(["#pen-starrocks-body", "#pen-starrocks-arm", "#pen-starrocks-pivot"], { attr: { stroke: "#1E2A2F" } }, 31.88);
+    tl.to("#pen-starrocks", { x: 1560, duration: 0.133, ease: "power3.out" }, 31.88);
+    tl.set("#swatch-starrocks", { attr: { stroke: "#5E6B70", "stroke-dasharray": "none" } }, 31.88);
+    tl.set("#pen-cube", { x: 1566, y: 836 }, 0);
+    tl.set("#pen-cube-nib", { attr: { fill: "#D9382B", stroke: "#1E2A2F" } }, 24.95);
+    tl.set(["#pen-cube-body", "#pen-cube-arm", "#pen-cube-pivot"], { attr: { stroke: "#1E2A2F" } }, 24.95);
+    tl.to("#pen-cube", { x: 1560, duration: 0.133, ease: "power3.out" }, 24.95);
+    tl.set("#pen-cube-nib", { attr: { fill: "none", stroke: "#8A979B" } }, 28.72);
+    tl.set(["#pen-cube-body", "#pen-cube-arm", "#pen-cube-pivot"], { attr: { stroke: "#8A979B" } }, 28.72);
+    tl.to("#pen-cube", { x: 1566, duration: 0.133, ease: "power3.out" }, 28.72);
+    tl.set("#pen-cube", { opacity: 1 }, 24.75);
+    tl.set("#pen-cube", { opacity: 0 }, 28.95);
+    tl.set({}, {}, 34);
+    window.__timelines["instrument"] = tl;
+  </script>
+</template>

@@ -1,0 +1,63 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+  </style>
+  <div id="root" data-composition-id="s7" data-width="1920" data-height="1080">
+    <div id="s7-sheet" class="sheet">
+      <!-- The three readers' traces arrive from the left edge and meet at the Cube mark. -->
+      <svg class="pen" viewBox="0 0 1920 1080">
+        <g stroke="#8a979b" stroke-width="4">
+          <path id="s7-trace-top" class="trace" d="M0 160 C 140 160, 180 340, 284 380" />
+          <path id="s7-trace-middle" class="trace" d="M0 420 L 284 420" />
+          <path id="s7-trace-bottom" class="trace" d="M0 680 C 140 680, 180 500, 284 460" />
+        </g>
+      </svg>
+      <img id="s7-cube" class="at logo ink" src="assets/logos/cube.png" alt="Cube" style="left: 240px; top: 260px; height: 320px" />
+      <div class="at row" style="left: 680px; top: 230px; font-size: 88px"><span id="s7-question" class="typed">Central Park, June 2025?</span></div>
+      <div id="s7-answer" class="at display red ink" style="left: 680px; top: 400px; font-size: 238px">16-34 ms</div>
+      <div id="s7-source" class="at label ink" style="left: 684px; top: 700px; font-size: 56px">from Cube Store</div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      function typeOn(selector, at) {
+        const line = document.querySelector(selector);
+        const characters = Array.from(line.textContent);
+        line.textContent = "";
+        characters.forEach(function (character, index) {
+          const span = document.createElement("span");
+          span.textContent = character;
+          line.appendChild(span);
+          tl.set(span, { opacity: 1 }, at + index / 30);
+        });
+      }
+      function stamp(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scale: 1.12, "--spread": "2px" }, { scale: 1, "--spread": "0px", duration: 0.2, ease: "power3.out", immediateRender: false }, at);
+      }
+      // The pen draws the path from its start. The gap is longer than the path so no round cap shows before the pen arrives.
+      function draw(selector, at, duration) {
+        const path = document.querySelector(selector);
+        const length = path.getTotalLength();
+        tl.fromTo(path, { strokeDasharray: length + " " + (length + 2), strokeDashoffset: length + 1 }, { strokeDashoffset: 0, duration: duration, ease: "power2.inOut" }, at);
+      }
+
+      draw("#s7-trace-top", 0.0, 0.6);
+      draw("#s7-trace-middle", 0.0, 0.6);
+      draw("#s7-trace-bottom", 0.0, 0.6);
+      stamp("#s7-cube", 0.6);
+      typeOn("#s7-question", 0.8);
+      // A 0.3 s hold after the question, then the payoff.
+      stamp("#s7-answer", 1.9);
+      stamp("#s7-source", 2.1);
+      tl.to("#s7-sheet", { x: -1920, duration: 0.4, ease: "power3.in" }, 3.6);
+
+      window.__timelines["s7"] = tl;
+    })();
+  </script>
+</template>

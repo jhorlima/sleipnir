@@ -1,0 +1,99 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #s6-card {
+      left: 420px;
+      top: 400px;
+      width: 600px;
+      height: 280px;
+      border: 3px solid var(--ink);
+      background: var(--paper);
+      padding: 24px 32px;
+    }
+    .s6-name {
+      width: 230px;
+    }
+  </style>
+  <div id="root" data-composition-id="s6" data-width="1920" data-height="1080">
+    <div id="s6-sheet" class="sheet">
+      <svg class="pen" viewBox="0 0 1920 1080">
+        <g stroke="#1e2a2f" stroke-width="4">
+          <path id="s6-from-trino" class="trace" d="M260 400 C 340 400, 360 470, 420 490" />
+          <path id="s6-from-spark" class="trace" d="M260 680 C 340 680, 360 600, 420 590" />
+          <path id="s6-to-trino" class="trace" d="M1020 540 C 1100 540, 1090 220, 1160 220" />
+          <path id="s6-to-starrocks" class="trace" d="M1020 540 L 1160 540" />
+          <path id="s6-to-duckdb" class="trace" d="M1020 540 C 1100 540, 1090 860, 1160 860" />
+        </g>
+      </svg>
+      <div id="s6-written" class="at label quiet ink" style="left: 120px; top: 240px">written by</div>
+      <div id="s6-writer-trino" class="at ink" style="left: 120px; top: 340px">
+        <img class="logo" src="assets/logos/trino.svg" alt="Trino" style="width: 120px" />
+        <div class="label" style="margin-top: 6px">Trino</div>
+      </div>
+      <div id="s6-writer-spark" class="at ink" style="left: 120px; top: 620px">
+        <img class="logo" src="assets/logos/spark.svg" alt="Apache Spark" style="width: 120px" />
+        <div class="label" style="margin-top: 6px">Spark</div>
+      </div>
+      <div id="s6-card" class="at ink">
+        <div class="label quiet" style="font-size: 36px">gold · fct_weather_daily</div>
+        <div class="label" style="font-size: 60px; margin-top: 12px">USW00094728</div>
+        <div class="label" style="font-size: 60px">2025-06-01 · tmax 18.9</div>
+      </div>
+      <div id="s6-read" class="at label quiet ink" style="left: 1160px; top: 60px">read by</div>
+      <div id="s6-reader-trino" class="at stack ink" style="left: 1160px; top: 160px">
+        <img class="logo" src="assets/logos/trino.svg" alt="Trino" style="width: 120px" />
+        <div class="label s6-name">Trino</div>
+      </div>
+      <div id="s6-reader-starrocks" class="at stack ink" style="left: 1160px; top: 480px">
+        <img class="logo" src="assets/logos/starrocks.png" alt="StarRocks" style="width: 120px" />
+        <div class="label s6-name">StarRocks</div>
+      </div>
+      <div id="s6-reader-duckdb" class="at stack ink" style="left: 1160px; top: 800px">
+        <div class="duck"><img src="assets/logos/duckdb.svg" alt="DuckDB" /></div>
+        <div class="label s6-name">DuckDB</div>
+      </div>
+      <div id="s6-answer-trino" class="at display red ink" style="left: 1582px; top: 150px; font-size: 140px">18.9</div>
+      <div id="s6-answer-starrocks" class="at display red ink" style="left: 1582px; top: 470px; font-size: 140px">18.9</div>
+      <div id="s6-answer-duckdb" class="at display red ink" style="left: 1582px; top: 790px; font-size: 140px">18.9</div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      function stamp(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scale: 1.12, "--spread": "2px" }, { scale: 1, "--spread": "0px", duration: 0.2, ease: "power3.out", immediateRender: false }, at);
+      }
+      // The pen draws the path from its start. The gap is longer than the path so no round cap shows before the pen arrives.
+      function draw(selector, at, duration) {
+        const path = document.querySelector(selector);
+        const length = path.getTotalLength();
+        tl.fromTo(path, { strokeDasharray: length + " " + (length + 2), strokeDashoffset: length + 1 }, { strokeDashoffset: 0, duration: duration, ease: "power2.inOut" }, at);
+      }
+
+      stamp("#s6-card", 0.1);
+      stamp("#s6-written", 0.25);
+      stamp("#s6-writer-trino", 0.3);
+      stamp("#s6-writer-spark", 0.43);
+      draw("#s6-from-trino", 0.4, 0.5);
+      draw("#s6-from-spark", 0.5, 0.5);
+      stamp("#s6-read", 1.0);
+      draw("#s6-to-trino", 1.1, 0.6);
+      draw("#s6-to-starrocks", 1.23, 0.6);
+      draw("#s6-to-duckdb", 1.37, 0.6);
+      stamp("#s6-reader-trino", 1.7);
+      stamp("#s6-reader-starrocks", 1.83);
+      stamp("#s6-reader-duckdb", 1.97);
+      stamp("#s6-answer-trino", 1.9);
+      stamp("#s6-answer-starrocks", 2.03);
+      stamp("#s6-answer-duckdb", 2.17);
+      tl.to("#s6-sheet", { x: -1920, duration: 0.4, ease: "power3.in" }, 3.6);
+
+      window.__timelines["s6"] = tl;
+    })();
+  </script>
+</template>
