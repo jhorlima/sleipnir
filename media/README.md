@@ -11,6 +11,7 @@ The films and stills that go with the article and the README. They are [HyperFra
 | `film-race/`, `film-stack/`, `film-night-shift/` | One HyperFrames project per film |
 | `film-race-square/` | The 1080×1080, 15 s silent cut of the race for LinkedIn |
 | `medium-cards/` | The stills for the Medium post |
+| `medium-tables/render_tables.py` | Renders every table of the Medium post as a PNG (Medium can't show Markdown tables): `uv run media/medium-tables/render_tables.py`, output in `docs/assets/medium/tables/`. Re-run whenever the post's tables change. |
 
 Rendered outputs live in `docs/assets/`: `films/<name>.mp4` (with sound), `films/<name>-silent.mp4`, `films/<name>-poster.png`, `films/race-square.mp4`, and `medium/*.png`.
 
