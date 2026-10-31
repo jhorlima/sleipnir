@@ -1,0 +1,101 @@
+<template id="sheet-build-template">
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #build-sheet {
+      position: absolute; left: 0; top: 0; width: 1940px; height: 1080px; overflow: hidden;
+      background-color: #F5F7F3;
+      clip-path: polygon(0px 0px, 1940px 0px, 1926px 27px, 1940px 54px, 1926px 81px, 1940px 108px, 1926px 135px, 1940px 162px, 1926px 189px, 1940px 216px, 1926px 243px, 1940px 270px, 1926px 297px, 1940px 324px, 1926px 351px, 1940px 378px, 1926px 405px, 1940px 432px, 1926px 459px, 1940px 486px, 1926px 513px, 1940px 540px, 1926px 567px, 1940px 594px, 1926px 621px, 1940px 648px, 1926px 675px, 1940px 702px, 1926px 729px, 1940px 756px, 1926px 783px, 1940px 810px, 1926px 837px, 1940px 864px, 1926px 891px, 1940px 918px, 1926px 945px, 1940px 972px, 1926px 999px, 1940px 1026px, 1926px 1053px, 1940px 1080px, 0px 1080px);
+    }
+    #build-strip {
+      position: absolute; left: 0; top: 0; width: 2680px; height: 1080px;
+      background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/><feColorMatrix type='saturate' values='0'/></filter><rect width='240' height='240' filter='url(%23n)' opacity='0.06'/></svg>"),
+        linear-gradient(to right, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to bottom, #BFD8D2 2px, transparent 2px),
+        linear-gradient(to right, #BFD8D2 1px, transparent 1px),
+        linear-gradient(to bottom, #BFD8D2 1px, transparent 1px);
+      background-size: 240px 240px, 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+    }
+    #build-window { position: absolute; left: 0; top: 0; width: 1558px; height: 1080px; overflow: hidden; }
+    #build-ink { position: absolute; left: 0; top: 0; width: 2680px; height: 1080px; }
+    #build-strip svg, #build-ink svg, #build-static { position: absolute; left: 0; top: 0; }
+    
+      .unstamped { opacity: 0; }
+      .title { position: absolute; font-family: "Oswald"; font-weight: 500; line-height: 1.2; letter-spacing: 0.02em; white-space: nowrap; color: #1E2A2F; }
+      .stamp { position: absolute; font-family: "League Gothic"; font-weight: 400; line-height: 1; letter-spacing: 0.01em;
+        font-variant-numeric: tabular-nums; white-space: nowrap; color: #1E2A2F; -webkit-text-stroke: 2px currentColor; }
+      .claim { position: absolute; font-family: "League Gothic"; font-weight: 400; font-size: 190px; line-height: 1; letter-spacing: 0.01em;
+        white-space: nowrap; color: #1E2A2F; -webkit-text-stroke: 2px currentColor; }
+      .label { position: absolute; font-family: "Oswald"; font-weight: 500; font-size: 44px; line-height: 1.2; letter-spacing: 0.02em; white-space: nowrap; color: #1E2A2F; }
+      .label.big { font-size: 56px; line-height: 1.15; }
+      .label.small { font-size: 40px; }
+      .label.muted { color: #5E6B70; }
+      .sec { position: absolute; display: flex; flex-direction: column; white-space: nowrap; color: #1E2A2F; }
+      .sec-name { font-family: "League Gothic"; line-height: 1; letter-spacing: 0.01em; }
+      .sec-profile { font-family: "Oswald"; font-weight: 500; line-height: 1.2; letter-spacing: 0.02em; }
+      .red { color: #D9382B; }
+      .logo-stamp { position: absolute; mix-blend-mode: multiply; object-fit: contain; }
+
+  </style>
+  <div id="root" data-composition-id="sheet-build" data-width="1920" data-height="1080">
+    <div id="build-sheet">
+      <div id="build-strip">
+        <svg width="2680" height="1080" viewBox="0 0 2680 1080">
+          <g id="build-cross-1" class="unstamped" stroke="#8A979B" stroke-width="4" stroke-linecap="round"><line x1="1712.0" y1="689" x2="1740.0" y2="717"/><line x1="1712.0" y1="717" x2="1740.0" y2="689"/></g>
+          <line id="build-leader-6" class="unstamped" x1="1530" y1="466" x2="1800" y2="466" stroke="#1E2A2F" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 8"/>
+        </svg>
+        <div id="build-stamp-2" class="sec unstamped" style="left:1570px;top:852px;transform-origin:left center;"><span class="sec-name" style="font-size:52px">M</span><span class="sec-profile" style="font-size:36px">4 CPU / 8 GB</span></div>
+        <div id="build-stamp-3" class="sec unstamped" style="left:1810px;top:852px;transform-origin:left center;"><span class="sec-name" style="font-size:52px">L</span><span class="sec-profile" style="font-size:36px">8 CPU / 12 GB</span></div>
+        <div id="build-stamp-4" class="label small muted unstamped" style="left:1592px;top:276px;transform-origin:left center;">12,639 s</div>
+        <div id="build-stamp-5" class="stamp red unstamped" style="right:1160px;top:351px;font-size:230px;transform-origin:right center;">9,351 s</div>
+        <div id="build-stamp-7" class="stamp red unstamped" style="left:1812px;top:580px;font-size:120px;transform-origin:left center;line-height:1">Spark<br>failed</div>
+        <div id="build-stamp-8" class="sec unstamped" style="left:2050px;top:852px;transform-origin:left center;"><span class="sec-name" style="font-size:52px">L2</span><span class="sec-profile" style="font-size:36px">object store at 2 CPU</span></div>
+        <div id="build-stamp-9" class="label small unstamped" style="left:2072px;top:230px;transform-origin:left center;">13,803 s</div>
+      </div>
+      <svg id="build-static" width="1920" height="1080" viewBox="0 0 1920 1080"><line  x1="240" y1="840" x2="1704" y2="840" stroke="#1E2A2F" stroke-width="3" stroke-linecap="butt"/></svg>
+      <div id="build-window">
+        <div id="build-ink">
+          <svg width="2680" height="1080" viewBox="0 0 2680 1080">
+            <line  x1="1560" y1="216" x2="1560" y2="840" stroke="#1E2A2F" stroke-width="2" stroke-linecap="butt" stroke-dasharray="12 8"/>
+            <line  x1="1800" y1="216" x2="1800" y2="840" stroke="#1E2A2F" stroke-width="2" stroke-linecap="butt" stroke-dasharray="12 8"/>
+            <line  x1="2040" y1="216" x2="2040" y2="840" stroke="#1E2A2F" stroke-width="2" stroke-linecap="butt" stroke-dasharray="12 8"/>
+            <polyline id="build-trace-trino-0" points="1560,840 1584,334 1800,334 1824,466 2040,466 2064,475 2280,475" fill="none" stroke="#D9382B" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+            <polyline id="build-trace-spark-0" points="1560,840 1680,700 1686,712 1695.6,694 1707.6,706" fill="none" stroke="#8A979B" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+            <polyline id="build-trace-spark-1" points="2040,840 2064,288 2280,288" fill="none" stroke="#5E6B70" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="title" style="left:288px;top:108px;font-size:48px">Build from scratch, 3.97 B rows</div>
+
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set(["#build-strip", "#build-ink"], { x: 0 }, 0);
+    tl.to(["#build-strip", "#build-ink"], { x: -480, duration: 4, ease: "none" }, 0.3);
+    tl.to(["#build-strip", "#build-ink"], { x: -720, duration: 2, ease: "none" }, 5.8);
+    tl.set("#build-cross-1", { opacity: 1 }, 1.6);
+    tl.set("#build-stamp-2", { opacity: 1 }, 4.35);
+    tl.fromTo("#build-stamp-2", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 4.35);
+    tl.set("#build-stamp-3", { opacity: 1 }, 4.35);
+    tl.fromTo("#build-stamp-3", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 4.35);
+    tl.set("#build-stamp-4", { opacity: 1 }, 4.5);
+    tl.fromTo("#build-stamp-4", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 4.5);
+    tl.set("#build-stamp-5", { opacity: 1 }, 4.7);
+    tl.fromTo("#build-stamp-5", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 4.7);
+    tl.set("#build-leader-6", { opacity: 1 }, 4.7);
+    tl.set("#build-stamp-7", { opacity: 1 }, 7.85);
+    tl.fromTo("#build-stamp-7", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 7.85);
+    tl.set("#build-stamp-8", { opacity: 1 }, 8.15);
+    tl.fromTo("#build-stamp-8", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 8.15);
+    tl.set("#build-stamp-9", { opacity: 1 }, 8.15);
+    tl.fromTo("#build-stamp-9", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 8.15);
+    tl.set("#build-trace-trino-0", { attr: { stroke: "#5E6B70" } }, 7.85);
+    tl.set("#build-stamp-5", { color: "#1E2A2F" }, 7.85);
+    tl.set("#build-trace-spark-0", { attr: { stroke: "#D9382B" } }, 7.85);
+    tl.set("#build-cross-1", { attr: { stroke: "#D9382B" } }, 7.85);
+    tl.fromTo("#build-sheet", { x: 0 }, { x: -1980, duration: 0.267, ease: "power3.in" }, 9.2);
+    tl.set({}, {}, 9.467);
+    window.__timelines["sheet-build"] = tl;
+  </script>
+</template>

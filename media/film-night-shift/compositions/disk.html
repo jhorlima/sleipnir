@@ -36,28 +36,57 @@
     }
   </style>
   <div id="root" data-composition-id="disk" data-width="1920" data-height="1080">
-    <div class="sheet"></div>
-    <div class="margin-rule"></div>
-    <div id="disk-margin" class="margin">
-      <img id="disk-logo" class="logo" src="assets/logos/spark.svg" alt="Apache Spark" />
-      <div id="disk-name" class="label engine-name">Spark</div>
-      <div id="disk-note" class="label">The Docker disk fills up</div>
+    <div id="disk-page" class="page">
+      <div class="sheet"></div>
+      <div class="margin-rule"></div>
+      <div id="disk-margin" class="margin">
+        <img id="disk-logo" class="logo" src="assets/logos/spark.svg" alt="Apache Spark" />
+        <div id="disk-name" class="label engine-name">Spark</div>
+        <div id="disk-note" class="label">The Docker disk fills up</div>
+      </div>
+      <div id="disk-value" class="display stamp red">103 GB full</div>
+      <svg id="disk-gauge" viewBox="0 0 1100 300" fill="none" stroke="#1E2A2F" stroke-width="6" stroke-linejoin="round">
+        <defs>
+          <pattern id="disk-hatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="16" stroke="#1E2A2F" stroke-width="4" />
+          </pattern>
+          <clipPath id="disk-fill">
+            <rect id="disk-fill-rect" x="0" y="0" width="1100" height="300" />
+          </clipPath>
+        </defs>
+        <path d="M10 10 L10 26 M137.5 10 L137.5 26 M265 10 L265 26 M392.5 10 L392.5 26 M520 10 L520 26 M647.5 10 L647.5 26 M775 10 L775 26 M902.5 10 L902.5 26 M1030 10 L1030 26" stroke-width="5" />
+        <rect clip-path="url(#disk-fill)" x="10" y="50" width="1020" height="200" rx="10" fill="url(#disk-hatch)" stroke="none" />
+        <rect x="10" y="50" width="1020" height="200" rx="10" />
+        <path id="disk-spill" class="pen" pathLength="1" d="M1030 90 Q1060 110 1052 150 Q1080 170 1070 210 Q1090 230 1084 262" stroke-width="6" stroke-linecap="round" />
+      </svg>
+      <div id="disk-line" class="label">Spark MERGE spilled ~33 GB</div>
     </div>
-    <div id="disk-value" class="display stamp red">103 GB full</div>
-    <svg id="disk-gauge" viewBox="0 0 1100 300" fill="none" stroke="#1E2A2F" stroke-width="6" stroke-linejoin="round">
-      <defs>
-        <pattern id="disk-hatch" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="16" stroke="#1E2A2F" stroke-width="4" />
-        </pattern>
-      </defs>
-      <path d="M10 10 L10 26 M137.5 10 L137.5 26 M265 10 L265 26 M392.5 10 L392.5 26 M520 10 L520 26 M647.5 10 L647.5 26 M775 10 L775 26 M902.5 10 L902.5 26 M1030 10 L1030 26" stroke-width="5" />
-      <rect x="10" y="50" width="1020" height="200" rx="10" fill="url(#disk-hatch)" />
-      <path d="M1030 90 Q1060 110 1052 150 Q1080 170 1070 210 Q1090 230 1084 262" stroke-width="6" stroke-linecap="round" />
-    </svg>
-    <div id="disk-line" class="label">Spark MERGE spilled ~33 GB</div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
+
+    function stamp(selector, at) {
+      tl.fromTo(selector, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, at);
+      tl.fromTo(selector, { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, at);
+    }
+    function write(selector, at, duration) {
+      tl.fromTo(selector, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration, ease: "none" }, at);
+    }
+
+    tl.fromTo("#disk-page", { x: 1920 }, { x: 0, duration: 0.5, ease: "power2.inOut" }, 0);
+    stamp("#disk-logo", 0.55);
+    write("#disk-name", 0.6, 0.2);
+    write("#disk-note", 0.75, 0.45);
+
+    // The bar fills faster as the spill grows, then runs over its end.
+    tl.fromTo("#disk-fill-rect", { attr: { width: 0 } }, { attr: { width: 1100 }, duration: 0.8, ease: "power2.in" }, 0.7);
+    tl.fromTo("#disk-spill", { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.3, ease: "power2.out" }, 1.5);
+
+    stamp("#disk-value", 1.8);
+    write("#disk-line", 1.95, 0.45);
+
+    tl.to("#disk-page", { x: -1920, duration: 0.5, ease: "power2.inOut" }, 3.5);
+
     window.__timelines["disk"] = tl;
   </script>
 </template>

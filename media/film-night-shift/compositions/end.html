@@ -9,6 +9,7 @@
       left: 640px;
       top: 250px;
       font-size: 400px;
+      transform-origin: left center;
     }
     #end-repo {
       position: absolute;
@@ -18,13 +19,21 @@
     }
   </style>
   <div id="root" data-composition-id="end" data-width="1920" data-height="1080">
-    <div class="sheet"></div>
-    <div class="margin-rule"></div>
-    <div id="end-name" class="display stamp red">Sleipnir</div>
-    <div id="end-repo" class="label">github.com/jhorlima/sleipnir</div>
+    <div id="end-page" class="page">
+      <div class="sheet"></div>
+      <div class="margin-rule"></div>
+      <div id="end-name" class="display stamp red">Sleipnir</div>
+      <div id="end-repo" class="label">github.com/jhorlima/sleipnir</div>
+    </div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
+
+    tl.fromTo("#end-page", { x: 1920 }, { x: 0, duration: 0.5, ease: "power2.inOut" }, 0);
+    tl.fromTo("#end-name", { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, 0.6);
+    tl.fromTo("#end-name", { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, 0.6);
+    tl.fromTo("#end-repo", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.5, ease: "none" }, 0.85);
+
     window.__timelines["end"] = tl;
   </script>
 </template>

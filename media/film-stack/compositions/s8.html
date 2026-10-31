@@ -1,0 +1,34 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+  </style>
+  <div id="root" data-composition-id="s8" data-width="1920" data-height="1080">
+    <div id="s8-sheet" class="sheet">
+      <div id="s8-row" class="at label ink" style="left: 120px; top: 120px; color: var(--faint)">USW00094728,20250601,TMAX,189</div>
+      <div id="s8-one-row" class="at display ink" style="left: 120px; top: 240px; font-size: 220px">One row.</div>
+      <div id="s8-four-engines" class="at display ink" style="left: 120px; top: 480px; font-size: 220px">Four engines.</div>
+      <div id="s8-same-answer" class="at display red ink" style="left: 120px; top: 720px; font-size: 220px">Same answer.</div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      function stamp(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scale: 1.12, "--spread": "2px" }, { scale: 1, "--spread": "0px", duration: 0.2, ease: "power3.out", immediateRender: false }, at);
+      }
+
+      stamp("#s8-row", 0.05);
+      stamp("#s8-one-row", 0.15);
+      stamp("#s8-four-engines", 0.45);
+      stamp("#s8-same-answer", 0.75);
+      tl.to("#s8-sheet", { x: -1920, duration: 0.4, ease: "power3.in" }, 2.1);
+
+      window.__timelines["s8"] = tl;
+    })();
+  </script>
+</template>

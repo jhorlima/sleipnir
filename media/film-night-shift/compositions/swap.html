@@ -25,39 +25,71 @@
       align-items: baseline;
       gap: 32px;
     }
-    #swap-value {
+    #swap-value,
+    #swap-of {
+      display: inline-block;
       font-size: 220px;
     }
     #swap-unit {
       font-size: 56px;
     }
+    #swap-band {
+      stroke-dasharray: 1402.3 9999;
+    }
   </style>
   <div id="root" data-composition-id="swap" data-width="1920" data-height="1080">
-    <div class="sheet"></div>
-    <div class="margin-rule"></div>
-    <div id="swap-margin" class="margin">
-      <div id="swap-note" class="label">macOS swap fills up</div>
-    </div>
-    <svg id="swap-dial" viewBox="0 0 1000 600" fill="none" stroke="#1E2A2F" stroke-linecap="butt">
-      <defs>
-        <pattern id="swap-hatch" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="14" stroke="#1E2A2F" stroke-width="5" />
-        </pattern>
-      </defs>
-      <path d="M45 520 A455 455 0 0 1 955 520" stroke="url(#swap-hatch)" stroke-width="50" stroke-dasharray="1402.3 9999" />
-      <path d="M20 520 A480 480 0 0 1 980 520" stroke-width="6" />
-      <path d="M100 520 A400 400 0 0 1 900 520" stroke-width="36" stroke-dasharray="4 74.54" />
-      <line x1="500" y1="520" x2="879.3" y2="497.3" stroke-width="12" stroke-linecap="round" />
-      <circle cx="500" cy="520" r="26" fill="#1E2A2F" stroke="none" />
-      <line x1="0" y1="520" x2="1000" y2="520" stroke-width="6" />
-    </svg>
-    <div id="swap-readout">
-      <div class="display"><span id="swap-value" class="stamp red">15.7</span><span id="swap-of" style="font-size: 220px"> / 16 GB</span></div>
-      <div id="swap-unit" class="label">swap in use</div>
+    <div id="swap-page" class="page">
+      <div class="sheet"></div>
+      <div class="margin-rule"></div>
+      <div id="swap-margin" class="margin">
+        <div id="swap-note" class="label">macOS swap fills up</div>
+      </div>
+      <svg id="swap-dial" viewBox="0 0 1000 600" fill="none" stroke="#1E2A2F" stroke-linecap="butt">
+        <defs>
+          <pattern id="swap-hatch" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="14" stroke="#1E2A2F" stroke-width="5" />
+          </pattern>
+        </defs>
+        <path id="swap-band" d="M45 520 A455 455 0 0 1 955 520" stroke="url(#swap-hatch)" stroke-width="50" />
+        <path d="M20 520 A480 480 0 0 1 980 520" stroke-width="6" />
+        <path d="M100 520 A400 400 0 0 1 900 520" stroke-width="36" stroke-dasharray="4 74.54" />
+        <line x1="0" y1="520" x2="1000" y2="520" stroke-width="6" />
+        <g id="swap-needle">
+          <line x1="500" y1="520" x2="879.3" y2="497.3" stroke-width="12" stroke-linecap="round" />
+        </g>
+        <circle cx="500" cy="520" r="26" fill="#1E2A2F" stroke="none" />
+      </svg>
+      <div id="swap-readout">
+        <div class="display"><span id="swap-value" class="stamp red">15.7</span><span id="swap-of">&nbsp;/ 16 GB</span></div>
+        <div id="swap-unit" class="label">swap in use</div>
+      </div>
     </div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
+
+    function stamp(selector, at) {
+      tl.fromTo(selector, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, at);
+      tl.fromTo(selector, { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, at);
+    }
+    function write(selector, at, duration) {
+      tl.fromTo(selector, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration, ease: "none" }, at);
+    }
+
+    tl.fromTo("#swap-page", { x: 1920 }, { x: 0, duration: 0.5, ease: "power2.inOut" }, 0);
+    write("#swap-note", 0.55, 0.5);
+
+    // The band and the needle sweep together to 15.7 of 16; the needle overshoots 2 degrees and settles.
+    tl.fromTo("#swap-band", { strokeDashoffset: 1402.3 }, { strokeDashoffset: 0, duration: 0.8, ease: "power2.inOut" }, 0.6);
+    tl.fromTo("#swap-needle", { rotation: -176.58 }, { rotation: 2, duration: 0.8, ease: "power2.inOut", svgOrigin: "500 520" }, 0.6);
+    tl.to("#swap-needle", { rotation: 0, duration: 0.13, ease: "power2.out", svgOrigin: "500 520" }, 1.4);
+
+    stamp("#swap-value", 1.45);
+    stamp("#swap-of", 1.55);
+    write("#swap-unit", 1.7, 0.35);
+
+    tl.to("#swap-page", { x: -1920, duration: 0.5, ease: "power2.inOut" }, 3.0);
+
     window.__timelines["swap"] = tl;
   </script>
 </template>

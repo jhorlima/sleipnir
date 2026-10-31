@@ -9,7 +9,10 @@ The films and stills that go with the article and the README. They are [HyperFra
 | `shared/data.json` | Every number that appears on screen, taken from `results/*.parquet` |
 | `shared/logos/` | Official marks of each project in the stack |
 | `film-race/`, `film-stack/`, `film-night-shift/` | One HyperFrames project per film |
+| `film-race-square/` | The 1080×1080, 15 s silent cut of the race for LinkedIn |
 | `medium-cards/` | The stills for the Medium post |
+
+Rendered outputs live in `docs/assets/`: `films/<name>.mp4` (with sound), `films/<name>-silent.mp4`, `films/<name>-poster.png`, `films/race-square.mp4`, and `medium/*.png`.
 
 ## Render
 

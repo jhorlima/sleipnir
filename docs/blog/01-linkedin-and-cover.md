@@ -1,5 +1,7 @@
 # LinkedIn post and cover image for the first Medium post
 
+Attach to both posts: `docs/assets/films/race-square.mp4` (1080×1080, 15 s, silent; LinkedIn autoplays it muted in the feed). The Medium cover is `docs/assets/medium/01-cover.png`.
+
 ## LinkedIn (English)
 
 A few weeks ago I wanted a public dataset big enough to push Cube.dev's pre-aggregations to their limit.

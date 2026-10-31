@@ -18,7 +18,7 @@
     #sleep-laptop {
       position: absolute;
       left: 680px;
-      top: 420px;
+      top: 230px;
       width: 1040px;
       height: 666px;
     }
@@ -40,7 +40,6 @@
       left: 660px;
       top: 140px;
       font-size: 190px;
-      transform: rotate(-4deg);
       transform-origin: left center;
     }
     #sleep-line {
@@ -51,28 +50,68 @@
     }
   </style>
   <div id="root" data-composition-id="sleep" data-width="1920" data-height="1080">
-    <div class="sheet"></div>
-    <div class="margin-rule"></div>
-    <div id="sleep-margin" class="margin">
-      <img id="sleep-logo" class="logo" src="assets/logos/trino.svg" alt="Trino" />
-      <div id="sleep-name" class="label engine-name">Trino</div>
-      <div id="sleep-note" class="label">The laptop falls asleep</div>
+    <div id="sleep-page" class="page">
+      <div class="sheet"></div>
+      <div class="margin-rule"></div>
+      <div id="sleep-margin" class="margin">
+        <img id="sleep-logo" class="logo" src="assets/logos/trino.svg" alt="Trino" />
+        <div id="sleep-name" class="label engine-name">Trino</div>
+        <div id="sleep-note" class="label">The laptop falls asleep</div>
+      </div>
+      <div id="sleep-stamp" class="display stamp red">ABANDONED_TASK</div>
+      <svg id="sleep-laptop" viewBox="0 0 1000 640" fill="none" stroke="#1E2A2F" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+        <g id="sleep-lid-open">
+          <rect x="110" y="20" width="780" height="500" rx="24" />
+          <rect x="148" y="58" width="704" height="424" rx="6" />
+          <polyline points="180,380 240,372 300,384 360,350" stroke-width="5" />
+        </g>
+        <path id="sleep-lid-shut" d="M110 520 L180 456 L820 456 L890 520 Z" />
+        <g id="sleep-base">
+          <path d="M110 520 L890 520 L985 598 Q992 616 972 616 L28 616 Q8 616 15 598 Z" />
+          <path d="M430 616 L436 604 L564 604 L570 616" />
+        </g>
+      </svg>
+      <div id="sleep-z">
+        <span id="sleep-z1" style="left: 0; top: 180px; font-size: 64px">z</span>
+        <span id="sleep-z2" style="left: 70px; top: 100px; font-size: 92px">z</span>
+        <span id="sleep-z3" style="left: 160px; top: 0; font-size: 128px">Z</span>
+      </div>
+      <div id="sleep-line" class="label">macOS idle sleep froze the Docker VM</div>
     </div>
-    <div id="sleep-stamp" class="display stamp red">ABANDONED_TASK</div>
-    <svg id="sleep-laptop" viewBox="0 0 1000 640" fill="none" stroke="#1E2A2F" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
-      <path d="M110 300 L180 236 L820 236 L890 300 Z" fill="#F5F7F3" />
-      <path d="M110 300 L890 300 L985 378 Q992 396 972 396 L28 396 Q8 396 15 378 Z" fill="#F5F7F3" />
-      <path d="M430 396 L436 384 L564 384 L570 396" />
-    </svg>
-    <div id="sleep-z">
-      <span style="left: 0; top: 180px; font-size: 64px">z</span>
-      <span style="left: 70px; top: 100px; font-size: 92px">z</span>
-      <span style="left: 160px; top: 0; font-size: 128px">Z</span>
-    </div>
-    <div id="sleep-line" class="label">macOS idle sleep froze the Docker VM</div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
+
+    function stamp(selector, at, rotation = 0) {
+      tl.fromTo(selector, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, at);
+      tl.fromTo(selector, { scale: 1.12, rotation }, { scale: 1, rotation, duration: 0.2, ease: "power3.out" }, at);
+    }
+    function write(selector, at, duration) {
+      tl.fromTo(selector, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration, ease: "none" }, at);
+    }
+    function appear(selector, at) {
+      tl.fromTo(selector, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, at);
+    }
+
+    stamp("#sleep-logo", 0.1);
+    write("#sleep-name", 0.2, 0.2);
+    write("#sleep-note", 0.4, 0.5);
+
+    // The lid swings shut on its hinge, then the base takes a two-frame squash.
+    tl.fromTo("#sleep-lid-open", { scaleY: 1 }, { scaleY: 0.12, duration: 0.33, ease: "power3.in", svgOrigin: "500 520" }, 0.15);
+    tl.fromTo("#sleep-lid-open", { opacity: 1 }, { opacity: 0, duration: 0.01, ease: "none" }, 0.48);
+    appear("#sleep-lid-shut", 0.48);
+    tl.fromTo("#sleep-base", { scaleY: 0.94 }, { scaleY: 1, duration: 0.067, ease: "power2.out", svgOrigin: "500 616" }, 0.48);
+
+    appear("#sleep-z1", 0.6);
+    appear("#sleep-z2", 0.733);
+    appear("#sleep-z3", 0.867);
+
+    stamp("#sleep-stamp", 1.2, -4);
+    write("#sleep-line", 1.4, 0.6);
+
+    tl.to("#sleep-page", { x: -1920, duration: 0.5, ease: "power2.inOut" }, 3.4);
+
     window.__timelines["sleep"] = tl;
   </script>
 </template>

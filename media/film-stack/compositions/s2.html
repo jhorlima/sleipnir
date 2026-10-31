@@ -1,0 +1,77 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #s2-under {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -6px;
+      height: 5px;
+      background: var(--ink);
+      transform-origin: left center;
+    }
+  </style>
+  <div id="root" data-composition-id="s2" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <div id="s2-sheet" class="sheet">
+      <!-- The time rule and the 1763 row ride the paper; the pen and the 2025 row stay put. -->
+      <div id="s2-drum" class="sheet">
+        <svg class="pen" viewBox="0 0 1920 1080" style="width: 2400px">
+          <line x1="0" y1="160" x2="2400" y2="160" stroke="#1e2a2f" stroke-width="3" />
+          <g stroke="#1e2a2f" stroke-width="3">
+            <line x1="120" y1="140" x2="120" y2="180" /><line x1="360" y1="140" x2="360" y2="180" />
+            <line x1="600" y1="140" x2="600" y2="180" /><line x1="840" y1="140" x2="840" y2="180" />
+            <line x1="1080" y1="140" x2="1080" y2="180" /><line x1="1320" y1="140" x2="1320" y2="180" />
+            <line x1="1560" y1="140" x2="1560" y2="180" /><line x1="1800" y1="140" x2="1800" y2="180" />
+            <line x1="2040" y1="140" x2="2040" y2="180" /><line x1="2280" y1="140" x2="2280" y2="180" />
+          </g>
+        </svg>
+        <div class="at label" style="left: 40px; top: 70px; color: var(--faint)">1763</div>
+        <div class="at row" style="left: -1000px; top: 250px; color: var(--faint)">ITE00100554,17630101,TMAX,-36</div>
+      </div>
+      <div id="s2-year" class="at display ink" style="left: 1660px; top: 40px; font-size: 110px">2025</div>
+      <div class="at row" style="left: 360px; top: 360px">
+        <span id="s2-row" class="typed">USW00094728,20250601,TMAX,</span><span style="position: relative"><span id="s2-value" class="typed">189</span><i id="s2-under"></i></span>
+      </div>
+      <div id="s2-place" class="at display ink" style="left: 360px; top: 530px; font-size: 140px">New York, Central Park</div>
+      <div id="s2-date" class="at label ink" style="left: 364px; top: 690px">1 June 2025</div>
+      <div id="s2-celsius" class="at display red ink" style="left: 1240px; top: 740px; font-size: 230px">18.9 °C</div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      function typeOn(selector, at) {
+        const line = document.querySelector(selector);
+        const characters = Array.from(line.textContent);
+        line.textContent = "";
+        characters.forEach(function (character, index) {
+          const span = document.createElement("span");
+          span.textContent = character;
+          line.appendChild(span);
+          tl.set(span, { opacity: 1 }, at + index / 30);
+        });
+      }
+      function stamp(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scale: 1.12, "--spread": "2px" }, { scale: 1, "--spread": "0px", duration: 0.2, ease: "power3.out", immediateRender: false }, at);
+      }
+
+      // The drum runs under the pen at 120 px/s, linear (the root timeline moves the grid with it).
+      tl.fromTo("#s2-drum", { x: 0 }, { x: -360, duration: 3, ease: "none" }, 0.1);
+      stamp("#s2-year", 0.5);
+      typeOn("#s2-row", 0.6);
+      typeOn("#s2-value", 0.6 + 26 / 30);
+      tl.fromTo("#s2-under", { scaleX: 0 }, { scaleX: 1, duration: 0.2, ease: "power2.inOut" }, 1.57);
+      stamp("#s2-place", 1.65);
+      stamp("#s2-date", 1.8);
+      stamp("#s2-celsius", 1.95);
+      tl.to("#s2-sheet", { x: -1920, duration: 0.4, ease: "power3.in" }, 3.1);
+
+      window.__timelines["s2"] = tl;
+    })();
+  </script>
+</template>

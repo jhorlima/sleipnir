@@ -16,28 +16,57 @@
       top: 110px;
       font-size: 190px;
     }
+    #claim-effort > div {
+      width: fit-content;
+      transform-origin: left center;
+    }
     #claim-next {
       position: absolute;
       left: 640px;
       top: 720px;
       font-size: 150px;
     }
+    #claim-lead,
+    #claim-cloud {
+      display: inline-block;
+    }
   </style>
   <div id="root" data-composition-id="claim" data-width="1920" data-height="1080">
-    <div class="sheet"></div>
-    <div class="margin-rule"></div>
-    <div id="claim-margin" class="margin">
-      <div id="claim-note" class="label">The whole campaign</div>
+    <div id="claim-page" class="page">
+      <div class="sheet"></div>
+      <div class="margin-rule"></div>
+      <div id="claim-margin" class="margin">
+        <div id="claim-note" class="label">The whole campaign</div>
+      </div>
+      <div id="claim-effort" class="display">
+        <div id="claim-hours"><span class="claim-tilde">~</span>40 h,</div>
+        <div id="claim-days">8 days,</div>
+        <div id="claim-runs">261 runs.</div>
+      </div>
+      <div id="claim-next" class="display"><span id="claim-lead">Next stop:&nbsp;</span><span id="claim-cloud" class="stamp red">the cloud.</span></div>
     </div>
-    <div id="claim-effort" class="display">
-      <div id="claim-hours"><span class="claim-tilde">~</span>40 h,</div>
-      <div id="claim-days">8 days,</div>
-      <div id="claim-runs">261 runs.</div>
-    </div>
-    <div id="claim-next" class="display">Next stop: <span id="claim-cloud" class="stamp red">the cloud.</span></div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
+
+    function stamp(selector, at) {
+      tl.fromTo(selector, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, at);
+      tl.fromTo(selector, { scale: 1.12 }, { scale: 1, duration: 0.2, ease: "power3.out" }, at);
+    }
+    function write(selector, at, duration) {
+      tl.fromTo(selector, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration, ease: "none" }, at);
+    }
+
+    tl.fromTo("#claim-page", { x: 1920 }, { x: 0, duration: 0.5, ease: "power2.inOut" }, 0);
+    write("#claim-note", 0.55, 0.4);
+    stamp("#claim-hours", 0.7);
+    stamp("#claim-days", 1.1);
+    stamp("#claim-runs", 1.5);
+    write("#claim-lead", 1.9, 0.35);
+    stamp("#claim-cloud", 2.4);
+
+    tl.to("#claim-page", { x: -1920, duration: 0.5, ease: "power2.inOut" }, 3.5);
+
     window.__timelines["claim"] = tl;
   </script>
 </template>

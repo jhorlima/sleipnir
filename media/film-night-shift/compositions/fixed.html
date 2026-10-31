@@ -24,33 +24,74 @@
     }
     .fixed-text {
       font-size: 72px;
-      text-decoration: line-through;
-      text-decoration-thickness: 7px;
-      text-decoration-color: var(--graphite);
     }
     .fixed-stamp {
       position: absolute;
-      left: 820px;
-      font-size: 110px;
-      transform: rotate(-5deg);
+      left: 600px;
+      font-size: 96px;
+      transform-origin: left center;
     }
   </style>
   <div id="root" data-composition-id="fixed" data-width="1920" data-height="1080">
-    <div class="sheet"></div>
-    <div class="margin-rule"></div>
-    <div id="fixed-margin" class="margin">
-      <div id="fixed-note" class="label">Fixed,<br />line by line</div>
-    </div>
-    <div id="fixed-list">
-      <div class="fixed-row"><span id="fixed-sleep" class="fixed-text label">Laptop sleep</span><span id="fixed-sleep-stamp" class="fixed-stamp display stamp">fixed</span></div>
-      <div class="fixed-row"><span id="fixed-swap" class="fixed-text label">Swap</span><span id="fixed-swap-stamp" class="fixed-stamp display stamp">fixed</span></div>
-      <div class="fixed-row"><span id="fixed-heap" class="fixed-text label">Spark heap</span><span id="fixed-heap-stamp" class="fixed-stamp display stamp">fixed</span></div>
-      <div class="fixed-row"><span id="fixed-oom" class="fixed-text label">Object store OOM</span><span id="fixed-oom-stamp" class="fixed-stamp display stamp">fixed</span></div>
-      <div class="fixed-row"><span id="fixed-disk" class="fixed-text label">Docker disk full</span><span id="fixed-disk-stamp" class="fixed-stamp display stamp red">fixed</span></div>
+    <div id="fixed-page" class="page">
+      <div class="sheet"></div>
+      <div class="margin-rule"></div>
+      <div id="fixed-margin" class="margin">
+        <div id="fixed-note" class="label">The log,<br />line by line</div>
+      </div>
+      <div id="fixed-list">
+        <div class="fixed-row">
+          <span class="strike-wrap"><span class="fixed-text label">Laptop sleep</span><span id="fixed-sleep-strike" class="strike"></span></span>
+          <span id="fixed-sleep-stamp" class="fixed-stamp display stamp">fixed</span>
+        </div>
+        <div class="fixed-row">
+          <span class="fixed-text label">Swap</span>
+          <span id="fixed-swap-stamp" class="fixed-stamp display stamp">run at night</span>
+        </div>
+        <div class="fixed-row">
+          <span class="strike-wrap"><span class="fixed-text label">Spark heap</span><span id="fixed-heap-strike" class="strike"></span></span>
+          <span id="fixed-heap-stamp" class="fixed-stamp display stamp">fixed</span>
+        </div>
+        <div class="fixed-row">
+          <span class="strike-wrap"><span class="fixed-text label">Object store OOM</span><span id="fixed-oom-strike" class="strike"></span></span>
+          <span id="fixed-oom-stamp" class="fixed-stamp display stamp">fixed</span>
+        </div>
+        <div class="fixed-row">
+          <span class="fixed-text label">Docker disk full</span>
+          <span id="fixed-disk-stamp" class="fixed-stamp display stamp red">next: the cloud</span>
+        </div>
+      </div>
     </div>
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
+
+    function stamp(selector, at) {
+      tl.fromTo(selector, { opacity: 0 }, { opacity: 1, duration: 0.01, ease: "none" }, at);
+      tl.fromTo(selector, { scale: 1.12, rotation: -5 }, { scale: 1, rotation: -5, duration: 0.2, ease: "power3.out" }, at);
+    }
+    function write(selector, at, duration) {
+      tl.fromTo(selector, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration, ease: "none" }, at);
+    }
+    function strike(selector, at) {
+      tl.fromTo(selector, { scaleX: 0 }, { scaleX: 1, duration: 0.267, ease: "power2.inOut" }, at);
+    }
+
+    tl.fromTo("#fixed-page", { x: 1920 }, { x: 0, duration: 0.5, ease: "power2.inOut" }, 0);
+    write("#fixed-note", 0.55, 0.4);
+
+    // One row every 0.5 s: fixed rows are struck through, then every row gets its stamp.
+    strike("#fixed-sleep-strike", 0.7);
+    stamp("#fixed-sleep-stamp", 1.07);
+    stamp("#fixed-swap-stamp", 1.57);
+    strike("#fixed-heap-strike", 1.7);
+    stamp("#fixed-heap-stamp", 2.07);
+    strike("#fixed-oom-strike", 2.2);
+    stamp("#fixed-oom-stamp", 2.57);
+    stamp("#fixed-disk-stamp", 3.07);
+
+    tl.to("#fixed-page", { x: -1920, duration: 0.5, ease: "power2.inOut" }, 4.0);
+
     window.__timelines["fixed"] = tl;
   </script>
 </template>

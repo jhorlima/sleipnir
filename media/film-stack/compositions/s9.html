@@ -1,0 +1,41 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+  </style>
+  <div id="root" data-composition-id="s9" data-width="1920" data-height="1080">
+    <div id="s9-sheet" class="sheet">
+      <div id="s9-name" class="at display ink" style="left: 240px; top: 170px; font-size: 440px">Sleipnir</div>
+      <svg class="pen" viewBox="0 0 1920 1080">
+        <path id="s9-underline" class="trace" d="M244 700 C 560 690, 900 712, 1290 696" stroke="#d9382b" stroke-width="10" />
+      </svg>
+      <div id="s9-repo" class="at label ink" style="left: 244px; top: 760px; font-size: 64px">github.com/jhorlima/sleipnir</div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      function stamp(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scale: 1.12, "--spread": "2px" }, { scale: 1, "--spread": "0px", duration: 0.2, ease: "power3.out", immediateRender: false }, at);
+      }
+      // The pen draws the path from its start. The gap is longer than the path so no round cap shows before the pen arrives.
+      function draw(selector, at, duration) {
+        const path = document.querySelector(selector);
+        const length = path.getTotalLength();
+        tl.fromTo(path, { strokeDasharray: length + " " + (length + 2), strokeDashoffset: length + 1 }, { strokeDashoffset: 0, duration: duration, ease: "power2.inOut" }, at);
+      }
+
+      stamp("#s9-name", 0.1);
+      draw("#s9-underline", 0.25, 0.6);
+      stamp("#s9-repo", 0.45);
+      // Held to the last frame: the end card does not move.
+      tl.set({}, {}, 2.5);
+
+      window.__timelines["s9"] = tl;
+    })();
+  </script>
+</template>

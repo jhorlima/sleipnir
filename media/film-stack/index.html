@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=1920, height=1080" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
     <style>
-      /* Placeholders: replace all three with the film's own palette and display face. */
       :root {
-        --ground: #000;
-        --ink: #ffffff;
-        --font-display: sans-serif;
+        --paper: #f5f7f3;
+        --grid: #bfd8d2;
+        --ink: #1e2a2f;
+        --red: #d9382b;
+        --muted: #5e6b70;
+        --faint: #8a979b;
+        --display: "League Gothic", sans-serif;
+        --label: "Oswald", sans-serif;
       }
       * {
         margin: 0;
@@ -18,44 +22,231 @@
       }
       html,
       body {
-        margin: 0;
         width: 1920px;
         height: 1080px;
         overflow: hidden;
-        background: var(--ground);
+        background: var(--paper);
       }
-      #root {
+      #main {
+        position: relative;
         width: 100%;
         height: 100%;
+        overflow: hidden;
+        color: var(--ink);
+        font-family: var(--label);
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* The recorder paper: printed grid, minor 24 px / major 120 px, plus fibre noise.
+         The grid strip is wider than the frame so the drum can advance a whole sheet and reset unseen. */
+      #paper {
+        position: absolute;
+        inset: 0;
+        background: var(--paper);
+      }
+      #grid {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 4320px;
+        height: 1080px;
+        background-image:
+          linear-gradient(var(--grid) 2px, transparent 2px),
+          linear-gradient(90deg, var(--grid) 2px, transparent 2px),
+          linear-gradient(rgba(191, 216, 210, 0.55) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(191, 216, 210, 0.55) 1px, transparent 1px);
+        background-size:
+          120px 120px,
+          120px 120px,
+          24px 24px,
+          24px 24px;
+      }
+      #fibre {
+        position: absolute;
+        inset: 0;
+        opacity: 0.015;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='480' height='480'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>");
+      }
+
+      /* Shared by every scene. */
+      .sheet {
+        position: absolute;
+        inset: 0;
+      }
+      .at {
+        position: absolute;
+        white-space: nowrap;
+      }
+      .display {
+        font-family: var(--display);
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        line-height: 1;
+      }
+      .row {
+        font-size: 96px;
+        line-height: 1.1;
+      }
+      .label {
+        font-size: 48px;
+        line-height: 1.1;
+      }
+      .quiet {
+        color: var(--muted);
+      }
+      .red {
+        color: var(--red);
+      }
+      .logo {
+        display: block;
+        height: 120px;
+        width: auto;
+        mix-blend-mode: multiply;
+      }
+      .pen {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: visible;
+      }
+      .trace {
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      /* Printed on cue: hidden until its stamp or keystroke. --spread is the 2 px ink spread of a stamp. */
+      .ink {
+        opacity: 0;
+        -webkit-text-stroke: var(--spread, 0px) currentColor;
+      }
+      .typed > span {
+        opacity: 0;
+      }
+
+      /* DuckDB: the bundled SVG is the disc with the duck cut out; inked graphite over a yellow disc it reads as the official mark. */
+      .duck {
+        position: relative;
+        width: 120px;
+        height: 120px;
+      }
+      .duck::before {
+        content: "";
+        position: absolute;
+        left: 16px;
+        top: 16px;
+        width: 88px;
+        height: 88px;
+        border-radius: 50%;
+        background: #fff000;
+      }
+      .duck img {
+        position: absolute;
+        inset: 0;
+        width: 120px;
+        height: 120px;
+        filter: brightness(0) saturate(100%) invert(13%) sepia(10%) saturate(1200%) hue-rotate(155deg);
+      }
+      .stack {
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-family: var(--font-display);
-      }
-      #title {
-        color: var(--ink);
-        font-size: 72px;
-        font-weight: 600;
-        letter-spacing: -0.03em;
+        gap: 36px;
       }
     </style>
   </head>
   <body>
     <div
-      id="root"
+      id="main"
       data-composition-id="main"
       data-start="0"
-      data-duration="10"
+      data-duration="30.5"
       data-width="1920"
       data-height="1080"
     >
-      <h1 id="title" class="clip" data-start="0" data-duration="10" data-track-index="0">Title</h1>
+      <div id="paper">
+        <div id="grid"></div>
+        <div id="fibre"></div>
+      </div>
+
+      <div id="s1" data-composition-id="s1" data-composition-src="compositions/s1.html" data-start="0" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s2" data-composition-id="s2" data-composition-src="compositions/s2.html" data-start="3" data-duration="3.5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s3" data-composition-id="s3" data-composition-src="compositions/s3.html" data-start="6.5" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s4" data-composition-id="s4" data-composition-src="compositions/s4.html" data-start="10.5" data-duration="3.5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s5" data-composition-id="s5" data-composition-src="compositions/s5.html" data-start="14" data-duration="3.5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s6" data-composition-id="s6" data-composition-src="compositions/s6.html" data-start="17.5" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s7" data-composition-id="s7" data-composition-src="compositions/s7.html" data-start="21.5" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s8" data-composition-id="s8" data-composition-src="compositions/s8.html" data-start="25.5" data-duration="2.5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s9" data-composition-id="s9" data-composition-src="compositions/s9.html" data-start="28" data-duration="2.5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- Sound: each hit is placed so its peak lands one frame after its picture
+           (peaks: typing onset 0.454 s trimmed by data-media-start, pop 0.120 s, click-soft 0.073 s,
+           whoosh-short 0.162 s, impact-bass-1 0.073 s).
+           Every effect plays at the LOOK volume (0.35) except the sheet-advance whooshes (0.2), so the one
+           impact stays the loudest moment. The sfx bus lifts the whole mix to about -16 LUFS and a limiter
+           keeps the true peak under -1 dBTP. -->
+      <hf-audio-group
+        id="sfx"
+        data-label="Sound effects"
+        data-volume="1"
+        data-fx-chain='{"version":1,"nodes":[{"type":"gain","id":"lift","label":"Mix to -16 LUFS","params":{"gain":6.3}},{"type":"limiter","id":"ceiling","label":"True-peak ceiling","params":{"limit":-2,"attack":1,"release":80,"level_out":0}}]}'
+      ></hf-audio-group>
+      <audio data-audio-group="sfx" id="sfx-type-1763" class="clip" src="assets/sfx/typing.mp3" data-start="0" data-media-start="0.42" data-duration="1" data-track-index="2" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-type-2025" class="clip" src="assets/sfx/typing.mp3" data-start="3.6" data-media-start="0.42" data-duration="1" data-track-index="2" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-type-question" class="clip" src="assets/sfx/typing.mp3" data-start="22.3" data-media-start="0.42" data-duration="0.8" data-track-index="2" data-volume="0.35"></audio>
+
+      <audio data-audio-group="sfx" id="sfx-pop-milan" class="clip" src="assets/sfx/pop.mp3" data-start="0.963" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-minus36" class="clip" src="assets/sfx/pop.mp3" data-start="1.363" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-2025" class="clip" src="assets/sfx/pop.mp3" data-start="3.413" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-central-park" class="clip" src="assets/sfx/pop.mp3" data-start="4.563" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-celsius" class="clip" src="assets/sfx/pop.mp3" data-start="4.863" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-duckdb" class="clip" src="assets/sfx/pop.mp3" data-start="8.213" data-duration="0.13" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-iceberg" class="clip" src="assets/sfx/pop.mp3" data-start="8.346" data-duration="0.13" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-rustfs" class="clip" src="assets/sfx/pop.mp3" data-start="8.479" data-duration="0.13" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-lakekeeper" class="clip" src="assets/sfx/pop.mp3" data-start="8.613" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-dbt" class="clip" src="assets/sfx/pop.mp3" data-start="10.513" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-silver" class="clip" src="assets/sfx/pop.mp3" data-start="11.713" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-gold" class="clip" src="assets/sfx/pop.mp3" data-start="14.013" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-gold-tmax" class="clip" src="assets/sfx/pop.mp3" data-start="15.313" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-trino" class="clip" src="assets/sfx/pop.mp3" data-start="19.313" data-duration="0.13" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-starrocks" class="clip" src="assets/sfx/pop.mp3" data-start="19.446" data-duration="0.13" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-duckdb-reader" class="clip" src="assets/sfx/pop.mp3" data-start="19.579" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-one-row" class="clip" src="assets/sfx/pop.mp3" data-start="25.563" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-four-engines" class="clip" src="assets/sfx/pop.mp3" data-start="25.863" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-same-answer" class="clip" src="assets/sfx/pop.mp3" data-start="26.163" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-pop-sleipnir" class="clip" src="assets/sfx/pop.mp3" data-start="28.013" data-duration="0.3" data-track-index="3" data-volume="0.35"></audio>
+
+      <audio data-audio-group="sfx" id="sfx-click-strike" class="clip" src="assets/sfx/click-soft.mp3" data-start="11.11" data-duration="0.25" data-track-index="4" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-click-writers" class="clip" src="assets/sfx/click-soft.mp3" data-start="17.86" data-duration="0.25" data-track-index="4" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-click-readers" class="clip" src="assets/sfx/click-soft.mp3" data-start="18.56" data-duration="0.25" data-track-index="4" data-volume="0.35"></audio>
+      <audio data-audio-group="sfx" id="sfx-click-cube" class="clip" src="assets/sfx/click-soft.mp3" data-start="21.5" data-duration="0.25" data-track-index="4" data-volume="0.35"></audio>
+
+      <audio data-audio-group="sfx" id="sfx-whoosh-1" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="2.69" data-duration="0.45" data-track-index="5" data-volume="0.2"></audio>
+      <audio data-audio-group="sfx" id="sfx-whoosh-2" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="6.19" data-duration="0.45" data-track-index="5" data-volume="0.2"></audio>
+      <audio data-audio-group="sfx" id="sfx-whoosh-3" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="10.19" data-duration="0.45" data-track-index="5" data-volume="0.2"></audio>
+      <audio data-audio-group="sfx" id="sfx-whoosh-4" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="13.69" data-duration="0.45" data-track-index="5" data-volume="0.2"></audio>
+      <audio data-audio-group="sfx" id="sfx-whoosh-5" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="17.19" data-duration="0.45" data-track-index="5" data-volume="0.2"></audio>
+      <audio data-audio-group="sfx" id="sfx-whoosh-6" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="21.19" data-duration="0.45" data-track-index="5" data-volume="0.2"></audio>
+      <audio data-audio-group="sfx" id="sfx-whoosh-7" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="25.19" data-duration="0.45" data-track-index="5" data-volume="0.2"></audio>
+      <audio data-audio-group="sfx" id="sfx-whoosh-8" class="clip" src="assets/sfx/whoosh-short.mp3" data-start="27.69" data-duration="0.45" data-track-index="5" data-volume="0.2"></audio>
+
+      <audio data-audio-group="sfx" id="sfx-impact-answer" class="clip" src="assets/sfx/impact-bass-1.mp3" data-start="23.36" data-duration="2.1" data-track-index="6" data-volume="0.35"></audio>
     </div>
     <script>
+      // The drum: the grid moves only when the paper moves. Each sheet advance (last 0.4 s of a shot)
+      // carries the grid one full sheet left, then it resets unseen (the grid repeats every 120 px).
       const tl = gsap.timeline({ paused: true });
-      // Example: tl.fromTo("#title", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out" }, 0);
+      const sheetEnds = [3, 6.5, 10.5, 14, 17.5, 21.5, 25.5, 28];
+      for (const end of sheetEnds) {
+        const from = end === 6.5 ? -360 : 0;
+        tl.fromTo("#grid", { x: from }, { x: from - 1920, duration: 0.4, ease: "power3.in", immediateRender: false }, end - 0.4);
+        tl.set("#grid", { x: 0 }, end);
+      }
+      // Shot 2: the drum runs from 1763 to 2025 under the pen at 120 px/s, linear.
+      tl.fromTo("#grid", { x: 0 }, { x: -360, duration: 3, ease: "none", immediateRender: false }, 3.1);
       window.__timelines["main"] = tl;
-      tl.seek(0);
     </script>
   </body>
 </html>

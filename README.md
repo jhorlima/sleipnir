@@ -5,7 +5,31 @@
 
 Sleipnir is a local, reproducible **lakehouse benchmark**. It ingests public CSV data into Apache Iceberg, models it in a medallion layout with dbt, serves it through a Cube semantic layer, and measures every step on several query engines under identical resource limits.
 
-**Status:** work in progress (phase 1, MVP lakehouse). Results are not published yet.
+**Status:** phase 2 (the benchmark) is done on a single laptop; the next round runs in the cloud with more workers. The full story is in the article ([`docs/blog/01-medium-local-benchmark.md`](docs/blog/01-medium-local-benchmark.md)), and every decision, failure and invalidated run is in the [lab notebook](docs/lab-notebook.md).
+
+## The films
+
+Three ~30 s films, rendered deterministically from HTML with [HyperFrames](https://github.com/heygen-com/hyperframes) (sources in [`media/`](media/)):
+
+| The race | One row, four engines | The night shift |
+|---|---|---|
+| [![The race](docs/assets/films/race-poster.png)](docs/assets/films/race.mp4) | [![One row, four engines](docs/assets/films/stack-poster.png)](docs/assets/films/stack.mp4) | [![The night shift](docs/assets/films/night-shift-poster.png)](docs/assets/films/night-shift.mp4) |
+| Four engines on the same chart paper, and the result more CPU didn't buy. | One real weather row, from Milan in 1763 to an answer in 16-34 ms. | What benchmarking on a laptop overnight actually looks like. |
+
+## Results at a glance
+
+Single node, Docker VM on a Mac, NOAA GHCN-Daily (up to 3.97 B rows). Read them as "this setup", not as a ranking.
+
+| | |
+|---|---|
+| Load 742 M rows (DuckDB) | 146 s |
+| Build from scratch at 3.97 B rows (Trino, profile L) | 9,351 s |
+| Whole-table query through Cube (Trino: M → L → L with object store at 2 CPU) | 32.4 → 65.3 → 24.6 s |
+| Cube Store pre-aggregations | 16-34 ms at every scale |
+| Sorting the fact table | half the size (0.73 → 0.38 GB) |
+| Postgres vs Parquet, same 44 M rows | 35× the disk |
+
+All numbers come from `results/*.parquet` (`make report`).
 
 ## What it measures
 

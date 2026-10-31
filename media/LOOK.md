@@ -24,7 +24,7 @@ Shared by every film and still in `media/`. The medium is the instrument that pr
 
 ## SOUND (effects only, no music)
 
-From `media/shared/sfx/` (Pixabay Content License, bundled with HyperFrames): `click-soft` pen down, `typing` / `key-press` typed rows, `pop` a stamp, `whoosh-short` the paper advancing, `error` / `glitch-3` a failure (film C only), `impact-bass-1` once per film on the payoff. Volume 0.35; hits land one frame after their picture. A silent copy of each film is rendered for places that autoplay muted.
+From `media/shared/sfx/` (Pixabay Content License, bundled with HyperFrames): `click-soft` pen down, `typing` / `key-press` typed rows, `pop` a stamp, `whoosh-short` the paper advancing, `error` / `glitch-3` a failure (film C only), `impact-bass-1` once per film on the payoff, the loudest hit. Hits land one frame after their picture; each film's mix is brought to about -16 LUFS with true peak ≤ -1 dBTP (measured with `npx hyperframes audio`, per-clip volumes in each film's `SPEC.md`). A silent copy of each film is rendered for places that autoplay muted.
 
 ## BANNED
 

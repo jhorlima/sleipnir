@@ -1,0 +1,49 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .s5-rule {
+      transform-origin: left center;
+    }
+  </style>
+  <div id="root" data-composition-id="s5" data-width="1920" data-height="1080">
+    <div id="s5-sheet" class="sheet">
+      <div id="s5-stage" class="at display ink" style="left: 120px; top: 110px; font-size: 160px">gold</div>
+      <div id="s5-table" class="at label ink" style="left: 124px; top: 290px; font-size: 56px">fct_weather_daily</div>
+      <div id="s5-head-station" class="at label quiet ink" style="left: 124px; top: 450px">station_id</div>
+      <div id="s5-head-date" class="at label quiet ink" style="left: 904px; top: 450px">date</div>
+      <div id="s5-head-tmax" class="at label quiet ink" style="left: 1464px; top: 450px">tmax</div>
+      <div id="s5-rule-top" class="at s5-rule" style="left: 120px; top: 530px; width: 1680px; height: 4px; background: var(--ink)"></div>
+      <div id="s5-station" class="at row ink" style="left: 120px; top: 600px; font-size: 104px">USW00094728</div>
+      <div id="s5-date" class="at row ink" style="left: 900px; top: 600px; font-size: 104px">2025-06-01</div>
+      <div id="s5-tmax" class="at display red ink" style="left: 1460px; top: 570px; font-size: 230px">18.9</div>
+      <div id="s5-rule-bottom" class="at s5-rule" style="left: 120px; top: 840px; width: 1680px; height: 2px; background: var(--faint)"></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+
+      function stamp(selector, at) {
+        tl.set(selector, { opacity: 1 }, at);
+        tl.fromTo(selector, { scale: 1.12, "--spread": "2px" }, { scale: 1, "--spread": "0px", duration: 0.2, ease: "power3.out", immediateRender: false }, at);
+      }
+
+      stamp("#s5-stage", 0.1);
+      stamp("#s5-table", 0.25);
+      tl.fromTo("#s5-rule-top", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "power2.inOut" }, 0.45);
+      stamp("#s5-head-station", 0.5);
+      stamp("#s5-head-date", 0.63);
+      stamp("#s5-head-tmax", 0.77);
+      stamp("#s5-station", 1.0);
+      stamp("#s5-date", 1.13);
+      tl.fromTo("#s5-rule-bottom", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "power2.inOut" }, 1.1);
+      stamp("#s5-tmax", 1.4);
+      tl.to("#s5-sheet", { x: -1920, duration: 0.4, ease: "power3.in" }, 3.1);
+
+      window.__timelines["s5"] = tl;
+    })();
+  </script>
+</template>
