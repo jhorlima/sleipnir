@@ -44,7 +44,7 @@ A few things I didn't know before starting:
 
 I loaded it at four scales. The names are a bit cryptic, so here's what they mean (and yes, `r2` *is* about Cloudflare R2):
 
-![Data scales](../assets/medium/tables/t01-the-data.png)
+https://datawrapper.dwcdn.net/n9qRl/3/
 
 *The four data scales: years covered, bronze rows and what each name means.*
 
@@ -61,7 +61,7 @@ For a second, more standard workload I also generated **TPC-H** at SF8 with Duck
 
 ## The stack
 
-![Stack](../assets/medium/tables/t02-the-stack.png)
+https://datawrapper.dwcdn.net/YKOkR/3/
 
 *The stack, layer by layer.*
 
@@ -84,7 +84,7 @@ A note on how this got built: most of the stack was written with Claude, as an A
 
 Everything ran on one laptop:
 
-![Test machine](../assets/medium/tables/t03-the-machine.png)
+https://datawrapper.dwcdn.net/GrhBf/3/
 
 *The machine and Docker VM settings used for the runs.*
 
@@ -121,7 +121,7 @@ Unless a table says otherwise, times are the median of 5 warm runs, and profile 
 
 ### Loading (DuckDB)
 
-![Loading time by scale](../assets/medium/tables/t04-loading-duckdb.png)
+https://datawrapper.dwcdn.net/TMwDy/3/
 
 *Loading with DuckDB: batches, time and rows per second for each scale.*
 
@@ -141,7 +141,7 @@ The full history is slower per row: the early centuries are thousands of tiny ba
 
 The full numbers, including Postgres and the failed runs:
 
-![Build from scratch](../assets/medium/tables/t05-transforming-build-from-scratch-dbt.png)
+https://datawrapper.dwcdn.net/WAYVy/3/
 
 *Full results: build-from-scratch time per engine and scale, including Postgres and the failed runs.*
 
@@ -159,7 +159,7 @@ The full numbers, including Postgres and the failed runs:
 
 ### Transforming: reprocess the latest batch
 
-![Reprocess the latest batch](../assets/medium/tables/t06-transforming-reprocess-the-latest-batch.png)
+https://datawrapper.dwcdn.net/bkhwO/3/
 
 *Reprocessing the latest batch: time per incremental strategy, Trino and Spark.*
 
@@ -175,7 +175,7 @@ Reprocessing only touches one window, so it barely grows with the table. Spark's
 
 ### Reading: the questions
 
-![The ten benchmark questions](../assets/medium/tables/t07-reading-the-questions.png)
+https://datawrapper.dwcdn.net/Iuzcs/3/
 
 *The ten benchmark questions, Q1 to Q10.*
 
@@ -196,7 +196,7 @@ Spark doesn't appear in the read tables: in this benchmark it only writes. The r
 
 ### Reading: direct SQL (warm, ms)
 
-![Direct SQL at r2](../assets/medium/tables/t08-reading-direct-sql-warm-ms.png)
+https://datawrapper.dwcdn.net/afeYZ/3/
 
 *Direct SQL, warm median in ms, at the r2 scale on profile M.*
 
@@ -206,7 +206,7 @@ Spark doesn't appear in the read tables: in this benchmark it only writes. The r
 | StarRocks 4.1 | 546 | 152 | 137 | 109 | 249 | 45 |
 | DuckDB 1.5 (in-process) | 1,040 | 157 | 74 | 50 | 434 | 28 |
 
-![Direct SQL at local](../assets/medium/tables/t09-reading-direct-sql-warm-ms.png)
+https://datawrapper.dwcdn.net/Lr2uc/3/
 
 *Direct SQL, warm median in ms, at the local scale on profile L.*
 
@@ -220,7 +220,7 @@ Only Q1 (and the rolling window in Q5) grows with the data. The filtered questio
 
 ### Reading: through Cube (warm, ms)
 
-![Through Cube at r2](../assets/medium/tables/t10-reading-through-cube-warm-ms.png)
+https://datawrapper.dwcdn.net/uQ3jY/3/
 
 *Through Cube, warm median in ms, at the r2 scale on profile M.*
 
@@ -230,7 +230,7 @@ Only Q1 (and the rolling window in Q5) grows with the data. The filtered questio
 | StarRocks | 9,695 | 724 | 155 | 127 | failed ⁶ | 73 | 306 | 4,682 | 399 | 1,438 |
 | DuckDB inside Cube | 8,823 | 705 | 128 | 550 | 464 | 444 | 234 | 11,073 | 248 | 2,096 |
 
-![Through Cube at local](../assets/medium/tables/t11-reading-through-cube-warm-ms.png)
+https://datawrapper.dwcdn.net/07ZzD/3/
 
 *Through Cube, warm median in ms, at the local scale on profile L.*
 
@@ -247,7 +247,7 @@ Through Cube, Trino pays a floor of ~3–4 s per question on this setup, which h
 
 ### TPC-H SF8, 22 queries (`r2` scale, profile M)
 
-![TPC-H SF8](../assets/medium/tables/t12-tpc-h-sf8-22-queries-r2-scale-profile-m.png)
+https://datawrapper.dwcdn.net/DrF7P/3/
 
 *TPC-H SF8: warm and cold geometric mean over the 22 queries, per engine.*
 
@@ -261,7 +261,7 @@ Derived from TPC-H, not comparable to published TPC-H results.
 
 ### One year of data, with Postgres (`small`, 44 M rows, profile M)
 
-![Direct SQL with Postgres](../assets/medium/tables/t13-one-year-of-data-with-postgres-small-44-m-rows-p.png)
+https://datawrapper.dwcdn.net/F80qy/3/
 
 *Direct SQL at the small scale, warm median in ms, with Postgres added.*
 
@@ -272,7 +272,7 @@ Derived from TPC-H, not comparable to published TPC-H results.
 | Trino | 161 | 511 | 291 | 186 | 191 | 119 |
 | Postgres 18 | 589 | 1,016 | 451 | 258 | 389 | 137 |
 
-![Storage of one year](../assets/medium/tables/t14-one-year-of-data-with-postgres-small-44-m-rows-p.png)
+https://datawrapper.dwcdn.net/j7RzO/3/
 
 *Storage of that year: Iceberg/Parquet against the Postgres row store.*
 
@@ -289,7 +289,7 @@ Derived from TPC-H, not comparable to published TPC-H results.
 
 The per-question times and the build times:
 
-![Acceleration](../assets/medium/tables/t15-acceleration-r2-profile-m-warm-ms-in-parentheses.png)
+https://datawrapper.dwcdn.net/HEje3/3/
 
 *Acceleration options, warm ms, with the same question without it in parentheses and the refresh or build time.*
 
@@ -316,7 +316,7 @@ Every layout variant I tried, as a table:
 
 Each variant is a full copy of the 190 M-row fact table, written by Trino (z-order by Spark), read with the same direct-SQL questions (warm, ms):
 
-![Layout variants](../assets/medium/tables/t16-table-layout-and-maintenance-b6-trino-r2-profile.png)
+https://datawrapper.dwcdn.net/ier0w/3/
 
 *Table layout variants: size and warm read times for Q1, Q2 and Q6.*
 
@@ -337,7 +337,7 @@ Each variant is a full copy of the 190 M-row fact table, written by Trino (z-ord
 
 **Compression and file size.** Same table, same monthly partition, unsorted, only one knob changed at a time:
 
-![Compression and file size](../assets/medium/tables/t17-table-layout-and-maintenance-b6-trino-r2-profile.png)
+https://datawrapper.dwcdn.net/j7PDP/3/
 
 *Compression and target file size: size, write time and read times.*
 
@@ -357,7 +357,7 @@ Each variant is a full copy of the 190 M-row fact table, written by Trino (z-ord
 
 Table maintenance (compaction, manifests, expiring snapshots, orphan files) ran as its own measured step on the writers:
 
-![Maintenance](../assets/medium/tables/t18-table-layout-and-maintenance-b6-trino-r2-profile.png)
+https://datawrapper.dwcdn.net/kQtCV/3/
 
 *Table maintenance time per engine.*
 
@@ -379,7 +379,7 @@ I expected profile L (twice the CPU) to be faster everywhere. For DuckDB and Sta
 
 Q1 (whole-table yearly count) at 3.97 B rows, warm:
 
-![M to L, Q1](../assets/medium/tables/t19-the-m-l-surprise.png)
+https://datawrapper.dwcdn.net/1npII/3/
 
 *Q1 at 3.97 B rows by profile: M, L, and L with the object store at 2 CPUs.*
 
@@ -392,7 +392,7 @@ Q1 (whole-table yearly count) at 3.97 B rows, warm:
 | StarRocks, through Cube | 70.5 s | 44.5 s | 40.8 s |
 | DuckDB inside Cube | 60.5 s | 37.4 s | 30.6 s |
 
-![M to L, build](../assets/medium/tables/t20-the-m-l-surprise.png)
+https://datawrapper.dwcdn.net/l3pcb/3/
 
 *Trino build from scratch at 3.97 B rows by profile.*
 
@@ -418,7 +418,7 @@ The same numbers as a table:
 
 About three weeks from the first commit to the last measurement. The spec and the first working lakehouse took two days (October 9–10), with the AI assistant doing most of the scaffolding. The benchmark itself ran from **October 11 to October 28**:
 
-![Effort](../assets/medium/tables/t21-how-long-it-took.png)
+https://datawrapper.dwcdn.net/Epe4f/3/
 
 *How long it took: days, runs and hours of measurements.*
 
