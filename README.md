@@ -9,12 +9,25 @@ Sleipnir is a local, reproducible **lakehouse benchmark**. It ingests public CSV
 
 ## The films
 
-Three ~30 s films, rendered deterministically from HTML with [HyperFrames](https://github.com/heygen-com/hyperframes) (sources in [`media/`](media/)):
+Three ~30 s films, rendered deterministically from HTML with [HyperFrames](https://github.com/heygen-com/hyperframes) (sources in [`media/`](media/); the files are also in [`docs/assets/films/`](docs/assets/films/), with silent copies).
 
-| The race | One row, four engines | The night shift |
-|---|---|---|
-| [![The race](docs/assets/films/race-poster.png)](docs/assets/films/race.mp4) | [![One row, four engines](docs/assets/films/stack-poster.png)](docs/assets/films/stack.mp4) | [![The night shift](docs/assets/films/night-shift-poster.png)](docs/assets/films/night-shift.mp4) |
-| Four engines on the same chart paper, and the result more CPU didn't buy. | One real weather row, from Milan in 1763 to an answer in 16-34 ms. | What benchmarking on a laptop overnight actually looks like. |
+### The race
+
+Four engines on the same chart paper, and the result more CPU didn't buy.
+
+https://github.com/user-attachments/assets/2b197800-630f-4a67-a09e-dc6fdab675d8
+
+### One row, four engines
+
+One real weather row, from Milan in 1763 to an answer in 16-34 ms.
+
+https://github.com/user-attachments/assets/0dc92685-9947-4a48-9669-3a1c6755d272
+
+### The night shift
+
+What benchmarking on a laptop overnight actually looks like.
+
+https://github.com/user-attachments/assets/7d0cc641-3cb4-4b57-a3ac-c7cef7042200
 
 ## Results at a glance
 
