@@ -24,8 +24,10 @@ To be honest, a laptop isn't the fairest lab, so the next round goes to the clou
 
 Claude built the stack with me in days. Catching the wrong numbers was still on me :)
 
-The whole story, with the tables and everything that broke: https://medium.com/@jhorlima
+The whole story, with the tables and everything that broke: https://jhorlima.medium.com/four-query-engines-four-billion-weather-rows-one-laptop-98b440d2f4dc
 Code and results: https://github.com/jhorlima/sleipnir
+
+#DataEngineering #DuckDB #ApacheIceberg #Trino #ApacheSpark
 
 ## LinkedIn (Português)
 
@@ -49,8 +51,10 @@ Sendo honesto, um notebook não é o laboratório mais justo, então a próxima 
 
 O Claude montou a stack comigo em dias. Pegar os números errados continuou sendo comigo :)
 
-A história completa, com as tabelas e tudo que quebrou: https://medium.com/@jhorlima
+A história completa, com as tabelas e tudo que quebrou: https://jhorlima.medium.com/four-query-engines-four-billion-weather-rows-one-laptop-98b440d2f4dc
 Código e resultados: https://github.com/jhorlima/sleipnir
+
+#EngenhariaDeDados #DataEngineering #DuckDB #ApacheIceberg #Lakehouse
 
 ## Cover image prompt
 
